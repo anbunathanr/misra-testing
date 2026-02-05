@@ -1,7 +1,16 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { JWTService } from '../../services/auth/jwt-service';
 import { UserService } from '../../services/user/user-service';
-import { RefreshRequest, RefreshResponse } from '@misra-platform/shared';
+
+// Local type definitions (avoiding shared package import issues)
+interface RefreshRequest {
+  refreshToken: string;
+}
+
+interface RefreshResponse {
+  accessToken: string;
+  expiresIn: number;
+}
 
 const jwtService = new JWTService();
 const userService = new UserService();

@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
@@ -27,6 +28,7 @@ export class MisraPlatformStack extends cdk.Stack {
       bucketName: `misra-platform-frontend-${this.account}`,
       websiteIndexDocument: 'index.html',
       websiteErrorDocument: 'error.html',
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
       publicReadAccess: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
@@ -43,7 +45,7 @@ export class MisraPlatformStack extends cdk.Stack {
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
       tableName: 'misra-platform-users',
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.ON_DEMAND,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
@@ -64,7 +66,7 @@ export class MisraPlatformStack extends cdk.Stack {
       tableName: 'misra-platform-projects',
       partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'organizationId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.ON_DEMAND,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
@@ -80,7 +82,7 @@ export class MisraPlatformStack extends cdk.Stack {
       tableName: 'misra-platform-analyses',
       partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.ON_DEMAND,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
@@ -102,7 +104,7 @@ export class MisraPlatformStack extends cdk.Stack {
       tableName: 'misra-platform-test-runs',
       partitionKey: { name: 'testRunId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.ON_DEMAND,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
@@ -129,21 +131,12 @@ export class MisraPlatformStack extends cdk.Stack {
       },
     });
 
-    // Lambda Layer for shared dependencies
-    const sharedLayer = new lambda.LayerVersion(this, 'SharedLayer', {
-      layerVersionName: 'misra-platform-shared',
-      code: lambda.Code.fromAsset('src/layers/shared'),
-      compatibleRuntimes: [lambda.Runtime.NODEJS_18_X],
-      description: 'Shared utilities and dependencies',
-    });
-
     // Authentication Lambda Functions
     const loginFunction = new lambda.Function(this, 'LoginFunction', {
       functionName: 'misra-platform-login',
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'login.handler',
-      code: lambda.Code.fromAsset('src/functions/auth'),
-      layers: [sharedLayer],
+      handler: 'functions/auth/login.handler',
+      code: lambda.Code.fromAsset('src'),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -156,9 +149,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
       functionName: 'misra-platform-refresh',
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'refresh.handler',
-      code: lambda.Code.fromAsset('src/functions/auth'),
-      layers: [sharedLayer],
+      handler: 'functions/auth/refresh.handler',
+      code: lambda.Code.fromAsset('src'),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -166,11 +158,48 @@ export class MisraPlatformStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
     });
 
+    // File Upload Lambda Functions
+    const fileUploadFunction = new lambda.Function(this, 'FileUploadFunction', {
+      functionName: 'misra-platform-file-upload',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'functions/file/upload.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const uploadCompleteFunction = new lambda.Function(this, 'UploadCompleteFunction', {
+      functionName: 'misra-platform-upload-complete',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'functions/file/upload-complete.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        PROCESSING_QUEUE_URL: processingQueue.queueUrl,
+      },
+      timeout: cdk.Duration.minutes(5),
+    });
+
     // Grant permissions
     usersTable.grantReadWriteData(loginFunction);
     usersTable.grantReadWriteData(refreshFunction);
     jwtSecret.grantRead(loginFunction);
     jwtSecret.grantRead(refreshFunction);
+    jwtSecret.grantRead(fileUploadFunction);
+    
+    // File upload permissions
+    fileStorageBucket.grantReadWrite(fileUploadFunction);
+    fileStorageBucket.grantRead(uploadCompleteFunction);
+    processingQueue.grantSendMessages(uploadCompleteFunction);
+
+    // S3 event notification for upload completion
+    fileStorageBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(uploadCompleteFunction),
+      { prefix: 'uploads/' }
+    );
 
     // API Gateway
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
@@ -200,6 +229,13 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/auth/refresh',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('RefreshIntegration', refreshFunction),
+    });
+
+    // Add file upload routes
+    api.addRoutes({
+      path: '/files/upload',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction),
     });
 
     // Output important values

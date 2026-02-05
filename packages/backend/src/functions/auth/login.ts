@@ -2,7 +2,19 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { JWTService } from '../../services/auth/jwt-service';
 import { UserService } from '../../services/user/user-service';
 import { N8nService } from '../../services/auth/n8n-service';
-import { LoginRequest, LoginResponse } from '@misra-platform/shared';
+
+// Local type definitions (avoiding shared package import issues)
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: any;
+  expiresIn: number;
+}
 
 const jwtService = new JWTService();
 const userService = new UserService();
