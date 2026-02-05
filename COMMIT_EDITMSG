@@ -1,0 +1,3 @@
+Create KIRO_MISRA_AI_SaaS_Specification.docx
+
+Fixes a regression bug where users couldn't log in due to updated authentication library. Ensures login flow works correctly.

@@ -1,0 +1,26 @@
+{
+  "name": "misra-web-testing-platform",
+  "version": "1.0.0",
+  "description": "AI-powered SaaS platform for MISRA compliance analysis and UI regression testing",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "dev": "npm run dev --workspaces",
+    "deploy": "npm run deploy --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
