@@ -1,13 +1,7 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
-
-// Mock AWS SDK for development
-declare const process: {
-  env: {
-    [key: string]: string | undefined;
-  };
-};
+import * as crypto from 'crypto';
 
 export interface FileUploadRequest {
   fileName: string;
@@ -43,16 +37,12 @@ export class FileUploadService {
   ];
 
   constructor() {
-    // Mock S3 client for development
-    this.s3Client = {} as S3Client;
     this.bucketName = process.env.FILE_STORAGE_BUCKET_NAME || 'misra-platform-files-dev';
     
-    // In production, initialize real S3 client
-    if (process.env.NODE_ENV === 'production') {
-      this.s3Client = new S3Client({
-        region: process.env.AWS_REGION || 'us-east-1',
-      });
-    }
+    // Initialize S3 client
+    this.s3Client = new S3Client({
+      region: process.env.AWS_REGION || 'us-east-1',
+    });
   }
 
   async generatePresignedUploadUrl(request: FileUploadRequest): Promise<FileUploadResponse> {
@@ -66,32 +56,28 @@ export class FileUploadService {
     const fileId = uuidv4();
     const timestamp = Date.now();
     const sanitizedFileName = this.sanitizeFileName(request.fileName);
+    const fileHash = this.generateFileHash(request.fileName, request.userId, timestamp);
     const s3Key = `uploads/${request.organizationId}/${request.userId}/${timestamp}-${fileId}-${sanitizedFileName}`;
 
-    // For development, return mock URLs
-    if (process.env.NODE_ENV !== 'production') {
-      return {
-        fileId,
-        uploadUrl: `https://mock-s3-upload-url.com/${s3Key}`,
-        downloadUrl: `https://mock-s3-download-url.com/${s3Key}`,
-        expiresIn: 3600, // 1 hour
-      };
-    }
-
     try {
-      // Generate presigned URL for upload
+      // Generate presigned URL for upload with security constraints
       const putCommand = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
         ContentType: request.contentType,
         ContentLength: request.fileSize,
+        ServerSideEncryption: 'AES256',
         Metadata: {
           'original-filename': request.fileName,
           'user-id': request.userId,
           'organization-id': request.organizationId,
           'file-id': fileId,
           'upload-timestamp': timestamp.toString(),
+          'file-hash': fileHash,
+          'file-type': validation.fileType
         },
+        // Security: Ensure uploaded file matches expected content type
+        ContentDisposition: `attachment; filename="${sanitizedFileName}"`,
       });
 
       const uploadUrl = await getSignedUrl(this.s3Client, putCommand, {
@@ -102,6 +88,7 @@ export class FileUploadService {
       const getCommand = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
+        ResponseContentDisposition: `attachment; filename="${sanitizedFileName}"`,
       });
 
       const downloadUrl = await getSignedUrl(this.s3Client, getCommand, {
@@ -206,5 +193,61 @@ export class FileUploadService {
       uploadedAt: new Date().toISOString(),
       status: 'uploaded',
     };
+  }
+
+  /**
+   * Generate a hash for file tracking and integrity
+   */
+  private generateFileHash(fileName: string, userId: string, timestamp: number): string {
+    const data = `${fileName}-${userId}-${timestamp}`;
+    return crypto.createHash('sha256').update(data).digest('hex').substring(0, 16);
+  }
+
+  /**
+   * Verify file exists in S3
+   */
+  async verifyFileExists(s3Key: string): Promise<boolean> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+      });
+      await this.s3Client.send(command);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get file size limit based on file type
+   */
+  getMaxFileSizeForType(fileType: string): number {
+    // Different limits for different file types
+    const limits: Record<string, number> = {
+      'C': 10 * 1024 * 1024,      // 10MB for C files
+      'CPP': 10 * 1024 * 1024,    // 10MB for C++ files
+      'HEADER': 5 * 1024 * 1024,  // 5MB for header files
+    };
+    return limits[fileType] || this.maxFileSize;
+  }
+
+  /**
+   * Check if file extension matches content type
+   */
+  private validateContentTypeMatch(fileName: string, contentType: string): boolean {
+    const extension = this.getFileExtension(fileName).toLowerCase();
+    const validMappings: Record<string, string[]> = {
+      '.c': ['text/plain', 'text/x-c', 'application/octet-stream'],
+      '.cpp': ['text/plain', 'text/x-c++', 'application/octet-stream'],
+      '.cc': ['text/plain', 'text/x-c++', 'application/octet-stream'],
+      '.cxx': ['text/plain', 'text/x-c++', 'application/octet-stream'],
+      '.h': ['text/plain', 'text/x-c', 'application/octet-stream'],
+      '.hpp': ['text/plain', 'text/x-c++', 'application/octet-stream'],
+      '.hxx': ['text/plain', 'text/x-c++', 'application/octet-stream'],
+    };
+
+    const validTypes = validMappings[extension];
+    return validTypes ? validTypes.includes(contentType) : false;
   }
 }
