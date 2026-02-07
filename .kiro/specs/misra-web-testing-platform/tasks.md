@@ -37,14 +37,14 @@ This implementation plan breaks down the MISRA Web Testing Platform into discret
     - **Property 5: Role-based access control is consistently enforced**
     - **Validates: Requirements 1.2, 1.5**
 
-- [ ] 3. Create file upload and storage system
+- [-] 3. Create file upload and storage system
   - [ ] 3.1 Implement S3 file upload service
     - Create presigned URL generation for secure uploads
     - Implement file validation and sanitization
     - Set up S3 bucket with proper security policies and encryption
     - _Requirements: 2.1, 2.2, 9.1_
 
-  - [ ] 3.2 Create file metadata management
+  - [x] 3.2 Create file metadata management
     - Implement unique file identifier generation
     - Create DynamoDB schema for file metadata storage
     - Set up file format validation for C, C++, and header files

@@ -1,0 +1,84 @@
+/**
+ * AWS CDK infrastructure definition for File Metadata DynamoDB table
+ */
+
+import { Construct } from 'constructs'
+import { Table, AttributeType, BillingMode, ProjectionType } from 'aws-cdk-lib/aws-dynamodb'
+import { RemovalPolicy } from 'aws-cdk-lib'
+import { FILE_METADATA_TABLE_CONFIG } from '../config/dynamodb-config'
+
+export class FileMetadataTable extends Construct {
+  public readonly table: Table
+
+  constructor(scope: Construct, id: string, props?: { environment?: string }) {
+    super(scope, id)
+
+    const environment = props?.environment || 'dev'
+    const tableName = `${FILE_METADATA_TABLE_CONFIG.tableName}-${environment}`
+
+    this.table = new Table(this, 'FileMetadataTable', {
+      tableName,
+      partitionKey: {
+        name: 'file_id',
+        type: AttributeType.STRING
+      },
+      billingMode: BillingMode.ON_DEMAND,
+      removalPolicy: environment === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      pointInTimeRecovery: environment === 'prod',
+      
+      globalSecondaryIndexes: [
+        {
+          indexName: 'UserIndex',
+          partitionKey: {
+            name: 'user_id',
+            type: AttributeType.STRING
+          },
+          sortKey: {
+            name: 'upload_timestamp',
+            type: AttributeType.NUMBER
+          },
+          projectionType: ProjectionType.ALL
+        },
+        {
+          indexName: 'StatusIndex',
+          partitionKey: {
+            name: 'analysis_status',
+            type: AttributeType.STRING
+          },
+          sortKey: {
+            name: 'upload_timestamp',
+            type: AttributeType.NUMBER
+          },
+          projectionType: ProjectionType.ALL
+        },
+        {
+          indexName: 'UserStatusIndex',
+          partitionKey: {
+            name: 'user_id',
+            type: AttributeType.STRING
+          },
+          sortKey: {
+            name: 'analysis_status',
+            type: AttributeType.STRING
+          },
+          projectionType: ProjectionType.ALL
+        }
+      ]
+    })
+
+    this.table.node.addMetadata('Purpose', 'File metadata storage for MISRA testing')
+    this.table.node.addMetadata('Environment', environment)
+  }
+
+  public grantReadData(grantee: any) {
+    return this.table.grantReadData(grantee)
+  }
+
+  public grantWriteData(grantee: any) {
+    return this.table.grantWriteData(grantee)
+  }
+
+  public grantFullAccess(grantee: any) {
+    return this.table.grantFullAccess(grantee)
+  }
+}
