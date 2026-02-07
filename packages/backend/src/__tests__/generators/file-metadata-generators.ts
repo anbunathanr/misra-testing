@@ -23,7 +23,7 @@ export const analysisStatusGenerator = (): fc.Arbitrary<AnalysisStatus> =>
 
 export const filenameGenerator = (): fc.Arbitrary<string> =>
   fc.tuple(
-    fc.string({ minLength: 1, maxLength: 50, unit: fc.char().filter(c => /[a-zA-Z0-9_-]/.test(c)) }),
+    fc.stringMatching(/^[a-zA-Z0-9_-]{1,50}$/),
     fileTypeGenerator()
   ).map(([name, type]) => `${name}.${type}`)
 
@@ -37,7 +37,7 @@ export const timestampGenerator = (): fc.Arbitrary<number> => {
 }
 
 export const userIdGenerator = (): fc.Arbitrary<string> =>
-  fc.string({ minLength: 8, maxLength: 32, unit: fc.char().filter(c => /[a-zA-Z0-9]/.test(c)) })
+  fc.stringMatching(/^[a-zA-Z0-9]{8,32}$/)
 
 export const s3KeyGenerator = (): fc.Arbitrary<string> =>
   fc.tuple(

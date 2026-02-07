@@ -3,6 +3,8 @@
  * Sets up global test environment and utilities
  */
 
+import '@jest/globals'
+
 process.env.NODE_ENV = 'test'
 process.env.AWS_REGION = 'us-east-1'
 process.env.DYNAMODB_TABLE_NAME = 'FileMetadata-test'
