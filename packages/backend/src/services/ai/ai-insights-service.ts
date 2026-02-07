@@ -14,7 +14,8 @@ import {
   RecommendationAction,
   InsightGenerationRequest,
   InsightGenerationResponse,
-  DataPoint
+  DataPoint,
+  UserFeedback
 } from '../../types/ai-insights'
 import { AnalysisResultsService } from '../analysis-results-service'
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client'
@@ -224,6 +225,52 @@ export class AIInsightsService {
       })
     }
 
+    // Critical violations trend
+    const criticalDataPoints: DataPoint[] = sortedAnalyses.map(a => ({
+      timestamp: a.timestamp,
+      value: a.violations?.filter((v: any) => v.severity === 'required').length || 0
+    }))
+
+    if (criticalDataPoints.length >= 2) {
+      const firstValue = criticalDataPoints[0].value
+      const lastValue = criticalDataPoints[criticalDataPoints.length - 1].value
+      const changePercentage = firstValue > 0 
+        ? ((lastValue - firstValue) / firstValue) * 100 
+        : 0
+
+      trends.push({
+        trend_id: uuidv4(),
+        metric: 'critical_violations',
+        direction: changePercentage > 5 ? 'up' : changePercentage < -5 ? 'down' : 'stable',
+        change_percentage: changePercentage,
+        time_period_days: timeRangeDays,
+        data_points: criticalDataPoints
+      })
+    }
+
+    // Code quality score trend (inverse of violations)
+    const qualityDataPoints: DataPoint[] = sortedAnalyses.map(a => ({
+      timestamp: a.timestamp,
+      value: Math.max(0, 100 - (a.violations_count || 0))
+    }))
+
+    if (qualityDataPoints.length >= 2) {
+      const firstValue = qualityDataPoints[0].value
+      const lastValue = qualityDataPoints[qualityDataPoints.length - 1].value
+      const changePercentage = firstValue > 0 
+        ? ((lastValue - firstValue) / firstValue) * 100 
+        : 0
+
+      trends.push({
+        trend_id: uuidv4(),
+        metric: 'quality_score',
+        direction: changePercentage > 5 ? 'up' : changePercentage < -5 ? 'down' : 'stable',
+        change_percentage: changePercentage,
+        time_period_days: timeRangeDays,
+        data_points: qualityDataPoints
+      })
+    }
+
     return trends
   }
 
@@ -257,7 +304,7 @@ export class AIInsightsService {
 
     // Recommendations based on trends
     trends.forEach(trend => {
-      if (trend.direction === 'up' && trend.change_percentage > 20) {
+      if (trend.metric === 'violation_count' && trend.direction === 'up' && trend.change_percentage > 20) {
         recommendations.push({
           action_id: uuidv4(),
           title: 'Violation Count Increasing',
@@ -269,7 +316,7 @@ export class AIInsightsService {
             'https://www.misra.org.uk/Publications/tabid/57/Default.aspx'
           ]
         })
-      } else if (trend.direction === 'down' && trend.change_percentage < -20) {
+      } else if (trend.metric === 'violation_count' && trend.direction === 'down' && trend.change_percentage < -20) {
         recommendations.push({
           action_id: uuidv4(),
           title: 'Great Progress on Code Quality',
@@ -280,8 +327,148 @@ export class AIInsightsService {
           resources: []
         })
       }
+
+      // Critical violations trend
+      if (trend.metric === 'critical_violations' && trend.direction === 'up') {
+        recommendations.push({
+          action_id: uuidv4(),
+          title: 'Critical Violations Increasing',
+          description: `Critical (required) violations have increased by ${Math.abs(trend.change_percentage).toFixed(1)}%. These represent mandatory compliance rules.`,
+          priority: 1,
+          estimated_impact: 'high',
+          effort_level: 'high',
+          resources: [
+            'https://misra.org.uk/misra-c/',
+            'https://www.perforce.com/resources/qac/misra-c-cpp'
+          ]
+        })
+      }
+
+      // Quality score improvements
+      if (trend.metric === 'quality_score' && trend.direction === 'up' && trend.change_percentage > 10) {
+        recommendations.push({
+          action_id: uuidv4(),
+          title: 'Code Quality Improving',
+          description: `Your code quality score has improved by ${trend.change_percentage.toFixed(1)}%. Continue your current practices.`,
+          priority: 4,
+          estimated_impact: 'medium',
+          effort_level: 'low',
+          resources: []
+        })
+      }
     })
 
+    // Optimization suggestions based on analysis data
+    recommendations.push(...this.generateOptimizationSuggestions(analyses, patterns, trends))
+
+    return recommendations
+  }
+
+  /**
+   * Generate optimization suggestions based on analysis patterns
+   */
+  private generateOptimizationSuggestions(
+    analyses: any[],
+    patterns: PatternDetection[],
+    trends: TrendAnalysis[]
+  ): RecommendationAction[] {
+    const suggestions: RecommendationAction[] = []
+
+    // Suggest automated tooling if many violations
+    const avgViolations = analyses.reduce((sum, a) => sum + (a.violations_count || 0), 0) / analyses.length
+    if (avgViolations > 30) {
+      suggestions.push({
+        action_id: uuidv4(),
+        title: 'Implement Automated Code Formatting',
+        description: 'With an average of ' + avgViolations.toFixed(1) + ' violations per file, automated formatting tools can help reduce common issues.',
+        priority: 2,
+        estimated_impact: 'high',
+        effort_level: 'low',
+        resources: [
+          'https://clang.llvm.org/docs/ClangFormat.html',
+          'https://github.com/uncrustify/uncrustify'
+        ]
+      })
+    }
+
+    // Suggest code review process if degrading patterns
+    const degradingPatterns = patterns.filter(p => p.severity_trend === 'degrading')
+    if (degradingPatterns.length > 0) {
+      suggestions.push({
+        action_id: uuidv4(),
+        title: 'Strengthen Code Review Process',
+        description: `${degradingPatterns.length} violation patterns are degrading. Enhanced code reviews can catch these issues earlier.`,
+        priority: 2,
+        estimated_impact: 'high',
+        effort_level: 'medium',
+        resources: [
+          'https://google.github.io/eng-practices/review/',
+          'https://www.perforce.com/blog/qac/9-best-practices-for-code-review'
+        ]
+      })
+    }
+
+    // Suggest training if consistent patterns
+    const frequentPatterns = patterns.filter(p => p.frequency >= 10)
+    if (frequentPatterns.length > 0) {
+      suggestions.push({
+        action_id: uuidv4(),
+        title: 'Team Training on Common Violations',
+        description: `${frequentPatterns.length} violation patterns occur frequently. Team training can address these systematically.`,
+        priority: 3,
+        estimated_impact: 'medium',
+        effort_level: 'medium',
+        resources: [
+          'https://www.misra.org.uk/Training/tabid/171/Default.aspx'
+        ]
+      })
+    }
+
+    // Suggest refactoring if quality declining
+    const qualityTrend = trends.find(t => t.metric === 'quality_score')
+    if (qualityTrend && qualityTrend.direction === 'down' && qualityTrend.change_percentage < -15) {
+      suggestions.push({
+        action_id: uuidv4(),
+        title: 'Consider Code Refactoring',
+        description: 'Code quality has declined significantly. Refactoring problematic areas can improve maintainability.',
+        priority: 2,
+        estimated_impact: 'high',
+        effort_level: 'high',
+        resources: [
+          'https://refactoring.guru/',
+          'https://www.amazon.com/Refactoring-Improving-Design-Existing-Code/dp/0201485672'
+        ]
+      })
+    }
+
+    return suggestions
+  }
+
+  /**
+   * Store user feedback for learning
+   */
+  async storeFeedback(feedback: UserFeedback): Promise<void> {
+    // Store feedback in DynamoDB for future learning
+    // This would be implemented with a feedback table
+    console.log('Storing user feedback:', feedback)
+    // TODO: Implement feedback storage when feedback table is created
+  }
+
+  /**
+   * Apply user feedback to improve recommendations
+   */
+  private applyUserFeedback(
+    recommendations: RecommendationAction[],
+    userId: string
+  ): RecommendationAction[] {
+    // In a full implementation, this would:
+    // 1. Fetch historical feedback for this user
+    // 2. Adjust recommendation priorities based on what was helpful
+    // 3. Filter out recommendation types that were consistently unhelpful
+    // 4. Personalize recommendations based on user preferences
+    
+    // For now, return recommendations as-is
+    // TODO: Implement feedback-based learning when feedback data is available
     return recommendations
   }
 

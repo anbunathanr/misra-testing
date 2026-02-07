@@ -317,6 +317,21 @@ export class MisraPlatformStack extends cdk.Stack {
     analysisResultsTable.grantReadData(aiInsightsFunction);
     jwtSecret.grantRead(aiInsightsFunction);
 
+    // AI Feedback Lambda Function
+    const aiFeedbackFunction = new lambda.Function(this, 'AIFeedbackFunction', {
+      functionName: 'misra-platform-ai-feedback',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai/submit-feedback.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: this.stackName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant feedback function access to store feedback
+    jwtSecret.grantRead(aiFeedbackFunction);
+
     // Report Generation Lambda Function
     const reportFunction = new lambda.Function(this, 'ReportFunction', {
       functionName: 'misra-platform-get-report',
@@ -402,6 +417,13 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/ai/insights',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction),
+    });
+
+    // Add AI feedback routes
+    api.addRoutes({
+      path: '/ai/feedback',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction),
     });
 
     // Output important values
