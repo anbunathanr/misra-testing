@@ -17,6 +17,7 @@ export interface IFileMetadataService {
   createFileMetadata(metadata: FileMetadata): Promise<FileMetadata>
   getFileMetadata(fileId: string): Promise<FileMetadata | null>
   updateFileMetadata(fileId: string, updates: Partial<FileMetadata>): Promise<FileMetadata>
+  updateAnalysisStatus(fileId: string, status: AnalysisStatus): Promise<FileMetadata>
   deleteFileMetadata(fileId: string, userId: string): Promise<void>
   getUserFiles(userId: string, pagination?: PaginationOptions): Promise<PaginatedResult<FileMetadata>>
   getFilesByStatus(status: AnalysisStatus, pagination?: PaginationOptions): Promise<PaginatedResult<FileMetadata>>
@@ -164,6 +165,13 @@ export class FileMetadataService implements IFileMetadataService {
         error instanceof Error ? error : undefined
       )
     }
+  }
+
+  async updateAnalysisStatus(fileId: string, status: AnalysisStatus): Promise<FileMetadata> {
+    return this.updateFileMetadata(fileId, {
+      analysis_status: status,
+      updated_at: Date.now()
+    })
   }
 
   async deleteFileMetadata(fileId: string, userId: string): Promise<void> {

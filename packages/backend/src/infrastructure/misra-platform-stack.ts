@@ -135,7 +135,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // Authentication Lambda Functions
     const loginFunction = new lambda.Function(this, 'LoginFunction', {
       functionName: 'misra-platform-login',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'functions/auth/login.handler',
       code: lambda.Code.fromAsset('src'),
       environment: {
@@ -149,7 +149,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
       functionName: 'misra-platform-refresh',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'functions/auth/refresh.handler',
       code: lambda.Code.fromAsset('src'),
       environment: {
@@ -162,7 +162,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // File Upload Lambda Functions
     const fileUploadFunction = new lambda.Function(this, 'FileUploadFunction', {
       functionName: 'misra-platform-file-upload',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'functions/file/upload.handler',
       code: lambda.Code.fromAsset('src'),
       environment: {
@@ -174,7 +174,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     const uploadCompleteFunction = new lambda.Function(this, 'UploadCompleteFunction', {
       functionName: 'misra-platform-upload-complete',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'functions/file/upload-complete.handler',
       code: lambda.Code.fromAsset('src'),
       environment: {
@@ -202,37 +202,24 @@ export class MisraPlatformStack extends cdk.Stack {
       { prefix: 'uploads/' }
     );
 
-    // Analysis and Notification Lambda Functions (placeholders for workflow)
+    // Analysis and Notification Lambda Functions
     const analysisFunction = new lambda.Function(this, 'AnalysisFunction', {
       functionName: 'misra-platform-analysis',
-      runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        exports.handler = async (event) => {
-          console.log('Analysis function invoked:', JSON.stringify(event));
-          // Placeholder for MISRA analysis logic
-          return {
-            statusCode: 200,
-            status: 'COMPLETED',
-            analysisId: event.analysisId || 'test-analysis',
-            results: {
-              violations_count: 0,
-              rules_checked: ['MISRA-C-2012-1.1'],
-              completion_timestamp: Date.now()
-            }
-          };
-        };
-      `),
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/analysis/analyze-file.handler',
+      code: lambda.Code.fromAsset('src'),
       environment: {
         ANALYSES_TABLE_NAME: analysesTable.tableName,
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
+        ENVIRONMENT: this.stackName,
       },
       timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
     });
 
     const notificationFunction = new lambda.Function(this, 'NotificationFunction', {
       functionName: 'misra-platform-notification',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async (event) => {

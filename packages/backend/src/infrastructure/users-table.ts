@@ -21,44 +21,45 @@ export class UsersTable extends Construct {
         name: 'userId',
         type: AttributeType.STRING
       },
-      billingMode: BillingMode.ON_DEMAND,
+      billingMode: BillingMode.PAY_PER_REQUEST,
       removalPolicy: environment === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       pointInTimeRecovery: environment === 'prod',
-      
-      globalSecondaryIndexes: [
-        {
-          indexName: 'email-index',
-          partitionKey: {
-            name: 'email',
-            type: AttributeType.STRING
-          },
-          projectionType: ProjectionType.ALL
-        },
-        {
-          indexName: 'organizationId-index',
-          partitionKey: {
-            name: 'organizationId',
-            type: AttributeType.STRING
-          },
-          sortKey: {
-            name: 'createdAt',
-            type: AttributeType.NUMBER
-          },
-          projectionType: ProjectionType.ALL
-        },
-        {
-          indexName: 'role-index',
-          partitionKey: {
-            name: 'role',
-            type: AttributeType.STRING
-          },
-          sortKey: {
-            name: 'lastLoginAt',
-            type: AttributeType.NUMBER
-          },
-          projectionType: ProjectionType.ALL
-        }
-      ]
+    })
+
+    // Add Global Secondary Indexes
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'email-index',
+      partitionKey: {
+        name: 'email',
+        type: AttributeType.STRING
+      },
+      projectionType: ProjectionType.ALL
+    })
+
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'organizationId-index',
+      partitionKey: {
+        name: 'organizationId',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'createdAt',
+        type: AttributeType.NUMBER
+      },
+      projectionType: ProjectionType.ALL
+    })
+
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'role-index',
+      partitionKey: {
+        name: 'role',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'lastLoginAt',
+        type: AttributeType.NUMBER
+      },
+      projectionType: ProjectionType.ALL
     })
 
     this.table.node.addMetadata('Purpose', 'User profiles and authentication data')
