@@ -254,6 +254,18 @@ export class AnalysisResultsService {
   }
 
   /**
+   * Get analyses by user ID (simplified method for AI insights)
+   */
+  async getAnalysesByUserId(
+    userId: string,
+    options?: { limit?: number }
+  ): Promise<StoredAnalysisResult[]> {
+    const limit = options?.limit || 100;
+    const results = await this.getUserAnalysisHistory(userId, { limit });
+    return results.items;
+  }
+
+  /**
    * Get analysis statistics for a user
    */
   async getUserAnalysisStats(userId: string): Promise<{

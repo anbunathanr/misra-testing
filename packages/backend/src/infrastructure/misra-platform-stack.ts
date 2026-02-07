@@ -300,6 +300,23 @@ export class MisraPlatformStack extends cdk.Stack {
     analysisResultsTable.grantReadData(queryResultsFunction);
     analysisResultsTable.grantReadData(userStatsFunction);
 
+    // AI Insights Lambda Function
+    const aiInsightsFunction = new lambda.Function(this, 'AIInsightsFunction', {
+      functionName: 'misra-platform-ai-insights',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai/generate-insights.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: this.stackName,
+      },
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+    });
+
+    // Grant AI insights function access to analysis results
+    analysisResultsTable.grantReadData(aiInsightsFunction);
+    jwtSecret.grantRead(aiInsightsFunction);
+
     // Report Generation Lambda Function
     const reportFunction = new lambda.Function(this, 'ReportFunction', {
       functionName: 'misra-platform-get-report',
@@ -378,6 +395,13 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/analysis/stats/{userId}',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction),
+    });
+
+    // Add AI insights routes
+    api.addRoutes({
+      path: '/ai/insights',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction),
     });
 
     // Output important values
