@@ -110,6 +110,35 @@ export class MisraPlatformStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
 
+    // Analysis Results Table for storing detailed MISRA analysis results
+    const analysisResultsTable = new dynamodb.Table(this, 'AnalysisResultsTable', {
+      tableName: 'misra-platform-analysis-results',
+      partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+    });
+
+    // Add GSIs for analysis results queries
+    analysisResultsTable.addGlobalSecondaryIndex({
+      indexName: 'fileId-timestamp-index',
+      partitionKey: { name: 'fileId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+    });
+
+    analysisResultsTable.addGlobalSecondaryIndex({
+      indexName: 'userId-timestamp-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+    });
+
+    analysisResultsTable.addGlobalSecondaryIndex({
+      indexName: 'ruleSet-timestamp-index',
+      partitionKey: { name: 'ruleSet', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+    });
+
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'misra-platform-processing',
@@ -239,8 +268,37 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Grant permissions for analysis and notification functions
     analysesTable.grantReadWriteData(analysisFunction);
+    analysisResultsTable.grantReadWriteData(analysisFunction);
     fileStorageBucket.grantRead(analysisFunction);
     usersTable.grantReadData(notificationFunction);
+
+    // Query Results Lambda Function
+    const queryResultsFunction = new lambda.Function(this, 'QueryResultsFunction', {
+      functionName: 'misra-platform-query-results',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/analysis/query-results.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: this.stackName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // User Stats Lambda Function
+    const userStatsFunction = new lambda.Function(this, 'UserStatsFunction', {
+      functionName: 'misra-platform-user-stats',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/analysis/get-user-stats.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: this.stackName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant query and stats functions access to analysis results
+    analysisResultsTable.grantReadData(queryResultsFunction);
+    analysisResultsTable.grantReadData(userStatsFunction);
 
     // Report Generation Lambda Function
     const reportFunction = new lambda.Function(this, 'ReportFunction', {
@@ -306,6 +364,20 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/reports/{fileId}',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction),
+    });
+
+    // Add analysis query routes
+    api.addRoutes({
+      path: '/analysis/query',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('QueryResultsIntegration', queryResultsFunction),
+    });
+
+    // Add user stats routes
+    api.addRoutes({
+      path: '/analysis/stats/{userId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction),
     });
 
     // Output important values

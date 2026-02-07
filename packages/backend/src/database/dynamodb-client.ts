@@ -4,7 +4,7 @@
  */
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, DeleteCommand, QueryCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, DeleteCommand, QueryCommand, ScanCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
 import { DYNAMODB_CONFIG, getTableName } from '../config/dynamodb-config'
 import { MetadataError, ErrorCodes } from '../types/validation'
 
@@ -181,6 +181,100 @@ export class DynamoDBClientWrapper {
       return response
     } catch (error) {
       throw this.handleDynamoDBError(error, 'queryItems')
+    }
+  }
+
+  /**
+   * Query by index with simplified parameters
+   */
+  async queryByIndex(
+    indexName: string,
+    partitionKeyName: string,
+    partitionKeyValue: any,
+    options?: {
+      sortKeyName?: string;
+      sortKeyValue?: any;
+      limit?: number;
+      exclusiveStartKey?: Record<string, any>;
+      scanIndexForward?: boolean;
+    }
+  ): Promise<{
+    items: Record<string, any>[]
+    lastEvaluatedKey?: Record<string, any>
+    count: number
+    scannedCount: number
+  }> {
+    const expressionAttributeNames: Record<string, string> = {
+      '#pk': partitionKeyName
+    };
+    const expressionAttributeValues: Record<string, any> = {
+      ':pkval': partitionKeyValue
+    };
+
+    let keyConditionExpression = '#pk = :pkval';
+
+    if (options?.sortKeyName && options?.sortKeyValue !== undefined) {
+      expressionAttributeNames['#sk'] = options.sortKeyName;
+      expressionAttributeValues[':skval'] = options.sortKeyValue;
+      keyConditionExpression += ' AND #sk = :skval';
+    }
+
+    return this.queryItems(
+      keyConditionExpression,
+      expressionAttributeNames,
+      expressionAttributeValues,
+      indexName,
+      options?.scanIndexForward ?? false,
+      options?.limit,
+      options?.exclusiveStartKey
+    );
+  }
+
+  /**
+   * Scan table with optional filters
+   */
+  async scan(options?: {
+    limit?: number;
+    exclusiveStartKey?: Record<string, any>;
+    filterExpression?: string;
+    expressionAttributeNames?: Record<string, string>;
+    expressionAttributeValues?: Record<string, any>;
+  }): Promise<{
+    items: Record<string, any>[]
+    lastEvaluatedKey?: Record<string, any>
+    count: number
+    scannedCount: number
+  }> {
+    try {
+      const command = new ScanCommand({
+        TableName: this.tableName,
+        Limit: options?.limit,
+        ExclusiveStartKey: options?.exclusiveStartKey,
+        FilterExpression: options?.filterExpression,
+        ExpressionAttributeNames: options?.expressionAttributeNames,
+        ExpressionAttributeValues: options?.expressionAttributeValues
+      });
+
+      const result = await this.docClient.send(command);
+      
+      const response: {
+        items: Record<string, any>[]
+        lastEvaluatedKey?: Record<string, any>
+        count: number
+        scannedCount: number
+      } = {
+        items: result.Items || [],
+        count: result.Count || 0,
+        scannedCount: result.ScannedCount || 0
+      };
+      
+      if (result.LastEvaluatedKey) {
+        response.lastEvaluatedKey = result.LastEvaluatedKey;
+      }
+      
+      return response;
+    } catch (error) {
+      throw this.handleDynamoDBError(error, 'scan');
     }
   }
 

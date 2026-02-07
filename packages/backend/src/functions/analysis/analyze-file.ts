@@ -5,6 +5,7 @@
 
 import { MisraAnalysisService } from '../../services/misra/misra-analysis-service';
 import { ViolationReportService } from '../../services/misra/violation-report-service';
+import { AnalysisResultsService } from '../../services/analysis-results-service';
 import { FileMetadataService } from '../../services/file-metadata-service';
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
 import { AnalysisStatus } from '../../types/file-metadata';
@@ -18,6 +19,7 @@ const analysisService = new MisraAnalysisService(bucketName, region);
 const reportService = new ViolationReportService();
 const dbClient = new DynamoDBClientWrapper(environment);
 const metadataService = new FileMetadataService(dbClient);
+const resultsService = new AnalysisResultsService(dbClient);
 
 interface AnalyzeFileEvent {
   fileId: string;
@@ -32,7 +34,15 @@ interface AnalyzeFileEvent {
 export const handler = async (event: AnalyzeFileEvent) => {
   console.log('Analysis event received:', JSON.stringify(event, null, 2));
 
-  const { fileId, fileName, s3Key, fileType, ruleSet } = event;
+  const { fileId, fileName, s3Key, fileType, ruleSet, userId, organizationId } = event;
+
+  if (!userId) {
+    return {
+      statusCode: 400,
+      status: 'FAILED',
+      error: 'userId is required for analysis'
+    };
+  }
 
   try {
     // Update status to IN_PROGRESS
@@ -56,6 +66,13 @@ export const handler = async (event: AnalyzeFileEvent) => {
         groupByRule: true
       });
 
+      // Store analysis results in DynamoDB
+      const storedResult = await resultsService.storeAnalysisResult(
+        result,
+        userId,
+        organizationId
+      );
+
       // Update metadata with results
       await metadataService.updateFileMetadata(fileId, {
         analysis_status: AnalysisStatus.COMPLETED,
@@ -69,12 +86,13 @@ export const handler = async (event: AnalyzeFileEvent) => {
 
       console.log(`Analysis completed for ${fileId}: ${result.violationsCount} violations found`);
       console.log(`Report generated with ${report.recommendations.length} recommendations`);
+      console.log(`Results stored with ID: ${storedResult.analysisId}`);
 
       return {
         statusCode: 200,
         status: 'COMPLETED',
         fileId,
-        analysisId: fileId,
+        analysisId: storedResult.analysisId,
         results: {
           violations_count: result.violationsCount,
           rules_checked: result.rulesChecked,
@@ -92,6 +110,9 @@ export const handler = async (event: AnalyzeFileEvent) => {
         }
       };
     } else {
+      // Store failed analysis result
+      await resultsService.storeAnalysisResult(result, userId, organizationId);
+
       // Update status to FAILED
       await metadataService.updateFileMetadata(fileId, {
         analysis_status: AnalysisStatus.FAILED,
