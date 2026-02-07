@@ -242,6 +242,21 @@ export class MisraPlatformStack extends cdk.Stack {
     fileStorageBucket.grantRead(analysisFunction);
     usersTable.grantReadData(notificationFunction);
 
+    // Report Generation Lambda Function
+    const reportFunction = new lambda.Function(this, 'ReportFunction', {
+      functionName: 'misra-platform-get-report',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/reports/get-violation-report.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: this.stackName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant report function access to metadata
+    // Note: Would need file metadata table reference here
+
     // Create Step Functions workflow for analysis orchestration
     const workflow = new AnalysisWorkflow(this, 'AnalysisWorkflow', {
       environment: this.stackName,
@@ -284,6 +299,13 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/files/upload',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction),
+    });
+
+    // Add report routes
+    api.addRoutes({
+      path: '/reports/{fileId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction),
     });
 
     // Output important values

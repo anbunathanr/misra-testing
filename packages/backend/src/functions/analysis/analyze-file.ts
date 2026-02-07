@@ -4,6 +4,7 @@
  */
 
 import { MisraAnalysisService } from '../../services/misra/misra-analysis-service';
+import { ViolationReportService } from '../../services/misra/violation-report-service';
 import { FileMetadataService } from '../../services/file-metadata-service';
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
 import { AnalysisStatus } from '../../types/file-metadata';
@@ -14,6 +15,7 @@ const region = process.env.AWS_REGION || 'us-east-1';
 const environment = process.env.ENVIRONMENT || 'dev';
 
 const analysisService = new MisraAnalysisService(bucketName, region);
+const reportService = new ViolationReportService();
 const dbClient = new DynamoDBClientWrapper(environment);
 const metadataService = new FileMetadataService(dbClient);
 
@@ -46,6 +48,14 @@ export const handler = async (event: AnalyzeFileEvent) => {
     );
 
     if (result.success) {
+      // Generate violation report
+      const report = reportService.generateReport(result, {
+        includeSummary: true,
+        includeRecommendations: true,
+        groupBySeverity: true,
+        groupByRule: true
+      });
+
       // Update metadata with results
       await metadataService.updateFileMetadata(fileId, {
         analysis_status: AnalysisStatus.COMPLETED,
@@ -58,6 +68,7 @@ export const handler = async (event: AnalyzeFileEvent) => {
       });
 
       console.log(`Analysis completed for ${fileId}: ${result.violationsCount} violations found`);
+      console.log(`Report generated with ${report.recommendations.length} recommendations`);
 
       return {
         statusCode: 200,
@@ -69,7 +80,16 @@ export const handler = async (event: AnalyzeFileEvent) => {
           rules_checked: result.rulesChecked,
           completion_timestamp: result.analysisTimestamp
         },
-        violations: result.violations
+        violations: result.violations,
+        report: {
+          summary: report.summary,
+          recommendations: report.recommendations,
+          violationsByRule: report.violationsByRule.map(r => ({
+            ruleId: r.ruleId,
+            ruleTitle: r.ruleTitle,
+            count: r.count
+          }))
+        }
       };
     } else {
       // Update status to FAILED
