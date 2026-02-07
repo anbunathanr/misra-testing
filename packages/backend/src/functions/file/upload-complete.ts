@@ -1,27 +1,12 @@
 import { S3Event, S3Handler } from 'aws-lambda';
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { ProcessingQueueService } from '../../services/queue/processing-queue-service';
+import { FileMetadataService } from '../../services/file-metadata-service';
+import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
+import { FileType, AnalysisStatus } from '../../types/file-metadata';
 
-// Mock AWS SDK for development
-declare const process: {
-  env: {
-    [key: string]: string | undefined;
-  };
-};
-
-interface FileProcessingMessage {
-  fileId: string;
-  s3Key: string;
-  bucketName: string;
-  fileName: string;
-  fileSize: number;
-  userId: string;
-  organizationId: string;
-  uploadTimestamp: string;
-}
-
-const sqsClient = process.env.NODE_ENV === 'production' 
-  ? new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' })
-  : {} as SQSClient;
+const queueService = new ProcessingQueueService();
+const dbClient = new DynamoDBClientWrapper(process.env.ENVIRONMENT || 'dev');
+const metadataService = new FileMetadataService(dbClient);
 
 export const handler: S3Handler = async (event: S3Event) => {
   console.log('S3 upload complete event received:', JSON.stringify(event, null, 2));
@@ -53,52 +38,48 @@ export const handler: S3Handler = async (event: S3Event) => {
         continue;
       }
 
-      const uploadTimestamp = filenameParts[0];
+      const uploadTimestamp = parseInt(filenameParts[0]);
       const fileId = filenameParts[1];
       const originalFilename = filenameParts.slice(2).join('-');
+      const fileType = getFileType(originalFilename);
 
-      // Create processing message
-      const processingMessage: FileProcessingMessage = {
+      // Create file metadata record in DynamoDB
+      try {
+        await metadataService.createFileMetadata({
+          file_id: fileId,
+          user_id: userId,
+          filename: originalFilename,
+          file_type: fileType,
+          file_size: fileSize,
+          upload_timestamp: Math.floor(uploadTimestamp / 1000), // Convert to seconds
+          analysis_status: AnalysisStatus.PENDING,
+          s3_key: s3Key,
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        });
+        console.log(`Created file metadata for ${fileId}`);
+      } catch (error) {
+        console.error(`Failed to create file metadata for ${fileId}:`, error);
+        // Continue to queue the job even if metadata creation fails
+      }
+
+      // Create and send processing job to queue
+      const job = queueService.createJobFromUpload(
         fileId,
-        s3Key,
-        bucketName,
-        fileName: originalFilename,
+        originalFilename,
         fileSize,
+        s3Key,
         userId,
         organizationId,
-        uploadTimestamp,
-      };
+        'misra-analysis',
+        'normal'
+      );
 
-      // Send message to processing queue
-      if (process.env.NODE_ENV === 'production') {
-        const queueUrl = process.env.PROCESSING_QUEUE_URL;
-        if (!queueUrl) {
-          throw new Error('PROCESSING_QUEUE_URL environment variable not set');
-        }
-
-        const command = new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(processingMessage),
-          MessageAttributes: {
-            'file-type': {
-              DataType: 'String',
-              StringValue: getFileType(originalFilename),
-            },
-            'organization-id': {
-              DataType: 'String',
-              StringValue: organizationId,
-            },
-            'user-id': {
-              DataType: 'String',
-              StringValue: userId,
-            },
-          },
-        });
-
-        await sqsClient.send(command);
-        console.log(`Sent processing message for file ${fileId} to queue`);
+      if (queueService.isConfigured()) {
+        const messageId = await queueService.sendJob(job);
+        console.log(`Sent processing job ${job.jobId} to queue (message ID: ${messageId})`);
       } else {
-        console.log('Development mode: Mock processing message sent:', processingMessage);
+        console.log('Queue not configured - job would be sent:', job);
       }
 
     } catch (error) {
@@ -108,21 +89,23 @@ export const handler: S3Handler = async (event: S3Event) => {
   }
 };
 
-function getFileType(filename: string): string {
+function getFileType(filename: string): FileType {
   const extension = filename.toLowerCase().split('.').pop() || '';
   
   switch (extension) {
     case 'c':
-      return 'C';
+      return FileType.C;
     case 'cpp':
     case 'cc':
     case 'cxx':
-      return 'CPP';
+      return FileType.CPP;
     case 'h':
+      return FileType.H;
     case 'hpp':
+    case 'hh':
     case 'hxx':
-      return 'HEADER';
+      return FileType.HPP;
     default:
-      return 'UNKNOWN';
+      return FileType.C; // Default to C for unknown types
   }
 }

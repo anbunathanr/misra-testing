@@ -10,6 +10,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Construct } from 'constructs';
+import { AnalysisWorkflow } from './analysis-workflow';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -200,6 +201,66 @@ export class MisraPlatformStack extends cdk.Stack {
       new s3n.LambdaDestination(uploadCompleteFunction),
       { prefix: 'uploads/' }
     );
+
+    // Analysis and Notification Lambda Functions (placeholders for workflow)
+    const analysisFunction = new lambda.Function(this, 'AnalysisFunction', {
+      functionName: 'misra-platform-analysis',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+        exports.handler = async (event) => {
+          console.log('Analysis function invoked:', JSON.stringify(event));
+          // Placeholder for MISRA analysis logic
+          return {
+            statusCode: 200,
+            status: 'COMPLETED',
+            analysisId: event.analysisId || 'test-analysis',
+            results: {
+              violations_count: 0,
+              rules_checked: ['MISRA-C-2012-1.1'],
+              completion_timestamp: Date.now()
+            }
+          };
+        };
+      `),
+      environment: {
+        ANALYSES_TABLE_NAME: analysesTable.tableName,
+        FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
+      },
+      timeout: cdk.Duration.minutes(5),
+    });
+
+    const notificationFunction = new lambda.Function(this, 'NotificationFunction', {
+      functionName: 'misra-platform-notification',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+        exports.handler = async (event) => {
+          console.log('Notification function invoked:', JSON.stringify(event));
+          // Placeholder for notification logic (email, webhook, etc.)
+          return {
+            statusCode: 200,
+            message: 'Notification sent successfully'
+          };
+        };
+      `),
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant permissions for analysis and notification functions
+    analysesTable.grantReadWriteData(analysisFunction);
+    fileStorageBucket.grantRead(analysisFunction);
+    usersTable.grantReadData(notificationFunction);
+
+    // Create Step Functions workflow for analysis orchestration
+    const workflow = new AnalysisWorkflow(this, 'AnalysisWorkflow', {
+      environment: this.stackName,
+      analysisFunction,
+      notificationFunction,
+    });
 
     // API Gateway
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
