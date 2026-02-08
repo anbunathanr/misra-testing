@@ -27,13 +27,10 @@ if (-not $jwtSecret) {
 }
 
 try {
-    aws secretsmanager create-secret `
-        --name misra-platform/jwt-secret `
-        --secret-string $jwtSecret `
-        --region $region 2>&1 | Out-Null
-    Write-Host "   ✓ JWT secret created" -ForegroundColor Green
+    $result = aws secretsmanager create-secret --name misra-platform/jwt-secret --secret-string $jwtSecret --region $region 2>&1
+    Write-Host "   Success: JWT secret created" -ForegroundColor Green
 } catch {
-    Write-Host "   ✗ Failed to create JWT secret (may already exist)" -ForegroundColor Yellow
+    Write-Host "   Warning: Failed to create JWT secret (may already exist)" -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -48,13 +45,10 @@ if (-not $n8nUrl) {
 }
 
 try {
-    aws secretsmanager create-secret `
-        --name misra-platform/n8n-webhook-url `
-        --secret-string $n8nUrl `
-        --region $region 2>&1 | Out-Null
-    Write-Host "   ✓ n8n webhook URL created" -ForegroundColor Green
+    $result = aws secretsmanager create-secret --name misra-platform/n8n-webhook-url --secret-string $n8nUrl --region $region 2>&1
+    Write-Host "   Success: n8n webhook URL created" -ForegroundColor Green
 } catch {
-    Write-Host "   ✗ Failed to create n8n webhook URL (may already exist)" -ForegroundColor Yellow
+    Write-Host "   Warning: Failed to create n8n webhook URL (may already exist)" -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -69,13 +63,10 @@ if (-not $n8nKey) {
 }
 
 try {
-    aws secretsmanager create-secret `
-        --name misra-platform/n8n-api-key `
-        --secret-string $n8nKey `
-        --region $region 2>&1 | Out-Null
-    Write-Host "   ✓ n8n API key created" -ForegroundColor Green
+    $result = aws secretsmanager create-secret --name misra-platform/n8n-api-key --secret-string $n8nKey --region $region 2>&1
+    Write-Host "   Success: n8n API key created" -ForegroundColor Green
 } catch {
-    Write-Host "   ✗ Failed to create n8n API key (may already exist)" -ForegroundColor Yellow
+    Write-Host "   Warning: Failed to create n8n API key (may already exist)" -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -88,5 +79,5 @@ Write-Host "  - misra-platform/jwt-secret" -ForegroundColor Gray
 Write-Host "  - misra-platform/n8n-webhook-url" -ForegroundColor Gray
 Write-Host "  - misra-platform/n8n-api-key" -ForegroundColor Gray
 Write-Host ""
-Write-Host "You can now run the deployment script: .\deploy.ps1" -ForegroundColor Cyan
+Write-Host "You can now run the deployment script" -ForegroundColor Cyan
 Write-Host ""

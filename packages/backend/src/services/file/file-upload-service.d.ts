@@ -29,4 +29,20 @@ export declare class FileUploadService {
     private sanitizeFileName;
     private containsUnsafeCharacters;
     getFileMetadata(fileId: string): Promise<any>;
+    /**
+     * Generate a hash for file tracking and integrity
+     */
+    private generateFileHash;
+    /**
+     * Verify file exists in S3
+     */
+    verifyFileExists(s3Key: string): Promise<boolean>;
+    /**
+     * Get file size limit based on file type
+     */
+    getMaxFileSizeForType(fileType: string): number;
+    /**
+     * Check if file extension matches content type
+     */
+    private validateContentTypeMatch;
 }

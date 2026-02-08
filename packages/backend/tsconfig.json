@@ -26,5 +26,5 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.d.ts", "dist"]
+  "exclude": ["node_modules", "**/*.d.ts", "dist", "src/__tests__/**/*", "src/test-setup.ts"]
 }

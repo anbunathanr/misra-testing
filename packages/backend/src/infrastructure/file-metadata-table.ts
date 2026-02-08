@@ -22,48 +22,49 @@ export class FileMetadataTable extends Construct {
         name: 'file_id',
         type: AttributeType.STRING
       },
-      billingMode: BillingMode.ON_DEMAND,
+      billingMode: BillingMode.PAY_PER_REQUEST,
       removalPolicy: environment === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-      pointInTimeRecovery: environment === 'prod',
-      
-      globalSecondaryIndexes: [
-        {
-          indexName: 'UserIndex',
-          partitionKey: {
-            name: 'user_id',
-            type: AttributeType.STRING
-          },
-          sortKey: {
-            name: 'upload_timestamp',
-            type: AttributeType.NUMBER
-          },
-          projectionType: ProjectionType.ALL
-        },
-        {
-          indexName: 'StatusIndex',
-          partitionKey: {
-            name: 'analysis_status',
-            type: AttributeType.STRING
-          },
-          sortKey: {
-            name: 'upload_timestamp',
-            type: AttributeType.NUMBER
-          },
-          projectionType: ProjectionType.ALL
-        },
-        {
-          indexName: 'UserStatusIndex',
-          partitionKey: {
-            name: 'user_id',
-            type: AttributeType.STRING
-          },
-          sortKey: {
-            name: 'analysis_status',
-            type: AttributeType.STRING
-          },
-          projectionType: ProjectionType.ALL
-        }
-      ]
+      pointInTimeRecovery: environment === 'prod'
+    })
+
+    // Add Global Secondary Indexes
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'UserIndex',
+      partitionKey: {
+        name: 'user_id',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'upload_timestamp',
+        type: AttributeType.NUMBER
+      },
+      projectionType: ProjectionType.ALL
+    })
+
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'StatusIndex',
+      partitionKey: {
+        name: 'analysis_status',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'upload_timestamp',
+        type: AttributeType.NUMBER
+      },
+      projectionType: ProjectionType.ALL
+    })
+
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'UserStatusIndex',
+      partitionKey: {
+        name: 'user_id',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'analysis_status',
+        type: AttributeType.STRING
+      },
+      projectionType: ProjectionType.ALL
     })
 
     this.table.node.addMetadata('Purpose', 'File metadata storage for MISRA testing')

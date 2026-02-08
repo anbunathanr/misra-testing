@@ -11,7 +11,8 @@ import {
   ObjectOwnership,
   LifecycleRule,
   StorageClass,
-  Transition
+  Transition,
+  HttpMethods
 } from 'aws-cdk-lib/aws-s3'
 import { RemovalPolicy, Duration } from 'aws-cdk-lib'
 
@@ -74,11 +75,11 @@ export class FileStorageBucket extends Construct {
       cors: [
         {
           allowedMethods: [
-            'GET',
-            'PUT',
-            'POST',
-            'DELETE',
-            'HEAD'
+            HttpMethods.GET,
+            HttpMethods.PUT,
+            HttpMethods.POST,
+            HttpMethods.DELETE,
+            HttpMethods.HEAD
           ],
           allowedOrigins: ['*'], // In production, restrict to specific domains
           allowedHeaders: ['*'],
