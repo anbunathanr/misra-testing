@@ -28,7 +28,7 @@ export class MisraPlatformStack extends cdk.Stack {
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
       bucketName: `misra-platform-frontend-${this.account}`,
       websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'error.html',
+      websiteErrorDocument: 'index.html',
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
       publicReadAccess: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
@@ -40,6 +40,20 @@ export class MisraPlatformStack extends cdk.Stack {
         origin: new origins.S3Origin(frontendBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.minutes(5),
+        },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.minutes(5),
+        },
+      ],
     });
 
     // DynamoDB Tables
