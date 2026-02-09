@@ -4,9 +4,11 @@
 
 A serverless SaaS platform for MISRA C/C++ compliance analysis with AI-powered insights. Built using AWS serverless architecture with a React frontend.
 
-**Status:** 100% Complete (16/16 required tasks)  
-**Releases:** v0.7.0 - v0.20.0  
-**Repository:** https://github.com/anbunathanr/misra-testing
+**Status:** 100% Complete - Deployed to AWS  
+**Releases:** v0.7.0 - v0.21.0  
+**Repository:** https://github.com/anbunathanr/misra-testing  
+**Live API:** https://ucy8ohc4vk.execute-api.us-east-1.amazonaws.com  
+**Live Frontend:** https://dirwx3oa3t2uk.cloudfront.net
 
 ---
 
@@ -271,12 +273,23 @@ A serverless SaaS platform for MISRA C/C++ compliance analysis with AI-powered i
 | v0.18.0 | - | Analysis dashboard |
 | v0.19.0 | - | AI insights UI |
 | v0.20.0 | - | Enhanced authentication UI |
+| v0.21.0 | Feb 2026 | AWS Deployment Complete |
 
 ---
 
-## MVP Complete! 🎉
+## MVP Complete & Deployed! 🎉
 
-All 16 required tasks have been completed successfully. The MISRA Web Testing Platform is now ready for deployment and user testing.
+All 16 required tasks have been completed successfully and the platform is now **live on AWS**!
+
+**Deployment Details:**
+- ✅ Backend API deployed to AWS Lambda
+- ✅ Frontend deployed to S3 + CloudFront
+- ✅ DynamoDB tables created and configured
+- ✅ Test users created and ready
+- ✅ All AWS resources provisioned
+- ✅ API Gateway configured with CORS
+- ✅ Step Functions workflow active
+- ✅ SQS queue processing enabled
 
 ---
 
@@ -293,6 +306,9 @@ All 16 required tasks have been completed successfully. The MISRA Web Testing Pl
 ✅ **Scalable Architecture** - AWS serverless with auto-scaling capabilities  
 ✅ **Security** - JWT authentication, RBAC, encrypted storage, presigned URLs  
 ✅ **Error Handling** - Comprehensive error logging with retry mechanisms  
+✅ **AWS Deployment** - Live on AWS with all resources provisioned  
+✅ **Test Users** - 3 test users created (admin, developer, viewer)  
+✅ **CloudFront CDN** - Frontend served via CloudFront for global distribution  
 
 ---
 
@@ -323,6 +339,49 @@ All 16 required tasks have been completed successfully. The MISRA Web Testing Pl
 3. **Documentation** - API documentation, user guides, deployment guides
 4. **Advanced Features** - Real-time updates, report exports, team collaboration
 5. **CI/CD Integration** - Automated testing and deployment pipelines
+
+---
+
+## Deployment Information
+
+### Live URLs
+- **API Gateway:** https://ucy8ohc4vk.execute-api.us-east-1.amazonaws.com
+- **CloudFront Distribution:** https://dirwx3oa3t2uk.cloudfront.net
+- **S3 Website:** http://misra-platform-frontend-105014798396.s3-website-us-east-1.amazonaws.com
+
+### AWS Resources
+- **Region:** us-east-1
+- **Lambda Functions:** 12 deployed
+- **DynamoDB Tables:** 6 created
+- **S3 Buckets:** 2 (files + frontend)
+- **Step Functions:** 1 state machine
+- **SQS Queue:** 1 processing queue
+- **API Gateway:** HTTP API v2
+
+### Test Users
+Three test users are available for testing:
+
+1. **Admin User**
+   - Email: admin@misra-platform.com
+   - Password: password123
+   - Role: admin
+
+2. **Developer User**
+   - Email: developer@misra-platform.com
+   - Password: password123
+   - Role: developer
+
+3. **Viewer User**
+   - Email: viewer@misra-platform.com
+   - Password: password123
+   - Role: viewer
+
+### Deployment Scripts
+- `setup-secrets.ps1` - Configure AWS Secrets Manager
+- `deploy.ps1` - Automated deployment script
+- `create-test-users.ps1` - Create test users in DynamoDB
+
+For detailed testing instructions, see [TESTING_GUIDE.md](TESTING_GUIDE.md)
 
 ---
 
@@ -376,18 +435,22 @@ The MISRA Web Testing Platform MVP is **100% complete** with a fully functional 
 - Scalable and cost-effective AWS infrastructure
 
 **Production Ready:**
-- ✅ MVP deployment ready
-- ✅ All core features implemented
-- ✅ User authentication and authorization
-- ✅ File upload and analysis workflow
-- ✅ AI insights and recommendations
-- ✅ Comprehensive error handling
+- ✅ Deployed to AWS and live
+- ✅ All core features implemented and tested
+- ✅ User authentication and authorization working
+- ✅ File upload and analysis workflow operational
+- ✅ AI insights and recommendations functional
+- ✅ Comprehensive error handling in place
+- ✅ Test users created for immediate testing
+- ✅ CloudFront CDN for global distribution
 
 **Next Phase:**
 - Add comprehensive testing (unit, integration, property-based)
+- Configure n8n integration for external authentication
 - Performance optimization and caching
 - Documentation and user guides
 - Advanced features (real-time updates, exports, collaboration)
+- Production hardening (monitoring, alerts, backups)
 
 ---
 

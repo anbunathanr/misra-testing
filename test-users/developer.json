@@ -1,0 +1,23 @@
+{
+  "userId": {"S": "dev-001"},
+  "email": {"S": "developer@misra-platform.com"},
+  "organizationId": {"S": "org-001"},
+  "role": {"S": "developer"},
+  "firstName": {"S": "Developer"},
+  "lastName": {"S": "User"},
+  "createdAt": {"N": "1738761600000"},
+  "lastLoginAt": {"N": "1738761600000"},
+  "active": {"BOOL": true},
+  "preferences": {
+    "M": {
+      "theme": {"S": "dark"},
+      "notifications": {
+        "M": {
+          "email": {"BOOL": true},
+          "webhook": {"BOOL": true}
+        }
+      },
+      "defaultMisraRuleSet": {"S": "MISRA_C_2012"}
+    }
+  }
+}
