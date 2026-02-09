@@ -39,22 +39,27 @@ export const filesApi = api.injectEndpoints({
     uploadToS3: builder.mutation<void, { url: string; file: File; contentType: string }>({
       queryFn: async ({ url, file, contentType }) => {
         try {
+          console.log('Uploading to S3:', { url: url.substring(0, 100), fileSize: file.size, contentType })
+          
           const response = await fetch(url, {
             method: 'PUT',
             body: file,
             headers: {
-              'Content-Type': contentType,
-              'Content-Length': file.size.toString()
+              'Content-Type': contentType
             }
           })
 
+          console.log('S3 upload response:', { status: response.status, statusText: response.statusText })
+
           if (!response.ok) {
             const errorText = await response.text()
-            throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`)
+            console.error('S3 upload error:', errorText)
+            throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
           }
 
           return { data: undefined }
         } catch (error) {
+          console.error('Upload exception:', error)
           return { error: { status: 'CUSTOM_ERROR', error: String(error) } }
         }
       }
