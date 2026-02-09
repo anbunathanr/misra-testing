@@ -66,25 +66,31 @@ export class N8nService {
   }
 
   private mockValidateCredentials(email: string, password: string): N8nUser | null {
-    // Mock validation for development
+    // Mock validation for development - matches test users created in DynamoDB
     const validUsers = [
       {
-        email: 'admin@example.com',
-        password: 'admin123',
-        organizationId: 'org-1',
+        email: 'admin@misra-platform.com',
+        password: 'password123',
+        organizationId: 'org-001',
         role: 'admin' as const,
+        firstName: 'Admin',
+        lastName: 'User',
       },
       {
-        email: 'developer@example.com',
-        password: 'dev123',
-        organizationId: 'org-1',
+        email: 'developer@misra-platform.com',
+        password: 'password123',
+        organizationId: 'org-001',
         role: 'developer' as const,
+        firstName: 'Developer',
+        lastName: 'User',
       },
       {
-        email: 'viewer@example.com',
-        password: 'view123',
-        organizationId: 'org-2',
+        email: 'viewer@misra-platform.com',
+        password: 'password123',
+        organizationId: 'org-001',
         role: 'viewer' as const,
+        firstName: 'Viewer',
+        lastName: 'User',
       },
     ];
 
@@ -98,31 +104,31 @@ export class N8nService {
       email: user.email,
       organizationId: user.organizationId,
       role: user.role,
-      firstName: 'Test',
-      lastName: 'User',
+      firstName: user.firstName,
+      lastName: user.lastName,
     };
   }
 
   private mockGetUserProfile(email: string): N8nUser | null {
-    // Mock profile data for development
+    // Mock profile data for development - matches test users created in DynamoDB
     const profiles = [
       {
-        email: 'admin@example.com',
-        organizationId: 'org-1',
+        email: 'admin@misra-platform.com',
+        organizationId: 'org-001',
         role: 'admin' as const,
         firstName: 'Admin',
         lastName: 'User',
       },
       {
-        email: 'developer@example.com',
-        organizationId: 'org-1',
+        email: 'developer@misra-platform.com',
+        organizationId: 'org-001',
         role: 'developer' as const,
         firstName: 'Developer',
         lastName: 'User',
       },
       {
-        email: 'viewer@example.com',
-        organizationId: 'org-2',
+        email: 'viewer@misra-platform.com',
+        organizationId: 'org-001',
         role: 'viewer' as const,
         firstName: 'Viewer',
         lastName: 'User',
