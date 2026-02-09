@@ -60,13 +60,11 @@ export class FileUploadService {
     const s3Key = `uploads/${request.organizationId}/${request.userId}/${timestamp}-${fileId}-${sanitizedFileName}`;
 
     try {
-      // Generate presigned URL for upload with security constraints
+      // Generate presigned URL for upload
       const putCommand = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
         ContentType: request.contentType,
-        ContentLength: request.fileSize,
-        ServerSideEncryption: 'AES256',
         Metadata: {
           'original-filename': request.fileName,
           'user-id': request.userId,
@@ -75,9 +73,7 @@ export class FileUploadService {
           'upload-timestamp': timestamp.toString(),
           'file-hash': fileHash,
           'file-type': validation.fileType
-        },
-        // Security: Ensure uploaded file matches expected content type
-        ContentDisposition: `attachment; filename="${sanitizedFileName}"`,
+        }
       });
 
       const uploadUrl = await getSignedUrl(this.s3Client, putCommand, {

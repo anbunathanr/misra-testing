@@ -36,19 +36,21 @@ export const filesApi = api.injectEndpoints({
       }),
       invalidatesTags: ['File']
     }),
-    uploadToS3: builder.mutation<void, { url: string; file: File }>({
-      queryFn: async ({ url, file }) => {
+    uploadToS3: builder.mutation<void, { url: string; file: File; contentType: string }>({
+      queryFn: async ({ url, file, contentType }) => {
         try {
           const response = await fetch(url, {
             method: 'PUT',
             body: file,
             headers: {
-              'Content-Type': file.type
+              'Content-Type': contentType,
+              'Content-Length': file.size.toString()
             }
           })
 
           if (!response.ok) {
-            throw new Error('Upload failed')
+            const errorText = await response.text()
+            throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`)
           }
 
           return { data: undefined }

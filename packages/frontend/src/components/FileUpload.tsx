@@ -110,7 +110,8 @@ function FileUpload() {
       // Upload to S3
       await uploadToS3({
         url: urlResponse.uploadUrl,
-        file: fileItem.file
+        file: fileItem.file,
+        contentType: fileItem.file.type || 'application/octet-stream'
       }).unwrap()
 
       setFiles((prev) =>
