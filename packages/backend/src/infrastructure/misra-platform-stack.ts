@@ -13,6 +13,8 @@ import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
 import { ProjectsTable } from './projects-table';
+import { TestSuitesTable } from './test-suites-table';
+import { TestCasesTable } from './test-cases-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -163,6 +165,12 @@ export class MisraPlatformStack extends cdk.Stack {
     // Projects Table for Web App Testing System
     const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
 
+    // Test Suites Table for Web App Testing System
+    const testSuitesTable = new TestSuitesTable(this, 'TestSuitesTable');
+
+    // Test Cases Table for Web App Testing System
+    const testCasesTable = new TestCasesTable(this, 'TestCasesTable');
+
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'misra-platform-processing',
@@ -288,6 +296,80 @@ export class MisraPlatformStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
     });
 
+    // Test Suite Management Lambda Functions
+    const createTestSuiteFunction = new lambda.Function(this, 'CreateTestSuiteFunction', {
+      functionName: 'misra-platform-create-test-suite',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-suites/create-suite.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const getTestSuitesFunction = new lambda.Function(this, 'GetTestSuitesFunction', {
+      functionName: 'misra-platform-get-test-suites',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-suites/get-suites.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const updateTestSuiteFunction = new lambda.Function(this, 'UpdateTestSuiteFunction', {
+      functionName: 'misra-platform-update-test-suite',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-suites/update-suite.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Test Case Management Lambda Functions
+    const createTestCaseFunction = new lambda.Function(this, 'CreateTestCaseFunction', {
+      functionName: 'misra-platform-create-test-case',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-cases/create-test-case.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const getTestCasesFunction = new lambda.Function(this, 'GetTestCasesFunction', {
+      functionName: 'misra-platform-get-test-cases',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-cases/get-test-cases.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const updateTestCaseFunction = new lambda.Function(this, 'UpdateTestCaseFunction', {
+      functionName: 'misra-platform-update-test-case',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/test-cases/update-test-case.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
     // Grant permissions
     usersTable.grantReadWriteData(loginFunction);
     usersTable.grantReadWriteData(refreshFunction);
@@ -313,6 +395,22 @@ export class MisraPlatformStack extends cdk.Stack {
     jwtSecret.grantRead(createProjectFunction);
     jwtSecret.grantRead(getProjectsFunction);
     jwtSecret.grantRead(updateProjectFunction);
+
+    // Test suite management permissions
+    testSuitesTable.table.grantReadWriteData(createTestSuiteFunction);
+    testSuitesTable.table.grantReadData(getTestSuitesFunction);
+    testSuitesTable.table.grantReadWriteData(updateTestSuiteFunction);
+    jwtSecret.grantRead(createTestSuiteFunction);
+    jwtSecret.grantRead(getTestSuitesFunction);
+    jwtSecret.grantRead(updateTestSuiteFunction);
+
+    // Test case management permissions
+    testCasesTable.table.grantReadWriteData(createTestCaseFunction);
+    testCasesTable.table.grantReadData(getTestCasesFunction);
+    testCasesTable.table.grantReadWriteData(updateTestCaseFunction);
+    jwtSecret.grantRead(createTestCaseFunction);
+    jwtSecret.grantRead(getTestCasesFunction);
+    jwtSecret.grantRead(updateTestCaseFunction);
 
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
@@ -546,6 +644,44 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/projects/{projectId}',
       methods: [apigateway.HttpMethod.PUT],
       integration: new integrations.HttpLambdaIntegration('UpdateProjectIntegration', updateProjectFunction),
+    });
+
+    // Add test suite management routes
+    api.addRoutes({
+      path: '/test-suites',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('CreateTestSuiteIntegration', createTestSuiteFunction),
+    });
+
+    api.addRoutes({
+      path: '/test-suites',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetTestSuitesIntegration', getTestSuitesFunction),
+    });
+
+    api.addRoutes({
+      path: '/test-suites/{suiteId}',
+      methods: [apigateway.HttpMethod.PUT],
+      integration: new integrations.HttpLambdaIntegration('UpdateTestSuiteIntegration', updateTestSuiteFunction),
+    });
+
+    // Add test case management routes
+    api.addRoutes({
+      path: '/test-cases',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('CreateTestCaseIntegration', createTestCaseFunction),
+    });
+
+    api.addRoutes({
+      path: '/test-cases',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetTestCasesIntegration', getTestCasesFunction),
+    });
+
+    api.addRoutes({
+      path: '/test-cases/{testCaseId}',
+      methods: [apigateway.HttpMethod.PUT],
+      integration: new integrations.HttpLambdaIntegration('UpdateTestCaseIntegration', updateTestCaseFunction),
     });
 
     // Output important values
