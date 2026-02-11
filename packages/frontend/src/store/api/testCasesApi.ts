@@ -56,7 +56,7 @@ export const testCasesApi = api.injectEndpoints({
     }),
     getTestCase: builder.query<TestCase, string>({
       query: (testCaseId) => `/test-cases/${testCaseId}`,
-      providesTags: (result, error, testCaseId) => [{ type: 'TestCases', id: testCaseId }],
+      providesTags: (_result, _error, testCaseId) => [{ type: 'TestCases', id: testCaseId }],
     }),
     createTestCase: builder.mutation<TestCase, CreateTestCaseInput>({
       query: (body) => ({
@@ -72,7 +72,7 @@ export const testCasesApi = api.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (result, error, { testCaseId }) => [
+      invalidatesTags: (_result, _error, { testCaseId }) => [
         'TestCases',
         { type: 'TestCases', id: testCaseId },
       ],

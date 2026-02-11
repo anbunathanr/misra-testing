@@ -33,7 +33,7 @@ export const testSuitesApi = api.injectEndpoints({
     }),
     getTestSuite: builder.query<TestSuite, string>({
       query: (suiteId) => `/test-suites/${suiteId}`,
-      providesTags: (result, error, suiteId) => [{ type: 'TestSuites', id: suiteId }],
+      providesTags: (_result, _error, suiteId) => [{ type: 'TestSuites', id: suiteId }],
     }),
     createTestSuite: builder.mutation<TestSuite, CreateTestSuiteInput>({
       query: (body) => ({
@@ -49,7 +49,7 @@ export const testSuitesApi = api.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (result, error, { suiteId }) => [
+      invalidatesTags: (_result, _error, { suiteId }) => [
         'TestSuites',
         { type: 'TestSuites', id: suiteId },
       ],

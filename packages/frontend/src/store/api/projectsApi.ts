@@ -34,7 +34,7 @@ export const projectsApi = api.injectEndpoints({
     }),
     getProject: builder.query<TestProject, string>({
       query: (projectId) => `/projects/${projectId}`,
-      providesTags: (result, error, projectId) => [{ type: 'Projects', id: projectId }],
+      providesTags: (_result, _error, projectId) => [{ type: 'Projects', id: projectId }],
     }),
     createProject: builder.mutation<TestProject, CreateProjectInput>({
       query: (body) => ({
@@ -50,7 +50,7 @@ export const projectsApi = api.injectEndpoints({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (result, error, { projectId }) => [
+      invalidatesTags: (_result, _error, { projectId }) => [
         'Projects',
         { type: 'Projects', id: projectId },
       ],
