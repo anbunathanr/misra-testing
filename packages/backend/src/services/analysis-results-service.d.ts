@@ -2,12 +2,12 @@
  * Analysis Results Service
  * Manages persistence and retrieval of MISRA analysis results
  */
-import { DynamoDBClientWrapper } from '../database/dynamodb-client';
-import { StoredAnalysisResult, AnalysisQueryFilters, AnalysisPaginationOptions, PaginatedAnalysisResults } from '../types/analysis-persistence';
+import { StoredAnalysisResult, AnalysisPaginationOptions, PaginatedAnalysisResults } from '../types/analysis-persistence';
 import { AnalysisResult } from '../types/misra-rules';
 export declare class AnalysisResultsService {
-    private readonly dbClient;
-    constructor(dbClient: DynamoDBClientWrapper);
+    private docClient;
+    private tableName;
+    constructor(dbClient?: any);
     /**
      * Store analysis result in DynamoDB
      */
@@ -25,22 +25,6 @@ export declare class AnalysisResultsService {
      */
     getUserAnalysisHistory(userId: string, pagination?: AnalysisPaginationOptions): Promise<PaginatedAnalysisResults>;
     /**
-     * Get analysis results by rule set
-     */
-    getAnalysisByRuleSet(ruleSet: string, pagination?: AnalysisPaginationOptions): Promise<PaginatedAnalysisResults>;
-    /**
-     * Query analysis results with filters
-     */
-    queryAnalysisResults(filters: AnalysisQueryFilters, pagination?: AnalysisPaginationOptions): Promise<PaginatedAnalysisResults>;
-    /**
-     * Scan table with filters (fallback for complex queries)
-     */
-    private scanWithFilters;
-    /**
-     * Delete analysis result
-     */
-    deleteAnalysisResult(analysisId: string, timestamp: number): Promise<void>;
-    /**
      * Get analyses by user ID (simplified method for AI insights)
      */
     getAnalysesByUserId(userId: string, options?: {
@@ -56,4 +40,8 @@ export declare class AnalysisResultsService {
         totalViolations: number;
         averageViolationsPerFile: number;
     }>;
+    /**
+     * Query analysis results with filters
+     */
+    queryAnalysisResults(filters: any, pagination?: AnalysisPaginationOptions): Promise<PaginatedAnalysisResults>;
 }

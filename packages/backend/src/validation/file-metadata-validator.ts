@@ -210,7 +210,8 @@ export class FileMetadataValidator implements IFileMetadataValidator {
       return false
     }
 
-    const userIdRegex = /^[a-zA-Z0-9]{8,32}$/
+    // Allow alphanumeric characters and hyphens, 3-32 characters
+    const userIdRegex = /^[a-zA-Z0-9-]{3,32}$/
     return userIdRegex.test(userId)
   }
 

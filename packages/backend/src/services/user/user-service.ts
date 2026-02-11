@@ -1,16 +1,14 @@
-// Declare Node.js globals for Lambda environment
-declare const process: {
-  env: {
-    AWS_REGION?: string;
-    USERS_TABLE_NAME?: string;
-  };
-};
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  QueryCommand,
+} from '@aws-sdk/lib-dynamodb';
+import { v4 as uuidv4 } from 'uuid';
 
-declare const console: {
-  error: (message: string, ...args: any[]) => void;
-};
-
-// Local type declarations for development
+// Local type declarations
 interface User {
   userId: string;
   email: string;
@@ -30,51 +28,6 @@ interface UserPreferences {
   defaultMisraRuleSet: 'MISRA_C_2004' | 'MISRA_C_2012' | 'MISRA_CPP_2008';
 }
 
-// Mock AWS SDK for development
-class MockDynamoDBClient {
-  constructor(config: any) {}
-}
-
-class MockDynamoDBDocumentClient {
-  static from(client: any) {
-    return new MockDynamoDBDocumentClient();
-  }
-  
-  async send(command: any): Promise<any> {
-    // Mock implementation for development
-    console.error('Mock DynamoDB operation - replace with real AWS SDK in production');
-    return { Item: null, Items: [] };
-  }
-}
-
-class MockGetCommand {
-  constructor(params: any) {}
-}
-
-class MockPutCommand {
-  constructor(params: any) {}
-}
-
-class MockUpdateCommand {
-  constructor(params: any) {}
-}
-
-class MockQueryCommand {
-  constructor(params: any) {}
-}
-
-// Mock UUID function
-const mockUuidv4 = (): string => `mock-uuid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-// Use mocks for development
-const DynamoDBClient = MockDynamoDBClient;
-const DynamoDBDocumentClient = MockDynamoDBDocumentClient;
-const GetCommand = MockGetCommand;
-const PutCommand = MockPutCommand;
-const UpdateCommand = MockUpdateCommand;
-const QueryCommand = MockQueryCommand;
-const uuidv4 = mockUuidv4;
-
 export interface CreateUserRequest {
   email: string;
   organizationId: string;
@@ -83,7 +36,7 @@ export interface CreateUserRequest {
 }
 
 export class UserService {
-  private docClient: MockDynamoDBDocumentClient;
+  private docClient: DynamoDBDocumentClient;
   private tableName: string;
 
   constructor() {

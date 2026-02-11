@@ -1,12 +1,13 @@
 import { S3Event, S3Handler } from 'aws-lambda';
-import { ProcessingQueueService } from '../../services/queue/processing-queue-service';
+import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { FileMetadataService } from '../../services/file-metadata-service';
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
-import { FileType, AnalysisStatus } from '../../types/file-metadata';
+import { AnalysisStatus } from '../../types/file-metadata';
 
-const queueService = new ProcessingQueueService();
+const sfnClient = new SFNClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const dbClient = new DynamoDBClientWrapper(process.env.ENVIRONMENT || 'dev');
 const metadataService = new FileMetadataService(dbClient);
+const stateMachineArn = process.env.STATE_MACHINE_ARN || '';
 
 export const handler: S3Handler = async (event: S3Event) => {
   console.log('S3 upload complete event received:', JSON.stringify(event, null, 2));
@@ -32,55 +33,50 @@ export const handler: S3Handler = async (event: S3Event) => {
       const filenamePart = keyParts[3];
       
       // Extract fileId from filename part
-      const filenameParts = filenamePart.split('-');
-      if (filenameParts.length < 3) {
+      // Format: {timestamp}-{uuid}-{filename}
+      // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars with hyphens)
+      const timestampEndIndex = filenamePart.indexOf('-');
+      if (timestampEndIndex === -1) {
         console.warn(`Unexpected filename format: ${filenamePart}`);
         continue;
       }
+      
+      const afterTimestamp = filenamePart.substring(timestampEndIndex + 1);
+      // UUID is 36 characters long
+      const fileId = afterTimestamp.substring(0, 36);
+      const originalFilename = afterTimestamp.substring(37); // Skip UUID and hyphen
 
-      const uploadTimestamp = parseInt(filenameParts[0]);
-      const fileId = filenameParts[1];
-      const originalFilename = filenameParts.slice(2).join('-');
-      const fileType = getFileType(originalFilename);
+      console.log(`Extracted: fileId=${fileId}, filename=${originalFilename}, userId=${userId}`);
 
-      // Create file metadata record in DynamoDB
+      // Update FileMetadata status to IN_PROGRESS
       try {
-        await metadataService.createFileMetadata({
-          file_id: fileId,
-          user_id: userId,
-          filename: originalFilename,
-          file_type: fileType,
-          file_size: fileSize,
-          upload_timestamp: Math.floor(uploadTimestamp / 1000), // Convert to seconds
-          analysis_status: AnalysisStatus.PENDING,
-          s3_key: s3Key,
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        });
-        console.log(`Created file metadata for ${fileId}`);
+        await metadataService.updateAnalysisStatus(fileId, AnalysisStatus.IN_PROGRESS);
+        console.log(`Updated file metadata status to IN_PROGRESS for ${fileId}`);
       } catch (error) {
-        console.error(`Failed to create file metadata for ${fileId}:`, error);
-        // Continue to queue the job even if metadata creation fails
+        console.error(`Failed to update file metadata for ${fileId}:`, error);
       }
 
-      // Create and send processing job to queue
-      const job = queueService.createJobFromUpload(
+      // Trigger Step Functions workflow for analysis
+      const input = {
         fileId,
-        originalFilename,
-        fileSize,
+        fileName: originalFilename,
         s3Key,
-        userId,
+        fileType: 'c',
+        userId: userId.replace(/-/g, '').substring(0, 32), // Clean userId
         organizationId,
-        'misra-analysis',
-        'normal'
-      );
+        userEmail: 'admin@misra-platform.com' // TODO: Get from user record
+      };
 
-      if (queueService.isConfigured()) {
-        const messageId = await queueService.sendJob(job);
-        console.log(`Sent processing job ${job.jobId} to queue (message ID: ${messageId})`);
-      } else {
-        console.log('Queue not configured - job would be sent:', job);
-      }
+      console.log(`Starting Step Functions execution with input:`, JSON.stringify(input));
+
+      const command = new StartExecutionCommand({
+        stateMachineArn,
+        input: JSON.stringify(input),
+        name: `analysis-${fileId}-${Date.now()}`
+      });
+
+      const result = await sfnClient.send(command);
+      console.log(`Started Step Functions execution: ${result.executionArn}`);
 
     } catch (error) {
       console.error('Error processing S3 upload event:', error);
@@ -88,24 +84,3 @@ export const handler: S3Handler = async (event: S3Event) => {
     }
   }
 };
-
-function getFileType(filename: string): FileType {
-  const extension = filename.toLowerCase().split('.').pop() || '';
-  
-  switch (extension) {
-    case 'c':
-      return FileType.C;
-    case 'cpp':
-    case 'cc':
-    case 'cxx':
-      return FileType.CPP;
-    case 'h':
-      return FileType.H;
-    case 'hpp':
-    case 'hh':
-    case 'hxx':
-      return FileType.HPP;
-    default:
-      return FileType.C; // Default to C for unknown types
-  }
-}

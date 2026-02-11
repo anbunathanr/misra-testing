@@ -79,6 +79,10 @@ export class FileMetadataTable extends Construct {
     return this.table.grantWriteData(grantee)
   }
 
+  public grantReadWriteData(grantee: any) {
+    return this.table.grantReadWriteData(grantee)
+  }
+
   public grantFullAccess(grantee: any) {
     return this.table.grantFullAccess(grantee)
   }

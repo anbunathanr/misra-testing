@@ -103,7 +103,7 @@ function AnalysisStats({ userId }: AnalysisStatsProps) {
               Avg Violations per File
             </Typography>
             <Typography variant="h3" fontWeight="bold" color="warning.main">
-              {stats.averageViolationsPerFile.toFixed(1)}
+              {(stats.averageViolationsPerFile ?? 0).toFixed(1)}
             </Typography>
           </Paper>
         </Grid>

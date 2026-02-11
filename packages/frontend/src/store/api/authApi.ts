@@ -13,8 +13,9 @@ export interface LoginResponse {
     role: string
     organizationId?: string
   }
-  token: string
+  accessToken: string
   refreshToken: string
+  expiresIn?: number
 }
 
 export interface RefreshTokenRequest {
@@ -22,8 +23,9 @@ export interface RefreshTokenRequest {
 }
 
 export interface RefreshTokenResponse {
-  token: string
+  accessToken: string
   refreshToken: string
+  expiresIn?: number
 }
 
 export interface UserProfile {

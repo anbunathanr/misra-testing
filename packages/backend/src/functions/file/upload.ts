@@ -1,6 +1,9 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { FileUploadService, FileUploadRequest } from '../../services/file/file-upload-service';
 import { JWTService } from '../../services/auth/jwt-service';
+import { FileMetadataService } from '../../services/file-metadata-service';
+import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
+import { AnalysisStatus, FileType } from '../../types/file-metadata';
 
 // Local type definitions
 interface UploadRequestBody {
@@ -18,6 +21,9 @@ interface UploadResponse {
 
 const fileUploadService = new FileUploadService();
 const jwtService = new JWTService();
+const environment = process.env.ENVIRONMENT || 'dev';
+const dbClient = new DynamoDBClientWrapper(environment);
+const fileMetadataService = new FileMetadataService(dbClient);
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -61,6 +67,27 @@ export const handler = async (
 
     // Generate presigned upload URL
     const uploadResponse = await fileUploadService.generatePresignedUploadUrl(fileUploadRequest);
+
+    // Create FileMetadata record
+    try {
+      const now = Math.floor(Date.now() / 1000); // Convert to seconds
+      await fileMetadataService.createFileMetadata({
+        file_id: uploadResponse.fileId,
+        filename: uploadRequest.fileName,
+        file_type: uploadRequest.fileName.endsWith('.c') ? FileType.C : FileType.CPP,
+        file_size: uploadRequest.fileSize,
+        user_id: tokenPayload.userId, // Use user ID as-is from JWT
+        upload_timestamp: now,
+        analysis_status: AnalysisStatus.PENDING,
+        s3_key: `uploads/${tokenPayload.organizationId}/${tokenPayload.userId}/${Date.now()}-${uploadResponse.fileId}-${uploadRequest.fileName}`,
+        created_at: now,
+        updated_at: now
+      });
+      console.log(`FileMetadata record created for file ${uploadResponse.fileId}`);
+    } catch (metadataError) {
+      console.error('Error creating FileMetadata record:', metadataError);
+      // Don't fail the upload if metadata creation fails
+    }
 
     const response: UploadResponse = {
       fileId: uploadResponse.fileId,

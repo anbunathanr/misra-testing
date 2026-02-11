@@ -129,7 +129,7 @@ export class FileMetadataService implements IFileMetadataService {
 
       const updatesWithTimestamp = {
         ...updates,
-        updated_at: Date.now()
+        updated_at: Math.floor(Date.now() / 1000)
       }
 
       const updateExpressionParts: string[] = []
@@ -170,7 +170,7 @@ export class FileMetadataService implements IFileMetadataService {
   async updateAnalysisStatus(fileId: string, status: AnalysisStatus): Promise<FileMetadata> {
     return this.updateFileMetadata(fileId, {
       analysis_status: status,
-      updated_at: Date.now()
+      updated_at: Math.floor(Date.now() / 1000)
     })
   }
 
@@ -228,10 +228,51 @@ export class FileMetadataService implements IFileMetadataService {
   }
 
   async getUserFiles(
-    _userId: string,
-    _pagination?: PaginationOptions
+    userId: string,
+    pagination?: PaginationOptions
   ): Promise<PaginatedResult<FileMetadata>> {
-    throw new Error('Not implemented yet - will be implemented in Task 7.1')
+    if (!userId || userId.trim().length === 0) {
+      throw new MetadataError(
+        'User ID is required',
+        ErrorCodes.VALIDATION_ERROR,
+        400,
+        [{ field: 'user_id', message: 'User ID cannot be empty', code: 'REQUIRED_FIELD' }]
+      )
+    }
+
+    try {
+      const result = await this.dbClient.queryByIndex(
+        'UserIndex',
+        'user_id',
+        userId,
+        {
+          limit: pagination?.limit || 50,
+          exclusiveStartKey: pagination?.exclusiveStartKey
+        }
+      )
+
+      return {
+        items: result.items as FileMetadata[],
+        lastEvaluatedKey: result.lastEvaluatedKey,
+        count: result.count,
+        scannedCount: result.scannedCount
+      }
+    } catch (error) {
+      if (error instanceof MetadataError) {
+        throw error
+      }
+      throw new MetadataError(
+        'Failed to retrieve user files',
+        ErrorCodes.DATABASE_ERROR,
+        500,
+        error instanceof Error ? error : undefined
+      )
+    }
+  }
+
+  async getFilesByUserId(userId: string): Promise<FileMetadata[]> {
+    const result = await this.getUserFiles(userId, { limit: 100 })
+    return result.items
   }
 
   async getFilesByStatus(

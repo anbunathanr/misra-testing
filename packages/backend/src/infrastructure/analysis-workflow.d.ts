@@ -9,6 +9,12 @@ export interface AnalysisWorkflowProps {
 /**
  * Step Functions state machine for MISRA analysis workflow orchestration
  * Coordinates the analysis pipeline from file processing to result notification
+ *
+ * SIMPLIFIED WORKFLOW:
+ * - Single Lambda invocation that handles the entire analysis
+ * - Lambda updates FileMetadata status internally
+ * - Lambda sends notifications internally
+ * - Workflow just checks final status and succeeds/fails accordingly
  */
 export declare class AnalysisWorkflow extends Construct {
     readonly stateMachine: sfn.StateMachine;

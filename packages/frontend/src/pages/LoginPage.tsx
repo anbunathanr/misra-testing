@@ -76,7 +76,7 @@ function LoginPage() {
       dispatch(
         setCredentials({
           user: result.user,
-          token: result.token,
+          token: result.accessToken,
           refreshToken: result.refreshToken
         })
       )

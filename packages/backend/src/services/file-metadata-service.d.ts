@@ -25,7 +25,8 @@ export declare class FileMetadataService implements IFileMetadataService {
     updateFileMetadata(fileId: string, updates: Partial<FileMetadata>): Promise<FileMetadata>;
     updateAnalysisStatus(fileId: string, status: AnalysisStatus): Promise<FileMetadata>;
     deleteFileMetadata(fileId: string, userId: string): Promise<void>;
-    getUserFiles(_userId: string, _pagination?: PaginationOptions): Promise<PaginatedResult<FileMetadata>>;
+    getUserFiles(userId: string, pagination?: PaginationOptions): Promise<PaginatedResult<FileMetadata>>;
+    getFilesByUserId(userId: string): Promise<FileMetadata[]>;
     getFilesByStatus(_status: AnalysisStatus, _pagination?: PaginationOptions): Promise<PaginatedResult<FileMetadata>>;
     getUserFilesByStatus(_userId: string, _status: AnalysisStatus): Promise<FileMetadata[]>;
     batchGetFiles(fileIds: string[]): Promise<FileMetadata[]>;

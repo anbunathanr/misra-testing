@@ -11,6 +11,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
+import { FileMetadataTable } from './file-metadata-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -153,6 +154,11 @@ export class MisraPlatformStack extends cdk.Stack {
       sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
     });
 
+    // File Metadata Table for tracking uploaded files and analysis status
+    const fileMetadataTable = new FileMetadataTable(this, 'FileMetadataTable', {
+      environment: 'dev'
+    });
+
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'misra-platform-processing',
@@ -211,6 +217,7 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: {
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
         JWT_SECRET_NAME: jwtSecret.secretName,
+        ENVIRONMENT: 'dev',
       },
       timeout: cdk.Duration.seconds(30),
     });
@@ -222,8 +229,22 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         PROCESSING_QUEUE_URL: processingQueue.queueUrl,
+        ENVIRONMENT: 'dev',
+        STATE_MACHINE_ARN: '', // Will be set after workflow is created
       },
       timeout: cdk.Duration.minutes(5),
+    });
+
+    const getFilesFunction = new lambda.Function(this, 'GetFilesFunction', {
+      functionName: 'misra-platform-get-files',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/file/get-files.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        ENVIRONMENT: 'dev',
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
     });
 
     // Grant permissions
@@ -232,11 +253,17 @@ export class MisraPlatformStack extends cdk.Stack {
     jwtSecret.grantRead(loginFunction);
     jwtSecret.grantRead(refreshFunction);
     jwtSecret.grantRead(fileUploadFunction);
+    jwtSecret.grantRead(getFilesFunction);
     
     // File upload permissions
     fileStorageBucket.grantReadWrite(fileUploadFunction);
     fileStorageBucket.grantRead(uploadCompleteFunction);
     processingQueue.grantSendMessages(uploadCompleteFunction);
+    
+    // File metadata permissions
+    fileMetadataTable.grantReadWriteData(fileUploadFunction);
+    fileMetadataTable.grantReadWriteData(uploadCompleteFunction);
+    fileMetadataTable.grantReadData(getFilesFunction);
 
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
@@ -254,7 +281,7 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: {
         ANALYSES_TABLE_NAME: analysesTable.tableName,
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
-        ENVIRONMENT: this.stackName,
+        ENVIRONMENT: 'dev', // Fixed: was this.stackName
       },
       timeout: cdk.Duration.minutes(5),
       memorySize: 512,
@@ -284,6 +311,7 @@ export class MisraPlatformStack extends cdk.Stack {
     analysesTable.grantReadWriteData(analysisFunction);
     analysisResultsTable.grantReadWriteData(analysisFunction);
     fileStorageBucket.grantRead(analysisFunction);
+    fileMetadataTable.grantReadWriteData(analysisFunction);
     usersTable.grantReadData(notificationFunction);
 
     // Query Results Lambda Function
@@ -368,6 +396,12 @@ export class MisraPlatformStack extends cdk.Stack {
       notificationFunction,
     });
 
+    // Update upload-complete function with workflow ARN
+    uploadCompleteFunction.addEnvironment('STATE_MACHINE_ARN', workflow.stateMachine.stateMachineArn);
+    
+    // Grant upload-complete function permission to start workflow executions
+    workflow.stateMachine.grantStartExecution(uploadCompleteFunction);
+
     // API Gateway
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
       apiName: 'misra-platform-api',
@@ -403,6 +437,12 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/files/upload',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction),
+    });
+
+    api.addRoutes({
+      path: '/files',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetFilesIntegration', getFilesFunction),
     });
 
     // Add report routes
