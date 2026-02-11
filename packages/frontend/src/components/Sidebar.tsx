@@ -13,6 +13,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import FolderIcon from '@mui/icons-material/Folder'
 import AssessmentIcon from '@mui/icons-material/Assessment'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
+import WorkIcon from '@mui/icons-material/Work'
 import LogoutIcon from '@mui/icons-material/Logout'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
@@ -26,6 +27,7 @@ interface SidebarProps {
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Projects', icon: <WorkIcon />, path: '/projects' },
   { text: 'Files', icon: <FolderIcon />, path: '/files' },
   { text: 'Analysis', icon: <AssessmentIcon />, path: '/analysis' },
   { text: 'Insights', icon: <LightbulbIcon />, path: '/insights' }
@@ -47,9 +49,9 @@ function Sidebar({ drawerWidth, mobileOpen, onDrawerToggle }: SidebarProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
           <AssessmentIcon sx={{ mr: 1, color: 'primary.main' }} />
           <Box>
-            <Box sx={{ fontWeight: 600, fontSize: '1.1rem' }}>MISRA</Box>
+            <Box sx={{ fontWeight: 600, fontSize: '1.1rem' }}>Web Testing</Box>
             <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-              Code Quality
+              Test Platform
             </Box>
           </Box>
         </Box>
