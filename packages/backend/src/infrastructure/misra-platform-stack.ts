@@ -12,6 +12,7 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
+import { ProjectsTable } from './projects-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -159,6 +160,9 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: 'dev'
     });
 
+    // Projects Table for Web App Testing System
+    const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
+
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'misra-platform-processing',
@@ -247,6 +251,43 @@ export class MisraPlatformStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
     });
 
+    // Project Management Lambda Functions
+    const createProjectFunction = new lambda.Function(this, 'CreateProjectFunction', {
+      functionName: 'misra-platform-create-project',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/projects/create-project.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const getProjectsFunction = new lambda.Function(this, 'GetProjectsFunction', {
+      functionName: 'misra-platform-get-projects',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/projects/get-projects.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    const updateProjectFunction = new lambda.Function(this, 'UpdateProjectFunction', {
+      functionName: 'misra-platform-update-project',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/projects/update-project.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
     // Grant permissions
     usersTable.grantReadWriteData(loginFunction);
     usersTable.grantReadWriteData(refreshFunction);
@@ -264,6 +305,14 @@ export class MisraPlatformStack extends cdk.Stack {
     fileMetadataTable.grantReadWriteData(fileUploadFunction);
     fileMetadataTable.grantReadWriteData(uploadCompleteFunction);
     fileMetadataTable.grantReadData(getFilesFunction);
+
+    // Project management permissions
+    testProjectsTable.table.grantReadWriteData(createProjectFunction);
+    testProjectsTable.table.grantReadData(getProjectsFunction);
+    testProjectsTable.table.grantReadWriteData(updateProjectFunction);
+    jwtSecret.grantRead(createProjectFunction);
+    jwtSecret.grantRead(getProjectsFunction);
+    jwtSecret.grantRead(updateProjectFunction);
 
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
@@ -478,6 +527,25 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/ai/feedback',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction),
+    });
+
+    // Add project management routes
+    api.addRoutes({
+      path: '/projects',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('CreateProjectIntegration', createProjectFunction),
+    });
+
+    api.addRoutes({
+      path: '/projects',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetProjectsIntegration', getProjectsFunction),
+    });
+
+    api.addRoutes({
+      path: '/projects/{projectId}',
+      methods: [apigateway.HttpMethod.PUT],
+      integration: new integrations.HttpLambdaIntegration('UpdateProjectIntegration', updateProjectFunction),
     });
 
     // Output important values
