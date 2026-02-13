@@ -3,6 +3,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -15,6 +16,8 @@ import { FileMetadataTable } from './file-metadata-table';
 import { ProjectsTable } from './projects-table';
 import { TestSuitesTable } from './test-suites-table';
 import { TestCasesTable } from './test-cases-table';
+import { TestExecutionsTable } from './test-executions-table';
+import { ScreenshotsBucket } from './screenshots-bucket';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -171,6 +174,14 @@ export class MisraPlatformStack extends cdk.Stack {
     // Test Cases Table for Web App Testing System
     const testCasesTable = new TestCasesTable(this, 'TestCasesTable');
 
+    // Test Executions Table for Web App Testing System
+    const testExecutionsTable = new TestExecutionsTable(this, 'TestExecutionsTable');
+
+    // Screenshots Bucket for Test Execution Failures
+    const screenshotsBucket = new ScreenshotsBucket(this, 'ScreenshotsBucket', {
+      environment: 'dev'
+    });
+
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'misra-platform-processing',
@@ -180,6 +191,22 @@ export class MisraPlatformStack extends cdk.Stack {
           queueName: 'misra-platform-processing-dlq',
         }),
         maxReceiveCount: 3,
+      },
+    });
+
+    // SQS Queue for test execution
+    const testExecutionDLQ = new sqs.Queue(this, 'TestExecutionDLQ', {
+      queueName: 'misra-platform-test-execution-dlq',
+      retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
+    });
+
+    const testExecutionQueue = new sqs.Queue(this, 'TestExecutionQueue', {
+      queueName: 'misra-platform-test-execution',
+      visibilityTimeout: cdk.Duration.minutes(15), // Match Lambda timeout
+      receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
+      deadLetterQueue: {
+        queue: testExecutionDLQ,
+        maxReceiveCount: 3, // Retry up to 3 times before moving to DLQ
       },
     });
 
@@ -411,6 +438,36 @@ export class MisraPlatformStack extends cdk.Stack {
     jwtSecret.grantRead(createTestCaseFunction);
     jwtSecret.grantRead(getTestCasesFunction);
     jwtSecret.grantRead(updateTestCaseFunction);
+
+    // Test Execution Lambda Functions
+    const testExecutorFunction = new lambda.Function(this, 'TestExecutorFunction', {
+      functionName: 'misra-platform-test-executor',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/executor.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        SCREENSHOTS_BUCKET_NAME: screenshotsBucket.bucket.bucketName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.minutes(15), // Maximum Lambda timeout
+      memorySize: 2048, // Increased memory for browser automation
+    });
+
+    // Grant test executor permissions
+    testExecutionsTable.table.grantReadWriteData(testExecutorFunction);
+    testCasesTable.table.grantReadData(testExecutorFunction);
+    screenshotsBucket.bucket.grantReadWrite(testExecutorFunction);
+
+    // Add SQS trigger for test executor
+    testExecutorFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(testExecutionQueue, {
+        batchSize: 1, // Process one test at a time
+        maxBatchingWindow: cdk.Duration.seconds(0), // No batching delay
+        reportBatchItemFailures: true, // Enable partial batch responses
+      })
+    );
 
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
@@ -705,9 +762,24 @@ export class MisraPlatformStack extends cdk.Stack {
       description: 'SQS queue for processing jobs',
     });
 
+    new cdk.CfnOutput(this, 'TestExecutionQueueUrl', {
+      value: testExecutionQueue.queueUrl,
+      description: 'SQS queue for test execution jobs',
+    });
+
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: api.apiEndpoint,
       description: 'API Gateway endpoint URL',
+    });
+
+    new cdk.CfnOutput(this, 'TestExecutionsTableName', {
+      value: testExecutionsTable.table.tableName,
+      description: 'DynamoDB table for test executions',
+    });
+
+    new cdk.CfnOutput(this, 'ScreenshotsBucketName', {
+      value: screenshotsBucket.bucket.bucketName,
+      description: 'S3 bucket for test execution screenshots',
     });
   }
 }
