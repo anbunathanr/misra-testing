@@ -27,6 +27,7 @@ import {
   Edit as EditIcon,
   PlayArrow as RunIcon,
   Delete as DeleteIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -37,6 +38,8 @@ import {
 } from '../store/api/testCasesApi';
 import { useGetTestSuiteQuery } from '../store/api/testSuitesApi';
 import { useGetProjectQuery } from '../store/api/projectsApi';
+import { ExecutionTriggerButton } from '../components/ExecutionTriggerButton';
+import { ExecutionStatusBadge } from '../components/ExecutionStatusBadge';
 
 export const TestCasesPage: React.FC = () => {
   const { projectId, suiteId } = useParams<{ projectId: string; suiteId: string }>();
@@ -47,6 +50,7 @@ export const TestCasesPage: React.FC = () => {
   const [createTestCase] = useCreateTestCaseMutation();
   
   const [openDialog, setOpenDialog] = useState(false);
+  const [latestExecutions, setLatestExecutions] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateTestCaseInput>({
     suiteId: suiteId!,
     projectId: projectId!,
@@ -109,6 +113,13 @@ export const TestCasesPage: React.FC = () => {
     });
   };
 
+  const handleExecutionSuccess = (testCaseId: string, executionId: string) => {
+    setLatestExecutions((prev) => ({
+      ...prev,
+      [testCaseId]: executionId,
+    }));
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'error';
@@ -169,9 +180,17 @@ export const TestCasesPage: React.FC = () => {
                       {testCase.description}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Chip label={testCase.type} color={getTypeColor(testCase.type)} size="small" />
-                    <Chip label={testCase.priority} color={getPriorityColor(testCase.priority)} size="small" />
+                  <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Chip label={testCase.type} color={getTypeColor(testCase.type)} size="small" />
+                      <Chip label={testCase.priority} color={getPriorityColor(testCase.priority)} size="small" />
+                    </Box>
+                    {latestExecutions[testCase.testCaseId] && (
+                      <ExecutionStatusBadge
+                        executionId={latestExecutions[testCase.testCaseId]}
+                        showProgress={true}
+                      />
+                    )}
                   </Box>
                 </Box>
                 <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
@@ -199,8 +218,19 @@ export const TestCasesPage: React.FC = () => {
                 </Box>
               </CardContent>
               <CardActions>
-                <Button size="small" startIcon={<RunIcon />} color="success">
-                  Run Test
+                <ExecutionTriggerButton
+                  testCaseId={testCase.testCaseId}
+                  environment="test"
+                  variant="text"
+                  size="small"
+                  onSuccess={(executionId) => handleExecutionSuccess(testCase.testCaseId, executionId)}
+                />
+                <Button
+                  size="small"
+                  startIcon={<HistoryIcon />}
+                  onClick={() => navigate(`/projects/${projectId}/executions?testCaseId=${testCase.testCaseId}`)}
+                >
+                  History
                 </Button>
                 <IconButton size="small">
                   <EditIcon fontSize="small" />

@@ -60,7 +60,7 @@ export const stepResultGenerator = (): fc.Arbitrary<StepResult> =>
     status: stepStatusGenerator(),
     duration: fc.integer({ min: 10, max: 30000 }),
     errorMessage: fc.option(fc.string({ minLength: 0, maxLength: 500 }), { nil: undefined }),
-    screenshot: fc.option(fc.string({ minLength: 10, maxLength: 100 }), { nil: undefined }),
+    screenshot: fc.constant(undefined), // Screenshots are assigned at execution level
     details: fc.option(
       fc.record({
         url: fc.option(fc.webUrl(), { nil: undefined }),
@@ -82,22 +82,60 @@ export const testExecutionGenerator = (): fc.Arbitrary<TestExecution> =>
     suiteExecutionId: fc.option(fc.uuid(), { nil: undefined }),
     status: executionStatusGenerator(),
     result: fc.option(executionResultGenerator(), { nil: undefined }),
-    startTime: fc.date({ min: new Date('2024-01-01'), max: new Date() }).map(d => d.toISOString()),
+    startTime: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
     endTime: fc.option(
-      fc.date({ min: new Date('2024-01-01'), max: new Date() }).map(d => d.toISOString()),
+      fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
       { nil: undefined }
     ),
     duration: fc.option(fc.integer({ min: 100, max: 600000 }), { nil: undefined }),
     steps: fc.array(stepResultGenerator(), { minLength: 0, maxLength: 10 }),
-    screenshots: fc.array(fc.string({ minLength: 10, maxLength: 100 }), { maxLength: 5 }),
     errorMessage: fc.option(fc.string({ minLength: 0, maxLength: 500 }), { nil: undefined }),
     metadata: fc.record({
       triggeredBy: fc.uuid(),
       environment: fc.option(fc.constantFrom('test', 'staging', 'production'), { nil: undefined }),
       browserVersion: fc.option(fc.string({ minLength: 1, maxLength: 50 }), { nil: undefined }),
     }),
-    createdAt: fc.date({ min: new Date('2024-01-01'), max: new Date() }).map(d => d.toISOString()),
-    updatedAt: fc.date({ min: new Date('2024-01-01'), max: new Date() }).map(d => d.toISOString()),
+    createdAt: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
+    updatedAt: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
+  }).chain(execution => {
+    // Generate screenshots based on failed steps
+    const failedSteps = execution.steps.filter(s => s.status === 'fail' || s.status === 'error');
+    const screenshotsArbitrary = failedSteps.length > 0
+      ? fc.array(
+          fc.uuid().map(id => `screenshots/${execution.executionId}/${id}.png`),
+          { minLength: 0, maxLength: failedSteps.length }
+        )
+      : fc.constant([] as string[]);
+    
+    return screenshotsArbitrary.map(screenshots => {
+      // Assign screenshots to failed steps
+      let screenshotIndex = 0;
+      const stepsWithScreenshots = execution.steps.map(step => {
+        if ((step.status === 'fail' || step.status === 'error') && screenshotIndex < screenshots.length) {
+          return { ...step, screenshot: screenshots[screenshotIndex++] };
+        }
+        return step;
+      });
+      
+      // Ensure completed executions have result, endTime, and duration
+      if (execution.status === 'completed') {
+        const duration = execution.duration || 5000;
+        return {
+          ...execution,
+          steps: stepsWithScreenshots,
+          screenshots: [...screenshots],
+          result: execution.result || 'pass',
+          duration,
+          endTime: new Date(new Date(execution.startTime).getTime() + duration).toISOString(),
+        };
+      }
+      
+      return {
+        ...execution,
+        steps: stepsWithScreenshots,
+        screenshots: [...screenshots],
+      };
+    });
   });
 
 // Generator for execution message (SQS)
@@ -116,11 +154,50 @@ export const executionMessageGenerator = (): fc.Arbitrary<ExecutionMessage> =>
 
 // Generator for completed test execution (with result and endTime)
 export const completedTestExecutionGenerator = (): fc.Arbitrary<TestExecution> =>
-  testExecutionGenerator().map(execution => ({
-    ...execution,
-    status: 'completed' as ExecutionStatus,
-    result: fc.sample(executionResultGenerator(), 1)[0],
-    endTime: new Date(
-      new Date(execution.startTime).getTime() + (execution.duration || 5000)
-    ).toISOString(),
-  }));
+  fc.record({
+    executionId: fc.uuid(),
+    projectId: fc.uuid(),
+    testCaseId: fc.option(fc.uuid(), { nil: undefined }),
+    testSuiteId: fc.option(fc.uuid(), { nil: undefined }),
+    suiteExecutionId: fc.option(fc.uuid(), { nil: undefined }),
+    status: fc.constant('completed' as ExecutionStatus),
+    result: executionResultGenerator(),
+    startTime: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
+    duration: fc.integer({ min: 100, max: 600000 }),
+    steps: fc.array(stepResultGenerator(), { minLength: 0, maxLength: 10 }),
+    errorMessage: fc.option(fc.string({ minLength: 0, maxLength: 500 }), { nil: undefined }),
+    metadata: fc.record({
+      triggeredBy: fc.uuid(),
+      environment: fc.option(fc.constantFrom('test', 'staging', 'production'), { nil: undefined }),
+      browserVersion: fc.option(fc.string({ minLength: 1, maxLength: 50 }), { nil: undefined }),
+    }),
+    createdAt: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
+    updatedAt: fc.integer({ min: new Date('2024-01-01').getTime(), max: Date.now() }).map(t => new Date(t).toISOString()),
+  }).chain(execution => {
+    // Generate screenshots based on failed steps
+    const failedSteps = execution.steps.filter(s => s.status === 'fail' || s.status === 'error');
+    const screenshotsArbitrary = failedSteps.length > 0
+      ? fc.array(
+          fc.uuid().map(id => `screenshots/${execution.executionId}/${id}.png`),
+          { minLength: 0, maxLength: failedSteps.length }
+        )
+      : fc.constant([] as string[]);
+    
+    return screenshotsArbitrary.map(screenshots => {
+      // Assign screenshots to failed steps
+      let screenshotIndex = 0;
+      const stepsWithScreenshots = execution.steps.map(step => {
+        if ((step.status === 'fail' || step.status === 'error') && screenshotIndex < screenshots.length) {
+          return { ...step, screenshot: screenshots[screenshotIndex++] };
+        }
+        return step;
+      });
+      
+      return {
+        ...execution,
+        steps: stepsWithScreenshots,
+        screenshots: [...screenshots],
+        endTime: new Date(new Date(execution.startTime).getTime() + execution.duration).toISOString(),
+      };
+    });
+  });

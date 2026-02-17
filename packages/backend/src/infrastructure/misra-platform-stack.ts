@@ -469,6 +469,99 @@ export class MisraPlatformStack extends cdk.Stack {
       })
     );
 
+    // Test Execution Trigger Lambda
+    const triggerExecutionFunction = new lambda.Function(this, 'TriggerExecutionFunction', {
+      functionName: 'misra-platform-trigger-execution',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/trigger.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
+        TEST_EXECUTION_QUEUE_URL: testExecutionQueue.queueUrl,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant trigger function permissions
+    testExecutionsTable.table.grantReadWriteData(triggerExecutionFunction);
+    testCasesTable.table.grantReadData(triggerExecutionFunction);
+    testSuitesTable.table.grantReadData(triggerExecutionFunction);
+    testExecutionQueue.grantSendMessages(triggerExecutionFunction);
+    jwtSecret.grantRead(triggerExecutionFunction);
+
+    // Test Execution Status Lambda
+    const getExecutionStatusFunction = new lambda.Function(this, 'GetExecutionStatusFunction', {
+      functionName: 'misra-platform-get-execution-status',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/get-status.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant status function permissions
+    testExecutionsTable.table.grantReadData(getExecutionStatusFunction);
+    jwtSecret.grantRead(getExecutionStatusFunction);
+
+    // Test Execution Results Lambda
+    const getExecutionResultsFunction = new lambda.Function(this, 'GetExecutionResultsFunction', {
+      functionName: 'misra-platform-get-execution-results',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/get-results.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        SCREENSHOTS_BUCKET_NAME: screenshotsBucket.bucket.bucketName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant results function permissions
+    testExecutionsTable.table.grantReadData(getExecutionResultsFunction);
+    screenshotsBucket.bucket.grantRead(getExecutionResultsFunction);
+    jwtSecret.grantRead(getExecutionResultsFunction);
+
+    // Test Execution History Lambda
+    const getExecutionHistoryFunction = new lambda.Function(this, 'GetExecutionHistoryFunction', {
+      functionName: 'misra-platform-get-execution-history',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/get-history.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant history function permissions
+    testExecutionsTable.table.grantReadData(getExecutionHistoryFunction);
+    jwtSecret.grantRead(getExecutionHistoryFunction);
+
+    // Test Suite Results Lambda
+    const getSuiteResultsFunction = new lambda.Function(this, 'GetSuiteResultsFunction', {
+      functionName: 'misra-platform-get-suite-results',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/executions/get-suite-results.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant suite results function permissions
+    testExecutionsTable.table.grantReadData(getSuiteResultsFunction);
+    jwtSecret.grantRead(getSuiteResultsFunction);
+
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
@@ -739,6 +832,37 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/test-cases/{testCaseId}',
       methods: [apigateway.HttpMethod.PUT],
       integration: new integrations.HttpLambdaIntegration('UpdateTestCaseIntegration', updateTestCaseFunction),
+    });
+
+    // Add test execution routes
+    api.addRoutes({
+      path: '/executions/trigger',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('TriggerExecutionIntegration', triggerExecutionFunction),
+    });
+
+    api.addRoutes({
+      path: '/executions/{executionId}/status',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetExecutionStatusIntegration', getExecutionStatusFunction),
+    });
+
+    api.addRoutes({
+      path: '/executions/{executionId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetExecutionResultsIntegration', getExecutionResultsFunction),
+    });
+
+    api.addRoutes({
+      path: '/executions/history',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetExecutionHistoryIntegration', getExecutionHistoryFunction),
+    });
+
+    api.addRoutes({
+      path: '/executions/suites/{suiteExecutionId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetSuiteResultsIntegration', getSuiteResultsFunction),
     });
 
     // Output important values

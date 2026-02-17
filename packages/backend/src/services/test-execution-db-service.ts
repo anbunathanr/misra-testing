@@ -293,6 +293,13 @@ export class TestExecutionDBService {
   }
 
   /**
+   * Alias for getSuiteExecutions - Get all executions by suite execution ID
+   */
+  async getExecutionsBySuiteExecutionId(suiteExecutionId: string): Promise<TestExecution[]> {
+    return this.getSuiteExecutions(suiteExecutionId);
+  }
+
+  /**
    * Calculate suite aggregate results from test case results
    * Returns total, passed, failed, and error counts
    */

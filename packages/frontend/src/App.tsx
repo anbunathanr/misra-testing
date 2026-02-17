@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage.tsx'
 import { ProjectsPage } from './pages/ProjectsPage.tsx'
 import { TestSuitesPage } from './pages/TestSuitesPage.tsx'
 import { TestCasesPage } from './pages/TestCasesPage.tsx'
+import { TestExecutionsPage } from './pages/TestExecutionsPage.tsx'
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:projectId" element={<TestSuitesPage />} />
           <Route path="projects/:projectId/suites/:suiteId" element={<TestCasesPage />} />
+          <Route path="projects/:projectId/executions" element={<TestExecutionsPage />} />
         </Route>
 
         {/* Catch all */}

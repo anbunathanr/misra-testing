@@ -17,10 +17,12 @@ import {
   Breadcrumbs,
   Link,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Visibility as ViewIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Visibility as ViewIcon, History as HistoryIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGetTestSuitesQuery, useCreateTestSuiteMutation, CreateTestSuiteInput } from '../store/api/testSuitesApi';
 import { useGetProjectQuery } from '../store/api/projectsApi';
+import { ExecutionTriggerButton } from '../components/ExecutionTriggerButton';
+import { ExecutionStatusBadge } from '../components/ExecutionStatusBadge';
 
 export const TestSuitesPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -30,6 +32,7 @@ export const TestSuitesPage: React.FC = () => {
   const [createSuite] = useCreateTestSuiteMutation();
   
   const [openDialog, setOpenDialog] = useState(false);
+  const [latestExecutions, setLatestExecutions] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateTestSuiteInput>({
     projectId: projectId!,
     name: '',
@@ -58,6 +61,15 @@ export const TestSuitesPage: React.FC = () => {
 
   const handleRemoveTag = (tagToRemove: string) => {
     setFormData({ ...formData, tags: formData.tags?.filter(tag => tag !== tagToRemove) });
+  };
+
+  const handleExecutionSuccess = (suiteId: string, _executionId: string, suiteExecutionId?: string) => {
+    if (suiteExecutionId) {
+      setLatestExecutions((prev) => ({
+        ...prev,
+        [suiteId]: suiteExecutionId,
+      }));
+    }
   };
 
   if (isLoading) {
@@ -89,9 +101,17 @@ export const TestSuitesPage: React.FC = () => {
           <Grid item xs={12} md={6} lg={4} key={suite.suiteId}>
             <Card>
               <CardContent>
-                <Typography variant="h6" component="div" sx={{ mb: 2 }}>
-                  {suite.name}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                  <Typography variant="h6" component="div">
+                    {suite.name}
+                  </Typography>
+                  {latestExecutions[suite.suiteId] && (
+                    <ExecutionStatusBadge
+                      executionId={latestExecutions[suite.suiteId]}
+                      showProgress={true}
+                    />
+                  )}
+                </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {suite.description}
                 </Typography>
@@ -102,12 +122,28 @@ export const TestSuitesPage: React.FC = () => {
                 </Box>
               </CardContent>
               <CardActions>
+                <ExecutionTriggerButton
+                  testSuiteId={suite.suiteId}
+                  environment="test"
+                  variant="text"
+                  size="small"
+                  onSuccess={(executionId, suiteExecutionId) => 
+                    handleExecutionSuccess(suite.suiteId, executionId, suiteExecutionId)
+                  }
+                />
                 <Button
                   size="small"
                   startIcon={<ViewIcon />}
                   onClick={() => navigate(`/projects/${projectId}/suites/${suite.suiteId}`)}
                 >
                   View Tests
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<HistoryIcon />}
+                  onClick={() => navigate(`/projects/${projectId}/executions?testSuiteId=${suite.suiteId}`)}
+                >
+                  History
                 </Button>
                 <IconButton size="small">
                   <EditIcon fontSize="small" />
