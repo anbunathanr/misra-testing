@@ -6,7 +6,7 @@ This implementation plan breaks down the notification system into discrete, incr
 
 ## Tasks
 
-- [ ] 1. Set up infrastructure and DynamoDB tables
+- [x] 1. Set up infrastructure and DynamoDB tables
   - Create NotificationPreferences DynamoDB table with userId partition key
   - Create NotificationTemplates DynamoDB table with templateId partition key and EventTypeChannelIndex GSI
   - Create NotificationHistory DynamoDB table with notificationId partition key, UserTimeIndex GSI, and EventTypeTimeIndex GSI

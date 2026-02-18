@@ -7,6 +7,7 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as sns from 'aws-cdk-lib/aws-sns';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -18,6 +19,9 @@ import { TestSuitesTable } from './test-suites-table';
 import { TestCasesTable } from './test-cases-table';
 import { TestExecutionsTable } from './test-executions-table';
 import { ScreenshotsBucket } from './screenshots-bucket';
+import { NotificationPreferencesTable } from './notification-preferences-table';
+import { NotificationTemplatesTable } from './notification-templates-table';
+import { NotificationHistoryTable } from './notification-history-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -180,6 +184,52 @@ export class MisraPlatformStack extends cdk.Stack {
     // Screenshots Bucket for Test Execution Failures
     const screenshotsBucket = new ScreenshotsBucket(this, 'ScreenshotsBucket', {
       environment: 'dev'
+    });
+
+    // Notification System Tables
+    const notificationPreferencesTable = new NotificationPreferencesTable(this, 'NotificationPreferencesTable', {
+      environment: 'dev'
+    });
+
+    const notificationTemplatesTable = new NotificationTemplatesTable(this, 'NotificationTemplatesTable', {
+      environment: 'dev'
+    });
+
+    const notificationHistoryTable = new NotificationHistoryTable(this, 'NotificationHistoryTable', {
+      environment: 'dev'
+    });
+
+    // SNS Topics for Notification Delivery
+    const emailNotificationTopic = new sns.Topic(this, 'EmailNotificationTopic', {
+      topicName: 'aibts-notifications-email',
+      displayName: 'AIBTS Email Notifications',
+    });
+
+    const smsNotificationTopic = new sns.Topic(this, 'SmsNotificationTopic', {
+      topicName: 'aibts-notifications-sms',
+      displayName: 'AIBTS SMS Notifications',
+    });
+
+    const webhookNotificationTopic = new sns.Topic(this, 'WebhookNotificationTopic', {
+      topicName: 'aibts-notifications-webhook',
+      displayName: 'AIBTS Webhook Notifications',
+    });
+
+    // SQS Queue for notification processing
+    const notificationDLQ = new sqs.Queue(this, 'NotificationDLQ', {
+      queueName: 'aibts-notification-dlq',
+      retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
+    });
+
+    const notificationQueue = new sqs.Queue(this, 'NotificationQueue', {
+      queueName: 'aibts-notification-queue',
+      visibilityTimeout: cdk.Duration.seconds(30), // Match Lambda timeout
+      receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
+      retentionPeriod: cdk.Duration.days(4),
+      deadLetterQueue: {
+        queue: notificationDLQ,
+        maxReceiveCount: 3, // Retry up to 3 times before moving to DLQ
+      },
     });
 
     // SQS Queue for async processing
@@ -904,6 +954,26 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ScreenshotsBucketName', {
       value: screenshotsBucket.bucket.bucketName,
       description: 'S3 bucket for test execution screenshots',
+    });
+
+    new cdk.CfnOutput(this, 'NotificationQueueUrl', {
+      value: notificationQueue.queueUrl,
+      description: 'SQS queue for notification processing',
+    });
+
+    new cdk.CfnOutput(this, 'EmailNotificationTopicArn', {
+      value: emailNotificationTopic.topicArn,
+      description: 'SNS topic for email notifications',
+    });
+
+    new cdk.CfnOutput(this, 'SmsNotificationTopicArn', {
+      value: smsNotificationTopic.topicArn,
+      description: 'SNS topic for SMS notifications',
+    });
+
+    new cdk.CfnOutput(this, 'WebhookNotificationTopicArn', {
+      value: webhookNotificationTopic.topicArn,
+      description: 'SNS topic for webhook notifications',
     });
   }
 }
