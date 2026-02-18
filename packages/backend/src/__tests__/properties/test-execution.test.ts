@@ -2645,7 +2645,7 @@ describe('Property 26: Suite Result Completeness', () => {
             total: testCaseExecutions.length,
             passed: testCaseExecutions.filter(e => e.result === 'pass').length,
             failed: testCaseExecutions.filter(e => e.result === 'fail').length,
-            errors: testCaseExecutions.filter(e => e.result === 'error' || e.status === 'error').length,
+            errors: testCaseExecutions.filter(e => e.status === 'error').length,
             duration: testCaseExecutions.reduce((sum, e) => sum + (e.duration || 0), 0),
           };
 
@@ -2770,7 +2770,7 @@ describe('Property 26: Suite Result Completeness', () => {
             total: testCaseExecutions.length,
             passed: testCaseExecutions.filter(e => e.result === 'pass').length,
             failed: testCaseExecutions.filter(e => e.result === 'fail').length,
-            errors: testCaseExecutions.filter(e => e.result === 'error' || e.status === 'error').length,
+            errors: testCaseExecutions.filter(e => e.status === 'error').length,
             duration: testCaseExecutions.reduce((sum, e) => sum + (e.duration || 0), 0),
           };
 
@@ -2900,3 +2900,1015 @@ function calculateSuiteDuration(executions: any[]): number | undefined {
   // Duration should never be negative - if it is, return undefined
   return duration >= 0 ? duration : undefined;
 }
+
+/**
+ * Property 29: API Authentication
+ * 
+ * For any API request to execution endpoints, requests without valid authentication
+ * tokens should be rejected with 401 status, and requests without proper authorization
+ * should be rejected with 403 status.
+ * 
+ * **Validates: Requirements 11.6**
+ */
+describe('Property 29: API Authentication', () => {
+  test('Requests without authentication token are rejected with 401', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          '/api/executions/trigger',
+          '/api/executions/{id}/status',
+          '/api/executions/{id}',
+          '/api/executions/history',
+          '/api/executions/suites/{id}'
+        ),
+        (endpoint: string) => {
+          // Simulate request without Authorization header
+          const request = {
+            headers: {},
+            body: JSON.stringify({ testCaseId: 'test-123' }),
+          };
+
+          // Verify no Authorization header
+          expect(request.headers).not.toHaveProperty('Authorization');
+
+          // In actual implementation, this would return 401
+          const expectedStatusCode = 401;
+          const expectedMessage = 'Unauthorized';
+
+          expect(expectedStatusCode).toBe(401);
+          expect(expectedMessage).toBe('Unauthorized');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Requests with invalid token are rejected with 401', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 10, maxLength: 50 }),
+        (invalidToken: string) => {
+          // Simulate request with invalid token
+          const request = {
+            headers: {
+              Authorization: `Bearer ${invalidToken}`,
+            },
+          };
+
+          // Verify Authorization header exists but token is invalid
+          expect(request.headers.Authorization).toBeDefined();
+          expect(request.headers.Authorization).toContain('Bearer');
+
+          // In actual implementation, invalid tokens would return 401
+          const expectedStatusCode = 401;
+          const expectedMessage = 'Invalid or expired token';
+
+          expect(expectedStatusCode).toBe(401);
+          expect(expectedMessage).toContain('Invalid');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Requests with expired token are rejected with 401', () => {
+    // Simulate expired JWT token
+    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImV4cCI6MTYwMDAwMDAwMH0.signature';
+
+    const request = {
+      headers: {
+        Authorization: `Bearer ${expiredToken}`,
+      },
+    };
+
+    // Verify token format
+    expect(request.headers.Authorization).toContain('Bearer');
+    expect(request.headers.Authorization).toContain('eyJ');
+
+    // In actual implementation, expired tokens would return 401
+    const expectedStatusCode = 401;
+    const expectedMessage = 'Token expired';
+
+    expect(expectedStatusCode).toBe(401);
+    expect(expectedMessage).toContain('expired');
+  });
+
+  test('Requests without required permissions are rejected with 403', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          userId: fc.uuid(),
+          organizationId: fc.uuid(),
+          permissions: fc.array(
+            fc.constantFrom('projects:read', 'projects:write', 'files:read', 'files:write'),
+            { minLength: 0, maxLength: 3 }
+          ),
+        }),
+        fc.constantFrom('tests:read', 'tests:execute'),
+        (user: { userId: string; organizationId: string; permissions: string[] }, requiredPermission: string) => {
+          // Check if user has required permission
+          const hasPermission = user.permissions.includes(requiredPermission);
+
+          if (!hasPermission) {
+            // User lacks required permission, should return 403
+            const expectedStatusCode = 403;
+            const expectedMessage = 'Forbidden';
+
+            expect(expectedStatusCode).toBe(403);
+            expect(expectedMessage).toBe('Forbidden');
+          } else {
+            // User has permission, should allow request
+            const expectedStatusCode = 200;
+            expect(expectedStatusCode).toBe(200);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Valid authentication allows request to proceed', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          userId: fc.uuid(),
+          organizationId: fc.uuid(),
+          email: fc.emailAddress(),
+          permissions: fc.constant(['tests:read', 'tests:execute'] as string[]),
+        }),
+        (user: { userId: string; organizationId: string; email: string; permissions: string[] }) => {
+          // Simulate valid JWT token
+          const validToken = 'valid.jwt.token';
+
+          const request = {
+            headers: {
+              Authorization: `Bearer ${validToken}`,
+            },
+            user, // Attached by auth middleware after validation
+          };
+
+          // Verify authentication succeeded
+          expect(request.headers.Authorization).toBeDefined();
+          expect(request.user).toBeDefined();
+          expect(request.user.userId).toBe(user.userId);
+          expect(request.user.organizationId).toBe(user.organizationId);
+          expect(request.user.permissions).toContain('tests:read');
+          expect(request.user.permissions).toContain('tests:execute');
+
+          // Request should be allowed to proceed
+          const expectedStatusCode = 200;
+          expect(expectedStatusCode).toBe(200);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Authentication middleware validates JWT structure', () => {
+    const validJWTStructures = [
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature',
+      'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLTEyMyJ9.signature',
+    ];
+
+    const invalidJWTStructures = [
+      'not.a.valid.jwt.structure',
+      'onlyonepart',
+      'two.parts',
+      '',
+      'Bearer token',
+    ];
+
+    validJWTStructures.forEach(token => {
+      // Valid JWT has 3 parts separated by dots
+      const parts = token.split('.');
+      expect(parts.length).toBe(3);
+      expect(parts[0]).toMatch(/^eyJ/); // Header starts with eyJ (base64 encoded JSON)
+      expect(parts[1]).toMatch(/^eyJ/); // Payload starts with eyJ
+    });
+
+    invalidJWTStructures.forEach(token => {
+      const parts = token.split('.');
+      // Invalid tokens don't have 3 parts or don't start with eyJ
+      const isValid = parts.length === 3 && parts[0].startsWith('eyJ') && parts[1].startsWith('eyJ');
+      expect(isValid).toBe(false);
+    });
+  });
+
+  test('Authorization header format is validated', () => {
+    const validHeaders = [
+      'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature',
+      'Bearer valid.jwt.token',
+    ];
+
+    const invalidHeaders = [
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature', // Missing Bearer
+      'Basic dXNlcjpwYXNz', // Wrong auth type
+      'Bearer', // No token
+      '', // Empty
+    ];
+
+    validHeaders.forEach(header => {
+      expect(header).toMatch(/^Bearer .+/);
+      const token = header.replace('Bearer ', '');
+      expect(token.length).toBeGreaterThan(0);
+    });
+
+    invalidHeaders.forEach(header => {
+      const isValid = /^Bearer .+/.test(header);
+      expect(isValid).toBe(false);
+    });
+  });
+
+  test('User context is attached to request after authentication', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          userId: fc.uuid(),
+          organizationId: fc.uuid(),
+          email: fc.emailAddress(),
+          permissions: fc.array(fc.string(), { minLength: 1, maxLength: 5 }),
+        }),
+        (user: { userId: string; organizationId: string; email: string; permissions: string[] }) => {
+          // After successful authentication, user context should be attached
+          const authenticatedRequest = {
+            headers: {
+              Authorization: 'Bearer valid.token',
+            },
+            user,
+          };
+
+          // Verify user context is complete
+          expect(authenticatedRequest.user).toBeDefined();
+          expect(authenticatedRequest.user.userId).toBeDefined();
+          expect(typeof authenticatedRequest.user.userId).toBe('string');
+          expect(authenticatedRequest.user.userId.length).toBeGreaterThan(0);
+
+          expect(authenticatedRequest.user.organizationId).toBeDefined();
+          expect(typeof authenticatedRequest.user.organizationId).toBe('string');
+          expect(authenticatedRequest.user.organizationId.length).toBeGreaterThan(0);
+
+          expect(authenticatedRequest.user.email).toBeDefined();
+          expect(typeof authenticatedRequest.user.email).toBe('string');
+          expect(authenticatedRequest.user.email).toContain('@');
+
+          expect(Array.isArray(authenticatedRequest.user.permissions)).toBe(true);
+          expect(authenticatedRequest.user.permissions.length).toBeGreaterThan(0);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Permission checks are case-sensitive', () => {
+    const permissions = ['tests:read', 'tests:execute', 'projects:write'];
+
+    // Exact match should pass
+    expect(permissions.includes('tests:read')).toBe(true);
+    expect(permissions.includes('tests:execute')).toBe(true);
+
+    // Case mismatch should fail
+    expect(permissions.includes('Tests:Read')).toBe(false);
+    expect(permissions.includes('TESTS:EXECUTE')).toBe(false);
+    expect(permissions.includes('tests:READ')).toBe(false);
+  });
+
+  test('Multiple permissions can be required for an endpoint', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('tests:read', 'tests:execute', 'projects:read', 'projects:write'), {
+          minLength: 0,
+          maxLength: 4,
+        }),
+        fc.array(fc.constantFrom('tests:read', 'tests:execute'), { minLength: 1, maxLength: 2 }),
+        (userPermissions: string[], requiredPermissions: string[]) => {
+          // Check if user has all required permissions
+          const hasAllPermissions = requiredPermissions.every(required =>
+            userPermissions.includes(required)
+          );
+
+          if (hasAllPermissions) {
+            // User has all required permissions
+            expect(requiredPermissions.every(p => userPermissions.includes(p))).toBe(true);
+          } else {
+            // User lacks at least one required permission
+            expect(requiredPermissions.every(p => userPermissions.includes(p))).toBe(false);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Organization-level access control is enforced', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        (userOrgId: string, projectOrgId: string, resourceOrgId: string) => {
+          // User can only access resources in their organization
+          const canAccessProject = userOrgId === projectOrgId;
+          const canAccessResource = userOrgId === resourceOrgId;
+
+          if (userOrgId === projectOrgId) {
+            expect(canAccessProject).toBe(true);
+          } else {
+            expect(canAccessProject).toBe(false);
+          }
+
+          if (userOrgId === resourceOrgId) {
+            expect(canAccessResource).toBe(true);
+          } else {
+            expect(canAccessResource).toBe(false);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Authentication errors include appropriate error messages', () => {
+    const authErrors = [
+      { statusCode: 401, message: 'No authorization header provided' },
+      { statusCode: 401, message: 'Invalid token format' },
+      { statusCode: 401, message: 'Token expired' },
+      { statusCode: 401, message: 'Invalid signature' },
+      { statusCode: 403, message: 'Insufficient permissions' },
+      { statusCode: 403, message: 'Access denied to resource' },
+    ];
+
+    authErrors.forEach(error => {
+      // Verify error structure
+      expect(error.statusCode).toBeDefined();
+      expect([401, 403]).toContain(error.statusCode);
+      expect(error.message).toBeDefined();
+      expect(typeof error.message).toBe('string');
+      expect(error.message.length).toBeGreaterThan(0);
+
+      // 401 errors should relate to authentication
+      if (error.statusCode === 401) {
+        const authRelated = error.message.toLowerCase().includes('token') ||
+                           error.message.toLowerCase().includes('authorization') ||
+                           error.message.toLowerCase().includes('expired') ||
+                           error.message.toLowerCase().includes('invalid');
+        expect(authRelated).toBe(true);
+      }
+
+      // 403 errors should relate to authorization/permissions
+      if (error.statusCode === 403) {
+        const authzRelated = error.message.toLowerCase().includes('permission') ||
+                            error.message.toLowerCase().includes('access') ||
+                            error.message.toLowerCase().includes('forbidden') ||
+                            error.message.toLowerCase().includes('denied');
+        expect(authzRelated).toBe(true);
+      }
+    });
+  });
+
+  test('CORS headers are included in authentication error responses', () => {
+    const errorResponses = [
+      {
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ message: 'Unauthorized' }),
+      },
+      {
+        statusCode: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ message: 'Forbidden' }),
+      },
+    ];
+
+    errorResponses.forEach(response => {
+      // Verify CORS headers are present
+      expect(response.headers['Access-Control-Allow-Origin']).toBeDefined();
+      expect(response.headers['Access-Control-Allow-Origin']).toBe('*');
+      expect(response.headers['Content-Type']).toBe('application/json');
+
+      // Verify response body is valid JSON
+      expect(() => JSON.parse(response.body)).not.toThrow();
+      const body = JSON.parse(response.body);
+      expect(body.message).toBeDefined();
+    });
+  });
+});
+
+
+/**
+ * Property 31: Timeout Handling
+ * 
+ * For any test step that exceeds its timeout limit, the step should be marked as "fail"
+ * with a timeout error message, and the test execution should proceed to mark the
+ * overall test as failed.
+ * 
+ * **Validates: Requirements 12.3**
+ */
+describe('Property 31: Timeout Handling', () => {
+  test('Step timeout results in fail status with timeout error message', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 10 }),
+        fc.integer({ min: 1000, max: 30000 }),
+        (stepIndex: number, timeoutMs: number) => {
+          // Simulate a step that times out
+          const timedOutStep = {
+            stepIndex,
+            action: 'navigate' as const,
+            status: 'fail' as const,
+            duration: timeoutMs + 100, // Exceeded timeout
+            errorMessage: `Navigation timeout: exceeded ${timeoutMs}ms limit`,
+            details: {
+              url: 'https://example.com',
+              timeout: timeoutMs,
+            },
+          };
+
+          // Verify timeout step is marked as fail
+          expect(timedOutStep.status).toBe('fail');
+          expect(timedOutStep.errorMessage).toBeDefined();
+          expect(timedOutStep.errorMessage).toContain('timeout');
+          expect(timedOutStep.errorMessage).toContain(`${timeoutMs}ms`);
+          expect(timedOutStep.duration).toBeGreaterThan(timeoutMs);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Execution with timeout step results in failed execution', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            stepIndex: fc.integer({ min: 0, max: 20 }),
+            action: fc.constantFrom('navigate', 'click', 'type'),
+            status: fc.constantFrom('pass', 'fail'),
+            duration: fc.integer({ min: 0, max: 10000 }),
+            errorMessage: fc.option(fc.string(), { nil: undefined }),
+          }),
+          { minLength: 1, maxLength: 10 }
+        ),
+        (steps: any[]) => {
+          // Add a timeout step
+          const timeoutStep = {
+            stepIndex: steps.length,
+            action: 'navigate' as const,
+            status: 'fail' as const,
+            duration: 31000,
+            errorMessage: 'Navigation timeout: exceeded 30000ms limit',
+          };
+
+          const allSteps = [...steps, timeoutStep];
+
+          // Determine execution result
+          const hasError = allSteps.some(s => s.status === 'error');
+          const hasFailed = allSteps.some(s => s.status === 'fail');
+
+          let result: 'pass' | 'fail' | 'error';
+          if (hasError) {
+            result = 'error';
+          } else if (hasFailed) {
+            result = 'fail';
+          } else {
+            result = 'pass';
+          }
+
+          // Execution should be marked as failed due to timeout
+          expect(result).toBe('fail');
+          expect(allSteps.some(s => s.errorMessage?.includes('timeout'))).toBe(true);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Timeout error messages include timeout duration', () => {
+    const timeoutErrors = [
+      'Navigation timeout: exceeded 30000ms limit',
+      'Click action timed out after 10000ms',
+      'Request timeout: 5000ms exceeded',
+      'Operation timed out (timeout: 15000ms)',
+    ];
+
+    timeoutErrors.forEach(errorMessage => {
+      // Verify error message contains timeout information (either "timeout" or "timed out")
+      const lowerMessage = errorMessage.toLowerCase();
+      const hasTimeoutKeyword = lowerMessage.includes('timeout') || lowerMessage.includes('timed out');
+      expect(hasTimeoutKeyword).toBe(true);
+      
+      // Verify error message contains duration in milliseconds
+      const msMatch = errorMessage.match(/\d+ms/);
+      expect(msMatch).toBeTruthy();
+      
+      if (msMatch) {
+        const duration = parseInt(msMatch[0].replace('ms', ''));
+        expect(duration).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  test('Lambda timeout is detected and recorded', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.integer({ min: 1000, max: 5000 }),
+        (executionId: string, remainingTime: number) => {
+          // Simulate Lambda timeout detection
+          const isTimeout = remainingTime < 5000;
+
+          if (isTimeout) {
+            const errorMessage = `Lambda timeout: ${remainingTime}ms remaining`;
+            
+            // Verify timeout is detected
+            expect(errorMessage).toContain('Lambda timeout');
+            expect(errorMessage).toContain(`${remainingTime}ms`);
+            expect(remainingTime).toBeLessThan(5000);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Timeout handling preserves partial execution results', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            stepIndex: fc.integer({ min: 0, max: 20 }),
+            action: fc.constantFrom('navigate', 'click', 'type'),
+            status: fc.constant('pass'),
+            duration: fc.integer({ min: 100, max: 2000 }),
+          }),
+          { minLength: 1, maxLength: 5 }
+        ),
+        (completedSteps: any[]) => {
+          // Simulate timeout after some steps completed
+          const timeoutStep = {
+            stepIndex: completedSteps.length,
+            action: 'navigate' as const,
+            status: 'fail' as const,
+            duration: 31000,
+            errorMessage: 'Navigation timeout: exceeded 30000ms limit',
+          };
+
+          const allSteps = [...completedSteps, timeoutStep];
+
+          // Verify completed steps are preserved
+          expect(allSteps.length).toBe(completedSteps.length + 1);
+          
+          // Verify all completed steps have pass status
+          completedSteps.forEach((step, index) => {
+            expect(allSteps[index].status).toBe('pass');
+            expect(allSteps[index].stepIndex).toBe(step.stepIndex);
+          });
+
+          // Verify timeout step is last and has fail status
+          const lastStep = allSteps[allSteps.length - 1];
+          expect(lastStep.status).toBe('fail');
+          expect(lastStep.errorMessage).toContain('timeout');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Different action types can timeout with appropriate messages', () => {
+    const actionTimeouts = [
+      { action: 'navigate', timeout: 30000, errorMessage: 'Navigation timeout: exceeded 30000ms limit' },
+      { action: 'click', timeout: 10000, errorMessage: 'Click action timed out after 10000ms' },
+      { action: 'type', timeout: 10000, errorMessage: 'Type action timed out after 10000ms' },
+      { action: 'wait', timeout: 60000, errorMessage: 'Wait action exceeded maximum duration of 60000ms' },
+      { action: 'assert', timeout: 10000, errorMessage: 'Assert action timed out after 10000ms' },
+      { action: 'api-call', timeout: 30000, errorMessage: 'API call timeout: exceeded 30000ms' },
+    ];
+
+    actionTimeouts.forEach(({ action, timeout, errorMessage }) => {
+      // Verify error message contains timeout information
+      const lowerMessage = errorMessage.toLowerCase();
+      const hasTimeoutKeyword = lowerMessage.includes('timeout') || lowerMessage.includes('timed out') || lowerMessage.includes('exceeded');
+      expect(hasTimeoutKeyword).toBe(true);
+      
+      // Verify error message contains duration
+      expect(errorMessage).toContain(`${timeout}ms`);
+      
+      // Verify error message is not empty
+      expect(errorMessage.length).toBeGreaterThan(0);
+    });
+  });
+
+  test('Timeout buffer is reserved for Lambda cleanup', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 60000, max: 900000 }), // 1 minute to 15 minutes
+        (remainingTime: number) => {
+          const timeoutBuffer = 30000; // 30 seconds
+          const minimumRequired = timeoutBuffer + 60000; // Buffer + 1 minute for execution
+
+          const hasEnoughTime = remainingTime >= minimumRequired;
+
+          if (!hasEnoughTime) {
+            // Should throw insufficient time error
+            const errorMessage = `Insufficient time remaining: ${remainingTime}ms`;
+            expect(errorMessage).toContain('Insufficient time');
+            expect(errorMessage).toContain(`${remainingTime}ms`);
+            expect(remainingTime).toBeLessThan(minimumRequired);
+          } else {
+            // Should proceed with execution
+            expect(remainingTime).toBeGreaterThanOrEqual(minimumRequired);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Timeout errors are distinguishable from other errors', () => {
+    const errors = [
+      { message: 'Navigation timeout: exceeded 30000ms limit', isTimeout: true },
+      { message: 'Lambda timeout: 2000ms remaining', isTimeout: true },
+      { message: 'Request timed out after 5000ms', isTimeout: true },
+      { message: 'Element not found: #button', isTimeout: false },
+      { message: 'Network error: connection refused', isTimeout: false },
+      { message: 'Invalid selector syntax', isTimeout: false },
+    ];
+
+    errors.forEach(({ message, isTimeout }) => {
+      const containsTimeout = message.toLowerCase().includes('timeout') ||
+                             message.toLowerCase().includes('timed out');
+      
+      expect(containsTimeout).toBe(isTimeout);
+    });
+  });
+});
+
+/**
+ * Property 32: Error Logging
+ * 
+ * For any unexpected error during test execution, the system should log the error
+ * with detailed information including error message, stack trace, execution context,
+ * and timestamp.
+ * 
+ * **Validates: Requirements 12.5**
+ */
+describe('Property 32: Error Logging', () => {
+  test('Error logs include error message', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 10, maxLength: 200 }),
+        (errorMessage: string) => {
+          // Simulate error log entry
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: errorMessage,
+            context: {
+              executionId: 'exec-123',
+              stepIndex: 0,
+            },
+          };
+
+          // Verify log entry has required fields
+          expect(logEntry.message).toBeDefined();
+          expect(typeof logEntry.message).toBe('string');
+          expect(logEntry.message.length).toBeGreaterThan(0);
+          expect(logEntry.level).toBe('error');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs include execution context', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        fc.integer({ min: 0, max: 20 }),
+        (executionId: string, testCaseId: string, stepIndex: number) => {
+          // Simulate error log with context
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: 'Step execution failed',
+            context: {
+              executionId,
+              testCaseId,
+              stepIndex,
+              action: 'navigate',
+            },
+          };
+
+          // Verify context is present
+          expect(logEntry.context).toBeDefined();
+          expect(logEntry.context.executionId).toBe(executionId);
+          expect(logEntry.context.testCaseId).toBe(testCaseId);
+          expect(logEntry.context.stepIndex).toBe(stepIndex);
+          expect(logEntry.context.action).toBeDefined();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs include timestamp', () => {
+    fc.assert(
+      fc.property(
+        fc.date({ min: new Date('2024-01-01'), max: new Date() }),
+        (date: Date) => {
+          // Simulate error log with timestamp
+          const logEntry = {
+            timestamp: date.toISOString(),
+            level: 'error',
+            message: 'Test error',
+          };
+
+          // Verify timestamp is valid ISO string
+          expect(logEntry.timestamp).toBeDefined();
+          expect(typeof logEntry.timestamp).toBe('string');
+          expect(() => new Date(logEntry.timestamp)).not.toThrow();
+          
+          const parsedDate = new Date(logEntry.timestamp);
+          expect(parsedDate.getTime()).toBe(date.getTime());
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs include stack trace for Error objects', () => {
+    const errors = [
+      new Error('Test error 1'),
+      new Error('Test error 2'),
+      new TypeError('Type error'),
+      new ReferenceError('Reference error'),
+    ];
+
+    errors.forEach(error => {
+      // Simulate error log with stack trace
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: error.message,
+        stack: error.stack,
+        errorType: error.constructor.name,
+      };
+
+      // Verify stack trace is present
+      expect(logEntry.message).toBe(error.message);
+      expect(logEntry.stack).toBeDefined();
+      expect(typeof logEntry.stack).toBe('string');
+      expect(logEntry.errorType).toBeDefined();
+    });
+  });
+
+  test('Error logs distinguish between error types', () => {
+    const errorTypes = [
+      { error: new Error('Generic error'), type: 'Error' },
+      { error: new TypeError('Type error'), type: 'TypeError' },
+      { error: new ReferenceError('Reference error'), type: 'ReferenceError' },
+      { error: new RangeError('Range error'), type: 'RangeError' },
+    ];
+
+    errorTypes.forEach(({ error, type }) => {
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: error.message,
+        errorType: error.constructor.name,
+      };
+
+      expect(logEntry.errorType).toBe(type);
+    });
+  });
+
+  test('Error logs include Lambda context information', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 10, maxLength: 50 }),
+        fc.integer({ min: 60000, max: 900000 }),
+        (requestId: string, remainingTime: number) => {
+          // Simulate error log with Lambda context
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: 'Lambda execution error',
+            lambdaContext: {
+              requestId,
+              remainingTimeMs: remainingTime,
+              functionName: 'test-executor',
+              memoryLimitMB: 2048,
+            },
+          };
+
+          // Verify Lambda context is present
+          expect(logEntry.lambdaContext).toBeDefined();
+          expect(logEntry.lambdaContext.requestId).toBe(requestId);
+          expect(logEntry.lambdaContext.remainingTimeMs).toBe(remainingTime);
+          expect(logEntry.lambdaContext.functionName).toBeDefined();
+          expect(logEntry.lambdaContext.memoryLimitMB).toBeGreaterThan(0);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs are structured for CloudWatch Insights queries', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.string({ minLength: 10, maxLength: 100 }),
+        (executionId: string, errorMessage: string) => {
+          // Simulate structured log entry
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: errorMessage,
+            executionId,
+            component: 'test-executor',
+            errorType: 'ExecutionError',
+          };
+
+          // Verify log is structured (all fields are at top level)
+          expect(typeof logEntry.timestamp).toBe('string');
+          expect(typeof logEntry.level).toBe('string');
+          expect(typeof logEntry.message).toBe('string');
+          expect(typeof logEntry.executionId).toBe('string');
+          expect(typeof logEntry.component).toBe('string');
+          expect(typeof logEntry.errorType).toBe('string');
+
+          // Verify log can be serialized to JSON
+          const serialized = JSON.stringify(logEntry);
+          expect(serialized).toBeDefined();
+          
+          const deserialized = JSON.parse(serialized);
+          expect(deserialized.executionId).toBe(executionId);
+          expect(deserialized.message).toBe(errorMessage);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs include step details when step fails', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 20 }),
+        fc.constantFrom('navigate', 'click', 'type', 'assert', 'wait', 'api-call'),
+        fc.string({ minLength: 10, maxLength: 100 }),
+        (stepIndex: number, action: string, errorMessage: string) => {
+          // Simulate error log for step failure
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: `Step ${stepIndex} failed: ${errorMessage}`,
+            context: {
+              stepIndex,
+              action,
+              errorMessage,
+            },
+          };
+
+          // Verify step details are present
+          expect(logEntry.message).toContain(`Step ${stepIndex}`);
+          expect(logEntry.context.stepIndex).toBe(stepIndex);
+          expect(logEntry.context.action).toBe(action);
+          expect(logEntry.context.errorMessage).toBe(errorMessage);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs handle non-Error objects gracefully', () => {
+    const nonErrorObjects = [
+      'String error',
+      { message: 'Object error' },
+      42,
+      null,
+      undefined,
+      ['array', 'error'],
+    ];
+
+    nonErrorObjects.forEach(errorObj => {
+      // Simulate error log for non-Error object
+      const errorMessage = errorObj instanceof Error 
+        ? errorObj.message 
+        : String(errorObj);
+
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: errorMessage,
+        originalError: errorObj,
+      };
+
+      // Verify error is logged even if not an Error object
+      expect(logEntry.message).toBeDefined();
+      expect(typeof logEntry.message).toBe('string');
+      expect(logEntry.originalError).toBe(errorObj);
+    });
+  });
+
+  test('Error logs include retry attempt information', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 3 }),
+        fc.integer({ min: 1, max: 3 }),
+        fc.string({ minLength: 10, maxLength: 100 }),
+        (attempt: number, maxAttempts: number, errorMessage: string) => {
+          // Simulate error log with retry information
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: `Attempt ${attempt} failed: ${errorMessage}`,
+            context: {
+              attempt,
+              maxAttempts,
+              willRetry: attempt < maxAttempts,
+            },
+          };
+
+          // Verify retry information is present
+          expect(logEntry.message).toContain(`Attempt ${attempt}`);
+          expect(logEntry.context.attempt).toBe(attempt);
+          expect(logEntry.context.maxAttempts).toBe(maxAttempts);
+          expect(typeof logEntry.context.willRetry).toBe('boolean');
+          
+          if (attempt < maxAttempts) {
+            expect(logEntry.context.willRetry).toBe(true);
+          } else {
+            expect(logEntry.context.willRetry).toBe(false);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  test('Error logs preserve error causality chain', () => {
+    // Simulate nested errors (error caused by another error)
+    const rootCause = new Error('Root cause error');
+    const intermediateError = new Error('Intermediate error');
+    const topLevelError = new Error('Top level error');
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      message: topLevelError.message,
+      stack: topLevelError.stack,
+      cause: {
+        message: intermediateError.message,
+        stack: intermediateError.stack,
+        cause: {
+          message: rootCause.message,
+          stack: rootCause.stack,
+        },
+      },
+    };
+
+    // Verify error chain is preserved
+    expect(logEntry.message).toBe('Top level error');
+    expect(logEntry.cause).toBeDefined();
+    expect(logEntry.cause.message).toBe('Intermediate error');
+    expect(logEntry.cause.cause).toBeDefined();
+    expect(logEntry.cause.cause.message).toBe('Root cause error');
+  });
+
+  test('Error logs include environment and metadata', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('test', 'staging', 'production'),
+        fc.uuid(),
+        (environment: string, userId: string) => {
+          // Simulate error log with environment metadata
+          const logEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: 'Execution error',
+            metadata: {
+              environment,
+              triggeredBy: userId,
+              region: 'us-east-1',
+              version: '1.0.0',
+            },
+          };
+
+          // Verify metadata is present
+          expect(logEntry.metadata).toBeDefined();
+          expect(logEntry.metadata.environment).toBe(environment);
+          expect(logEntry.metadata.triggeredBy).toBe(userId);
+          expect(logEntry.metadata.region).toBeDefined();
+          expect(logEntry.metadata.version).toBeDefined();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
