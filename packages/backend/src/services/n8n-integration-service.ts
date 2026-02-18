@@ -85,16 +85,16 @@ export class N8NIntegrationService {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      if (error instanceof Error) {
-        // Check if error is due to timeout
-        if (error.name === 'AbortError') {
-          return {
-            success: false,
-            errorMessage: `Webhook request timed out after ${this.WEBHOOK_TIMEOUT_MS}ms`,
-            duration,
-          };
-        }
+      // Check if error is due to timeout (handles both Error and DOMException)
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+        return {
+          success: false,
+          errorMessage: `Webhook request timed out after ${this.WEBHOOK_TIMEOUT_MS}ms`,
+          duration,
+        };
+      }
 
+      if (error instanceof Error) {
         return {
           success: false,
           errorMessage: error.message,

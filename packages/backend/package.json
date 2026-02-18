@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.400.0",
+    "@aws-sdk/client-eventbridge": "^3.992.0",
     "@aws-sdk/client-s3": "^3.400.0",
     "@aws-sdk/client-secrets-manager": "^3.400.0",
     "@aws-sdk/client-ses": "^3.985.0",

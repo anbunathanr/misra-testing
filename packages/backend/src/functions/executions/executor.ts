@@ -14,6 +14,8 @@ import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
 import { ExecutionMessage } from '../../types/test-execution';
 import { testExecutorService } from '../../services/test-executor-service';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
+import { eventPublisherService } from '../../services/event-publisher-service';
+import { failureDetectionService } from '../../services/failure-detection-service';
 
 /**
  * Lambda handler for test execution
@@ -91,6 +93,13 @@ async function processExecutionMessage(
     console.log(`Saving execution results to DynamoDB`);
     await testExecutionDBService.updateExecutionResults(result.execution);
 
+    // Publish test completion event to EventBridge for notifications
+    console.log(`Publishing test completion event to EventBridge`);
+    await eventPublisherService.publishTestCompletionEvent(result.execution);
+
+    // Check for failure patterns and generate critical alerts
+    await detectAndAlertFailures(result.execution, message);
+
     // If this execution is part of a suite, update suite status
     if (message.suiteExecutionId) {
       console.log(`Updating suite execution ${message.suiteExecutionId}`);
@@ -135,6 +144,10 @@ async function processExecutionMessage(
         await testExecutionDBService.updateExecutionResults(execution);
         console.log(`Execution ${executionId} marked as error`);
 
+        // Publish test completion event to EventBridge for notifications
+        console.log(`Publishing test error event to EventBridge`);
+        await eventPublisherService.publishTestCompletionEvent(execution);
+
         // If this execution is part of a suite, update suite status
         if (message.suiteExecutionId) {
           console.log(`Updating suite execution ${message.suiteExecutionId} after error`);
@@ -156,5 +169,85 @@ async function processExecutionMessage(
 
     // Re-throw the error to mark SQS message as failed (will retry or go to DLQ)
     throw error;
+  }
+}
+
+/**
+ * Detect failure patterns and generate critical alerts
+ */
+async function detectAndAlertFailures(
+  execution: any,
+  message: ExecutionMessage
+): Promise<void> {
+  try {
+    console.log('Checking for failure patterns', {
+      executionId: execution.executionId,
+      result: execution.result,
+      testCaseId: execution.testCaseId,
+      suiteExecutionId: message.suiteExecutionId,
+    });
+
+    // Only check for failures if test failed or errored
+    if (execution.result !== 'fail' && execution.result !== 'error') {
+      console.log('Test passed, skipping failure detection');
+      return;
+    }
+
+    // Check for consecutive failures (individual test case)
+    if (execution.testCaseId) {
+      console.log(`Checking for consecutive failures for test case ${execution.testCaseId}`);
+      const consecutiveAlert = await failureDetectionService.detectConsecutiveFailures(
+        execution.testCaseId
+      );
+
+      if (consecutiveAlert) {
+        console.log('Consecutive failures detected, generating critical alert', {
+          testCaseId: execution.testCaseId,
+          consecutiveFailures: consecutiveAlert.details.consecutiveFailures,
+        });
+
+        // Generate and publish critical alert event
+        const alertEvent = failureDetectionService.generateCriticalAlert(
+          consecutiveAlert,
+          message.projectId,
+          message.metadata.triggeredBy
+        );
+
+        await eventPublisherService.publishEvent(alertEvent);
+        console.log('Critical alert published for consecutive failures');
+      }
+    }
+
+    // Check for suite failure rate (if part of suite execution)
+    if (message.suiteExecutionId) {
+      console.log(`Checking suite failure rate for suite execution ${message.suiteExecutionId}`);
+      
+      // Wait a bit to ensure all suite executions are recorded
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const suiteAlert = await failureDetectionService.detectSuiteFailureRate(
+        message.suiteExecutionId
+      );
+
+      if (suiteAlert) {
+        console.log('Suite failure threshold exceeded, generating critical alert', {
+          suiteExecutionId: message.suiteExecutionId,
+          failureRate: suiteAlert.details.failureRate,
+        });
+
+        // Generate and publish critical alert event
+        const alertEvent = failureDetectionService.generateCriticalAlert(
+          suiteAlert,
+          message.projectId,
+          message.metadata.triggeredBy
+        );
+
+        await eventPublisherService.publishEvent(alertEvent);
+        console.log('Critical alert published for suite failure threshold');
+      }
+    }
+  } catch (error) {
+    // Don't fail the execution if failure detection fails
+    console.error('Error in failure detection:', error);
   }
 }

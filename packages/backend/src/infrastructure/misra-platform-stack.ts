@@ -8,6 +8,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -231,6 +233,166 @@ export class MisraPlatformStack extends cdk.Stack {
         maxReceiveCount: 3, // Retry up to 3 times before moving to DLQ
       },
     });
+
+    // EventBridge Rule for Test Completion Events
+    // Routes test execution completion events to notification queue
+    const testCompletionRule = new events.Rule(this, 'TestCompletionRule', {
+      ruleName: 'aibts-test-execution-completion',
+      description: 'Routes test execution completion events to notification queue',
+      eventPattern: {
+        source: ['aibts.test-execution'],
+        detailType: ['Test Execution Completed'],
+      },
+    });
+
+    // Add notification queue as target for test completion events
+    testCompletionRule.addTarget(new targets.SqsQueue(notificationQueue));
+
+    // Scheduled Reports Lambda Function
+    const scheduledReportsFunction = new lambda.Function(this, 'ScheduledReportsFunction', {
+      functionName: 'aibts-scheduled-reports',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/scheduled-reports.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        TEST_EXECUTIONS_TABLE: testExecutionsTable.table.tableName,
+        NOTIFICATION_QUEUE_URL: notificationQueue.queueUrl,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+    });
+
+    // Grant permissions to scheduled reports function
+    testExecutionsTable.table.grantReadData(scheduledReportsFunction);
+    notificationQueue.grantSendMessages(scheduledReportsFunction);
+
+    // EventBridge Cron Rules for Scheduled Reports
+    // Daily Report - 09:00 UTC daily
+    const dailyReportRule = new events.Rule(this, 'DailyReportRule', {
+      ruleName: 'aibts-daily-summary-report',
+      description: 'Triggers daily test execution summary report',
+      schedule: events.Schedule.cron({
+        minute: '0',
+        hour: '9',
+      }),
+    });
+    dailyReportRule.addTarget(new targets.LambdaFunction(scheduledReportsFunction));
+
+    // Weekly Report - 09:00 UTC every Monday
+    const weeklyReportRule = new events.Rule(this, 'WeeklyReportRule', {
+      ruleName: 'aibts-weekly-summary-report',
+      description: 'Triggers weekly test execution summary report',
+      schedule: events.Schedule.cron({
+        minute: '0',
+        hour: '9',
+        weekDay: 'MON',
+      }),
+    });
+    weeklyReportRule.addTarget(new targets.LambdaFunction(scheduledReportsFunction));
+
+    // Notification Preferences API Lambda Functions
+    const getPreferencesFunction = new lambda.Function(this, 'GetPreferencesFunction', {
+      functionName: 'aibts-get-preferences',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/get-preferences.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    const updatePreferencesFunction = new lambda.Function(this, 'UpdatePreferencesFunction', {
+      functionName: 'aibts-update-preferences',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/update-preferences.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    // Notification History API Lambda Functions
+    const getHistoryFunction = new lambda.Function(this, 'GetHistoryFunction', {
+      functionName: 'aibts-get-history',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/get-history.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    const getNotificationFunction = new lambda.Function(this, 'GetNotificationFunction', {
+      functionName: 'aibts-get-notification',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/get-notification.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    // Notification Template API Lambda Functions (Admin Only)
+    const createTemplateFunction = new lambda.Function(this, 'CreateTemplateFunction', {
+      functionName: 'aibts-create-template',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/create-template.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    const updateTemplateFunction = new lambda.Function(this, 'UpdateTemplateFunction', {
+      functionName: 'aibts-update-template',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/update-template.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    const getTemplatesFunction = new lambda.Function(this, 'GetTemplatesFunction', {
+      functionName: 'aibts-get-templates',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/get-templates.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+    });
+
+    // Grant permissions to notification API functions
+    notificationPreferencesTable.table.grantReadData(getPreferencesFunction);
+    notificationPreferencesTable.table.grantReadWriteData(updatePreferencesFunction);
+    notificationHistoryTable.table.grantReadData(getHistoryFunction);
+    notificationHistoryTable.table.grantReadData(getNotificationFunction);
+    notificationTemplatesTable.table.grantReadWriteData(createTemplateFunction);
+    notificationTemplatesTable.table.grantReadWriteData(updateTemplateFunction);
+    notificationTemplatesTable.table.grantReadData(getTemplatesFunction);
 
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
@@ -510,6 +672,12 @@ export class MisraPlatformStack extends cdk.Stack {
     testCasesTable.table.grantReadData(testExecutorFunction);
     screenshotsBucket.bucket.grantReadWrite(testExecutorFunction);
 
+    // Grant EventBridge permissions to test executor for publishing events
+    testExecutorFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: ['events:PutEvents'],
+      resources: ['*'], // EventBridge default bus
+    }));
+
     // Add SQS trigger for test executor
     testExecutorFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(testExecutionQueue, {
@@ -633,6 +801,60 @@ export class MisraPlatformStack extends cdk.Stack {
       timeout: cdk.Duration.minutes(5),
       memorySize: 512,
     });
+
+    // Notification Processor Lambda Function
+    const notificationProcessorFunction = new lambda.Function(this, 'NotificationProcessorFunction', {
+      functionName: 'aibts-notification-processor',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/processor.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
+        NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
+        NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
+        SNS_TOPIC_ARN_EMAIL: emailNotificationTopic.topicArn,
+        SNS_TOPIC_ARN_SMS: smsNotificationTopic.topicArn,
+        SNS_TOPIC_ARN_WEBHOOK: webhookNotificationTopic.topicArn,
+        N8N_ENABLED: process.env.N8N_ENABLED || 'false',
+        N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || '',
+        N8N_API_KEY: process.env.N8N_API_KEY || '',
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      reservedConcurrentExecutions: 100,
+    });
+
+    // Add SQS trigger for notification processor
+    notificationProcessorFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(notificationQueue, {
+        batchSize: 10, // Process up to 10 messages at once
+        maxBatchingWindow: cdk.Duration.seconds(5),
+      })
+    );
+
+    // Grant permissions to notification processor
+    notificationPreferencesTable.table.grantReadWriteData(notificationProcessorFunction);
+    notificationTemplatesTable.table.grantReadData(notificationProcessorFunction);
+    notificationHistoryTable.table.grantReadWriteData(notificationProcessorFunction);
+    emailNotificationTopic.grantPublish(notificationProcessorFunction);
+    smsNotificationTopic.grantPublish(notificationProcessorFunction);
+    webhookNotificationTopic.grantPublish(notificationProcessorFunction);
+
+    // Template Seeding Lambda Function
+    const seedTemplatesFunction = new lambda.Function(this, 'SeedTemplatesFunction', {
+      functionName: 'aibts-seed-templates',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/notifications/seed-templates.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
+      },
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 256,
+    });
+
+    // Grant permissions to seed templates function
+    notificationTemplatesTable.table.grantReadWriteData(seedTemplatesFunction);
 
     const notificationFunction = new lambda.Function(this, 'NotificationFunction', {
       functionName: 'misra-platform-notification',
@@ -913,6 +1135,51 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/executions/suites/{suiteExecutionId}',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('GetSuiteResultsIntegration', getSuiteResultsFunction),
+    });
+
+    // Add notification preferences routes
+    api.addRoutes({
+      path: '/notifications/preferences',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetPreferencesIntegration', getPreferencesFunction),
+    });
+
+    api.addRoutes({
+      path: '/notifications/preferences',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('UpdatePreferencesIntegration', updatePreferencesFunction),
+    });
+
+    // Add notification history routes
+    api.addRoutes({
+      path: '/notifications/history',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetHistoryIntegration', getHistoryFunction),
+    });
+
+    api.addRoutes({
+      path: '/notifications/history/{notificationId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetNotificationIntegration', getNotificationFunction),
+    });
+
+    // Add notification template routes (admin only)
+    api.addRoutes({
+      path: '/notifications/templates',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('CreateTemplateIntegration', createTemplateFunction),
+    });
+
+    api.addRoutes({
+      path: '/notifications/templates/{templateId}',
+      methods: [apigateway.HttpMethod.PUT],
+      integration: new integrations.HttpLambdaIntegration('UpdateTemplateIntegration', updateTemplateFunction),
+    });
+
+    api.addRoutes({
+      path: '/notifications/templates',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetTemplatesIntegration', getTemplatesFunction),
     });
 
     // Output important values
