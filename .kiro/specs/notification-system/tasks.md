@@ -69,8 +69,8 @@ This implementation plan breaks down the notification system into discrete, incr
     - Test payload size rejection
     - _Requirements: 1.2, 1.6, 10.1, 10.2, 10.3_
 
-- [ ] 5. Implement n8n Integration Service
-  - [ ] 5.1 Create services/n8n-integration-service.ts
+- [x] 5. Implement n8n Integration Service
+  - [x] 5.1 Create services/n8n-integration-service.ts
     - Implement sendToWebhook method with timeout (10 seconds)
     - Implement isEnabled method
     - Implement validateConfiguration method
@@ -92,8 +92,8 @@ This implementation plan breaks down the notification system into discrete, incr
     - Test disabled n8n configuration
     - _Requirements: 5.1, 5.2, 5.4, 5.5_
 
-- [ ] 6. Implement Notification Template Service
-  - [ ] 6.1 Create services/notification-template-service.ts
+- [x] 6. Implement Notification Template Service
+  - [x] 6.1 Create services/notification-template-service.ts
     - Implement getTemplate method (query by eventType and channel)
     - Implement renderTemplate method with variable substitution
     - Implement createTemplate method
@@ -122,8 +122,8 @@ This implementation plan breaks down the notification system into discrete, incr
     - Test template update persistence
     - _Requirements: 8.1, 8.2, 8.4, 8.5, 8.6_
 
-- [ ] 7. Implement Notification Preferences Service
-  - [ ] 7.1 Create services/notification-preferences-service.ts
+- [x] 7. Implement Notification Preferences Service
+  - [x] 7.1 Create services/notification-preferences-service.ts
     - Implement getPreferences method
     - Implement updatePreferences method
     - Implement shouldSendNotification method (check enabled/disabled)
@@ -162,8 +162,8 @@ This implementation plan breaks down the notification system into discrete, incr
     - Test email/phone validation
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 8. Implement Notification History Service
-  - [ ] 8.1 Create services/notification-history-service.ts
+- [x] 8. Implement Notification History Service
+  - [x] 8.1 Create services/notification-history-service.ts
     - Implement recordNotification method
     - Implement updateDeliveryStatus method
     - Implement queryHistory method with filtering and pagination
