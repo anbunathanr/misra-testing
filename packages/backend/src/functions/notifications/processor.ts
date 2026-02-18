@@ -4,6 +4,7 @@ import { notificationTemplateService } from '../../services/notification-templat
 import { notificationHistoryService } from '../../services/notification-history-service';
 import { snsDeliveryService } from '../../services/sns-delivery-service';
 import { n8nIntegrationService } from '../../services/n8n-integration-service';
+import { filterSensitiveData, SecureLogger } from '../../utils/security-util';
 import {
   NotificationEvent,
   NotificationChannel,
@@ -12,6 +13,8 @@ import {
   N8NWebhookPayload,
   TemplateRenderContext,
 } from '../../types/notification';
+
+const logger = new SecureLogger('NotificationProcessor');
 
 /**
  * Notification Processor Lambda Handler
@@ -30,21 +33,21 @@ import {
  * 11. Handle critical alert preference override
  */
 export const handler = async (event: SQSEvent, context: Context): Promise<void> => {
-  console.log('Notification Processor Lambda invoked');
-  console.log(`Processing ${event.Records.length} message(s)`);
-  console.log(`Remaining time: ${context.getRemainingTimeInMillis()}ms`);
+  logger.info('Notification Processor Lambda invoked');
+  logger.info(`Processing ${event.Records.length} message(s)`);
+  logger.info(`Remaining time: ${context.getRemainingTimeInMillis()}ms`);
 
   // Process each message
   for (const record of event.Records) {
     try {
       await processNotificationMessage(record);
     } catch (error) {
-      console.error('Failed to process notification message:', error);
+      logger.error('Failed to process notification message:', error);
       // Don't throw - let SQS handle retry via DLQ
     }
   }
 
-  console.log('All messages processed');
+  logger.info('All messages processed');
 };
 
 /**
@@ -206,7 +209,11 @@ async function deliverNotification(
   };
 
   // Render template with event context
-  const renderedContent = await notificationTemplateService.renderTemplate(template, renderContext);
+  let renderedContent = await notificationTemplateService.renderTemplate(template, renderContext);
+  
+  // Filter sensitive data from notification content
+  renderedContent = filterSensitiveData(renderedContent);
+  logger.info('Notification content rendered and sanitized');
 
   // Determine delivery method: n8n or SNS
   const n8nEnabled = await n8nIntegrationService.isEnabled();
@@ -215,7 +222,7 @@ async function deliverNotification(
   let deliveryMethod: 'n8n' | 'sns' = 'sns';
 
   if (n8nEnabled) {
-    console.log('Attempting delivery via n8n webhook');
+    logger.info('Attempting delivery via n8n webhook');
     deliveryMethod = 'n8n';
 
     try {
@@ -234,11 +241,11 @@ async function deliverNotification(
       const n8nResult = await n8nIntegrationService.sendToWebhook(n8nPayload);
       
       if (n8nResult.success) {
-        console.log('Successfully delivered via n8n');
+        logger.info('Successfully delivered via n8n');
         deliveryStatus = 'sent';
       } else {
-        console.warn('n8n delivery failed, falling back to SNS');
-        console.warn(`n8n error: ${n8nResult.errorMessage}`);
+        logger.warn('n8n delivery failed, falling back to SNS');
+        logger.warn(`n8n error: ${n8nResult.errorMessage}`);
         deliveryError = n8nResult.errorMessage;
         
         // Fallback to SNS

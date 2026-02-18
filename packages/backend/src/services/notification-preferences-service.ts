@@ -8,6 +8,9 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { NotificationPreferences, NotificationChannel } from '../types/notification';
+import { sanitizePreferences, SecureLogger } from '../utils/security-util';
+
+const logger = new SecureLogger('NotificationPreferencesService');
 
 export class NotificationPreferencesService {
   private docClient: DynamoDBDocumentClient;
@@ -17,7 +20,7 @@ export class NotificationPreferencesService {
     const client = new DynamoDBClient({
       region: process.env.AWS_REGION || 'us-east-1',
     });
-    this.docClient = DynamoDBDocumentClient.from(client);
+    this.docClient = DynamoDBDocumentClient.from(client as any);
     this.tableName = process.env.NOTIFICATION_PREFERENCES_TABLE || 'NotificationPreferences';
   }
 
@@ -43,7 +46,7 @@ export class NotificationPreferencesService {
       // Return default preferences if none configured
       return this.getDefaultPreferences(userId);
     } catch (error) {
-      console.error('Error getting preferences', { userId, error });
+      logger.error('Error getting preferences', { userId, error });
       throw error;
     }
   }
@@ -59,10 +62,18 @@ export class NotificationPreferencesService {
     userId: string,
     preferences: Partial<NotificationPreferences>
   ): Promise<NotificationPreferences> {
-    // Validate email addresses and phone numbers if provided
+    // Sanitize and validate input data
     if (preferences.preferences) {
-      // Email validation would happen at the API layer
-      // Phone validation would happen at the API layer
+      try {
+        const sanitized = sanitizePreferences(preferences.preferences);
+        preferences.preferences = {
+          ...preferences.preferences,
+          ...sanitized,
+        };
+      } catch (error) {
+        logger.error('Invalid preference data', { userId, error });
+        throw new Error(`Preference validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
 
     const now = new Date().toISOString();
@@ -85,9 +96,10 @@ export class NotificationPreferencesService {
       });
 
       await this.docClient.send(command);
+      logger.info('Preferences updated successfully', { userId });
       return updated;
     } catch (error) {
-      console.error('Error updating preferences', { userId, error });
+      logger.error('Error updating preferences', { userId, error });
       throw error;
     }
   }
