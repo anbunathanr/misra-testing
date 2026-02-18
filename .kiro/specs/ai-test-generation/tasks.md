@@ -189,7 +189,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 15: Test Case Persistence Round-Trip**
     - **Validates: Requirements 3.9**
 
-- [ ] 7. Implement Test Validator
+- [-] 7. Implement Test Validator
   - [ ] 7.1 Create Test Validator service
     - Implement `TestValidator` class in `packages/backend/src/services/ai-test-generation/test-validator.ts`
     - Implement `validate()` method with comprehensive validation rules
