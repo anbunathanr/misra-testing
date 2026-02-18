@@ -10,7 +10,7 @@ import { DynamoDBDocumentClient, ScanCommand, QueryCommand } from '@aws-sdk/lib-
 import { NotificationTemplate } from '../../types/notification';
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const docClient = DynamoDBDocumentClient.from(client);
+const docClient = DynamoDBDocumentClient.from(client as any);
 const tableName = process.env.NOTIFICATION_TEMPLATES_TABLE || 'NotificationTemplates';
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {

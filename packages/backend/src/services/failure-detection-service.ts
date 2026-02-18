@@ -36,7 +36,7 @@ export class FailureDetectionService {
     const client = new DynamoDBClient({
       region: process.env.AWS_REGION || 'us-east-1',
     });
-    this.docClient = DynamoDBDocumentClient.from(client);
+    this.docClient = DynamoDBDocumentClient.from(client as any);
     this.tableName = process.env.TEST_EXECUTIONS_TABLE || 'TestExecutions';
   }
 
