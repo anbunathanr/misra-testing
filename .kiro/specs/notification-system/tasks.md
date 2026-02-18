@@ -455,8 +455,8 @@ This implementation plan breaks down the notification system into discrete, incr
     - Test PII redaction
     - _Requirements: 12.2, 12.3, 12.6_
 
-- [ ] 20. Implement monitoring and alerting
-  - [ ] 20.1 Add CloudWatch alarms
+- [x] 20. Implement monitoring and alerting
+  - [x] 20.1 Add CloudWatch alarms
     - Alarm for DLQ depth > 0
     - Alarm for queue depth > 1000
     - Alarm for Lambda errors
@@ -467,7 +467,7 @@ This implementation plan breaks down the notification system into discrete, incr
     - **Property 41: Queue Depth Alert Threshold**
     - **Validates: Requirements 9.5**
   
-  - [ ] 20.3 Add CloudWatch dashboard
+  - [x] 20.3 Add CloudWatch dashboard
     - Notification processing metrics
     - Delivery success rates by channel
     - Queue depth over time

@@ -13,6 +13,7 @@ import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
@@ -1241,6 +1242,226 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WebhookNotificationTopicArn', {
       value: webhookNotificationTopic.topicArn,
       description: 'SNS topic for webhook notifications',
+    });
+
+    // CloudWatch Alarms for Notification System
+    // Alarm for DLQ depth > 0 (indicates failed notifications)
+    const dlqAlarm = new cloudwatch.Alarm(this, 'NotificationDLQAlarm', {
+      alarmName: 'aibts-notification-dlq-depth',
+      alarmDescription: 'Alert when notification DLQ has messages (failed notifications)',
+      metric: notificationDLQ.metricApproximateNumberOfMessagesVisible(),
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Alarm for queue depth > 1000 (indicates processing backlog)
+    const queueDepthAlarm = new cloudwatch.Alarm(this, 'NotificationQueueDepthAlarm', {
+      alarmName: 'aibts-notification-queue-depth',
+      alarmDescription: 'Alert when notification queue depth exceeds 1000 messages',
+      metric: notificationQueue.metricApproximateNumberOfMessagesVisible(),
+      threshold: 1000,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Alarm for notification processor Lambda errors
+    const processorErrorAlarm = new cloudwatch.Alarm(this, 'NotificationProcessorErrorAlarm', {
+      alarmName: 'aibts-notification-processor-errors',
+      alarmDescription: 'Alert when notification processor Lambda has errors',
+      metric: notificationProcessorFunction.metricErrors({
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Alarm for scheduled reports Lambda errors
+    const scheduledReportsErrorAlarm = new cloudwatch.Alarm(this, 'ScheduledReportsErrorAlarm', {
+      alarmName: 'aibts-scheduled-reports-errors',
+      alarmDescription: 'Alert when scheduled reports Lambda has errors',
+      metric: scheduledReportsFunction.metricErrors({
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Alarm for SNS delivery failures (email)
+    const snsEmailFailureAlarm = new cloudwatch.Alarm(this, 'SNSEmailFailureAlarm', {
+      alarmName: 'aibts-sns-email-failures',
+      alarmDescription: 'Alert when SNS email delivery fails',
+      metric: emailNotificationTopic.metricNumberOfNotificationsFailed({
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Alarm for SNS delivery failures (SMS)
+    const snsSmsFailureAlarm = new cloudwatch.Alarm(this, 'SNSSmsFailureAlarm', {
+      alarmName: 'aibts-sns-sms-failures',
+      alarmDescription: 'Alert when SNS SMS delivery fails',
+      metric: smsNotificationTopic.metricNumberOfNotificationsFailed({
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // CloudWatch Dashboard for Notification System
+    const notificationDashboard = new cloudwatch.Dashboard(this, 'NotificationDashboard', {
+      dashboardName: 'AIBTS-Notification-System',
+    });
+
+    // Add widgets to dashboard
+    notificationDashboard.addWidgets(
+      // Queue metrics
+      new cloudwatch.GraphWidget({
+        title: 'Notification Queue Depth',
+        left: [
+          notificationQueue.metricApproximateNumberOfMessagesVisible({
+            label: 'Messages Visible',
+            period: cdk.Duration.minutes(1),
+          }),
+          notificationQueue.metricApproximateNumberOfMessagesNotVisible({
+            label: 'Messages In Flight',
+            period: cdk.Duration.minutes(1),
+          }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'DLQ Depth (Failed Notifications)',
+        left: [
+          notificationDLQ.metricApproximateNumberOfMessagesVisible({
+            label: 'Failed Messages',
+            period: cdk.Duration.minutes(1),
+            statistic: 'Sum',
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    notificationDashboard.addWidgets(
+      // Lambda metrics
+      new cloudwatch.GraphWidget({
+        title: 'Notification Processor Performance',
+        left: [
+          notificationProcessorFunction.metricInvocations({
+            label: 'Invocations',
+            period: cdk.Duration.minutes(5),
+          }),
+          notificationProcessorFunction.metricErrors({
+            label: 'Errors',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        right: [
+          notificationProcessorFunction.metricDuration({
+            label: 'Duration',
+            period: cdk.Duration.minutes(5),
+            statistic: 'Average',
+          }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Scheduled Reports Performance',
+        left: [
+          scheduledReportsFunction.metricInvocations({
+            label: 'Invocations',
+            period: cdk.Duration.minutes(5),
+          }),
+          scheduledReportsFunction.metricErrors({
+            label: 'Errors',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        right: [
+          scheduledReportsFunction.metricDuration({
+            label: 'Duration',
+            period: cdk.Duration.minutes(5),
+            statistic: 'Average',
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    notificationDashboard.addWidgets(
+      // SNS delivery metrics
+      new cloudwatch.GraphWidget({
+        title: 'SNS Email Delivery',
+        left: [
+          emailNotificationTopic.metricNumberOfMessagesPublished({
+            label: 'Published',
+            period: cdk.Duration.minutes(5),
+          }),
+          emailNotificationTopic.metricNumberOfNotificationsDelivered({
+            label: 'Delivered',
+            period: cdk.Duration.minutes(5),
+          }),
+          emailNotificationTopic.metricNumberOfNotificationsFailed({
+            label: 'Failed',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'SNS SMS Delivery',
+        left: [
+          smsNotificationTopic.metricNumberOfMessagesPublished({
+            label: 'Published',
+            period: cdk.Duration.minutes(5),
+          }),
+          smsNotificationTopic.metricNumberOfNotificationsDelivered({
+            label: 'Delivered',
+            period: cdk.Duration.minutes(5),
+          }),
+          smsNotificationTopic.metricNumberOfNotificationsFailed({
+            label: 'Failed',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'SNS Webhook Delivery',
+        left: [
+          webhookNotificationTopic.metricNumberOfMessagesPublished({
+            label: 'Published',
+            period: cdk.Duration.minutes(5),
+          }),
+          webhookNotificationTopic.metricNumberOfNotificationsDelivered({
+            label: 'Delivered',
+            period: cdk.Duration.minutes(5),
+          }),
+          webhookNotificationTopic.metricNumberOfNotificationsFailed({
+            label: 'Failed',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+      })
+    );
+
+    // Output dashboard URL
+    new cdk.CfnOutput(this, 'NotificationDashboardUrl', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${notificationDashboard.dashboardName}`,
+      description: 'CloudWatch Dashboard for Notification System',
     });
   }
 }
