@@ -189,8 +189,8 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 15: Test Case Persistence Round-Trip**
     - **Validates: Requirements 3.9**
 
-- [-] 7. Implement Test Validator
-  - [ ] 7.1 Create Test Validator service
+- [x] 7. Implement Test Validator
+  - [x] 7.1 Create Test Validator service
     - Implement `TestValidator` class in `packages/backend/src/services/ai-test-generation/test-validator.ts`
     - Implement `validate()` method with comprehensive validation rules
     - Validate test case structure against schema
@@ -201,7 +201,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 21: Test Case Schema Validation**
     - **Validates: Requirements 5.1, 5.2, 5.3**
   
-  - [ ] 7.3 Implement field-specific validation
+  - [x] 7.3 Implement field-specific validation
     - Validate selectors are non-empty strings
     - Validate URLs in navigate steps (HTTP/HTTPS only)
     - Validate test case name is non-empty
@@ -215,7 +215,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 25: Project ID Format Validation**
     - **Validates: Requirements 5.4, 5.5, 5.6, 5.7**
   
-  - [ ] 7.5 Implement validation error handling
+  - [x] 7.5 Implement validation error handling
     - Collect all validation errors (don't fail fast)
     - Return structured ValidationResult with all errors
     - _Requirements: 5.8, 5.9_
@@ -225,7 +225,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 27: Valid Test Case Acceptance**
     - **Validates: Requirements 5.8, 5.9**
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Implement Cost Tracker
