@@ -228,13 +228,13 @@ Each task builds on previous work and includes property-based tests to validate 
 - [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Implement Cost Tracker
-  - [ ] 9.1 Create Cost Tracker infrastructure
+- [x] 9. Implement Cost Tracker
+  - [x] 9.1 Create Cost Tracker infrastructure
     - Create DynamoDB table for AI usage: `AIUsage` table in `packages/backend/src/infrastructure/ai-usage-table.ts`
     - Define usage record schema with GSIs for projectId and timestamp
     - _Requirements: 9.1, 9.2, 9.4_
   
-  - [ ] 9.2 Create Cost Tracker service
+  - [x] 9.2 Create Cost Tracker service
     - Implement `CostTracker` class in `packages/backend/src/services/ai-test-generation/cost-tracker.ts`
     - Implement `recordUsage()` method to store usage records
     - Implement token usage tracking
@@ -246,7 +246,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 46: Usage Record Metadata**
     - **Validates: Requirements 9.1, 9.2, 9.4**
   
-  - [ ] 9.4 Implement cost calculation
+  - [x] 9.4 Implement cost calculation
     - Add configurable pricing rates for OpenAI models
     - Implement cost calculation: (promptTokens × promptRate + completionTokens × completionRate)
     - _Requirements: 9.3_
@@ -255,7 +255,7 @@ Each task builds on previous work and includes property-based tests to validate 
     - **Property 45: Cost Calculation Accuracy**
     - **Validates: Requirements 9.3**
   
-  - [ ] 9.6 Implement usage limits and statistics
+  - [x] 9.6 Implement usage limits and statistics
     - Implement `checkLimit()` method to enforce per-user/per-project limits
     - Implement `getUsageStats()` method with aggregation by user, project, time period
     - _Requirements: 9.5, 9.6, 9.7, 9.8_
