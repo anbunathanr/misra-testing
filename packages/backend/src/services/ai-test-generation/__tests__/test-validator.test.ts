@@ -16,24 +16,24 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Valid Test Case',
+        description: 'A valid test case',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate to example',
           },
           {
             stepNumber: 2,
             action: 'click',
             target: '#submit-button',
-            description: 'Click submit',
           },
         ],
         tags: ['ai-generated'],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -49,18 +49,19 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -79,18 +80,19 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: '   ',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -109,18 +111,19 @@ describe('TestValidator', () => {
         projectId: 'invalid-uuid',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -139,11 +142,13 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -162,18 +167,19 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'ftp://example.com',
-            description: 'Navigate',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -192,24 +198,24 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate',
           },
           {
             stepNumber: 2,
             action: 'click',
             target: '',
-            description: 'Click',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -228,24 +234,24 @@ describe('TestValidator', () => {
         projectId: '550e8400-e29b-41d4-a716-446655440000',
         userId: 'user-789',
         name: 'Test Case',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [
           {
             stepNumber: 1,
             action: 'navigate',
             target: 'https://example.com',
-            description: 'Navigate',
           },
           {
             stepNumber: 2,
             action: 'type',
             target: '#input-field',
-            description: 'Type',
           },
         ],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
@@ -264,11 +270,13 @@ describe('TestValidator', () => {
         projectId: 'invalid-uuid',
         userId: 'user-789',
         name: '',
+        description: 'Test description',
         type: 'ui',
+        priority: 'medium',
         steps: [],
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       const result = validator.validate(testCase);
