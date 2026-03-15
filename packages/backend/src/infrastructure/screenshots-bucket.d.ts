@@ -1,5 +1,6 @@
 import { Construct } from 'constructs';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
+import { aws_iam as iam } from 'aws-cdk-lib';
 export declare class ScreenshotsBucket extends Construct {
     readonly bucket: Bucket;
     constructor(scope: Construct, id: string, props?: {
@@ -8,13 +9,13 @@ export declare class ScreenshotsBucket extends Construct {
     /**
      * Grant read permissions to a principal
      */
-    grantRead(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
+    grantRead(grantee: any): iam.Grant;
     /**
      * Grant write permissions to a principal
      */
-    grantWrite(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
+    grantWrite(grantee: any): iam.Grant;
     /**
      * Grant read/write permissions to a principal
      */
-    grantReadWrite(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
+    grantReadWrite(grantee: any): iam.Grant;
 }

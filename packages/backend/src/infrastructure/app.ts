@@ -5,6 +5,7 @@ import { MisraPlatformStack } from './misra-platform-stack';
 
 const app = new cdk.App();
 
+// Deploy Full Platform Stack with all endpoints
 new MisraPlatformStack(app, 'MisraPlatformStack', {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

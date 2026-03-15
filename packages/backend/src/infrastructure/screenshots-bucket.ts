@@ -6,7 +6,7 @@ import {
   LifecycleRule,
   StorageClass,
 } from 'aws-cdk-lib/aws-s3';
-import { RemovalPolicy, Duration } from 'aws-cdk-lib';
+import { RemovalPolicy, Duration, aws_iam as iam } from 'aws-cdk-lib';
 
 export class ScreenshotsBucket extends Construct {
   public readonly bucket: Bucket;
@@ -65,20 +65,22 @@ export class ScreenshotsBucket extends Construct {
     });
 
     // Add bucket policy for secure access
-    this.bucket.addToResourcePolicy({
-      effect: 'Deny',
-      principals: ['*'],
-      actions: ['s3:*'],
-      resources: [
-        this.bucket.bucketArn,
-        `${this.bucket.bucketArn}/*`,
-      ],
-      conditions: {
-        Bool: {
-          'aws:SecureTransport': 'false',
+    this.bucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.DENY,
+        principals: [new iam.AnyPrincipal()],
+        actions: ['s3:*'],
+        resources: [
+          this.bucket.bucketArn,
+          `${this.bucket.bucketArn}/*`,
+        ],
+        conditions: {
+          Bool: {
+            'aws:SecureTransport': 'false',
+          },
         },
-      },
-    } as any);
+      })
+    );
 
     // Add metadata tags
     this.bucket.node.addMetadata('Purpose', 'Screenshot storage for test execution failures');
