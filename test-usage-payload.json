@@ -1,0 +1,12 @@
+{
+  "queryStringParameters": {
+    "userId": "test-user-123"
+  },
+  "requestContext": {
+    "authorizer": {
+      "claims": {
+        "sub": "test-user-123"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "headers": {
+    "Authorization": "Bearer test-token"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/projects"
+    }
+  }
+}

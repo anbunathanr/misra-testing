@@ -1,0 +1,29 @@
+# Chromium Lambda Layer
+
+This directory is used by CDK to create a Lambda Layer containing:
+- @sparticuz/chromium (Chromium binary for Lambda)
+- playwright-core (Playwright browser automation)
+
+The layer is automatically built during CDK deployment using Docker bundling.
+
+## How it works
+
+1. CDK uses the bundling configuration in minimal-stack.ts
+2. Docker container installs the required npm packages
+3. Packages are placed in /nodejs directory (Lambda layer convention)
+4. Layer is uploaded to AWS Lambda
+5. Lambda functions reference the layer for browser automation
+
+## Manual testing (optional)
+
+To test the layer locally:
+
+```bash
+cd packages/backend/layers/chromium
+mkdir -p nodejs
+cd nodejs
+npm init -y
+npm install @sparticuz/chromium playwright-core
+```
+
+This creates a local version of what CDK will build automatically.

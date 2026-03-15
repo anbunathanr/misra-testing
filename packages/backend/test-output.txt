@@ -1,0 +1,52 @@
+﻿node.exe : npm warn Unknown cli config "--run". This will stop working in the 
+next major version of npm.
+At C:\Program Files\nodejs\npm.ps1:29 char:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...version of npm.: 
+   String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> @misra-platform/backend@1.0.0 test
+> jest cost-tracker.property.test.ts
+
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is 
+deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at 
+https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be 
+removed in v30.0.0. Please use "isolatedModules: true" in 
+D:/Code/misra-testing/packages/backend/tsconfig.json instead, see 
+https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+PASS src/services/ai-test-generation/__tests__/cost-tracker.property.test.ts
+  CostTracker - Property Tests
+    Property 43: User API Call Tracking
+      ΓêÜ should track all API calls for a user (102 ms)
+    Property 44: Token Usage Recording
+      ΓêÜ should record token usage for every API call (43 ms)
+    Property 45: Cost Calculation Accuracy
+      ΓêÜ should calculate cost accurately for GPT-4 (20 ms)
+      ΓêÜ should calculate cost accurately for GPT-3.5-turbo (19 ms)
+    Property 46: Usage Record Metadata
+      ΓêÜ should include timestamp and userId in every usage record (37 ms)
+    Property 47: Usage Limit Enforcement
+      ΓêÜ should reject requests when user exceeds monthly limit (35 ms)
+      ΓêÜ should reject requests when project exceeds monthly limit (43 ms)
+      ΓêÜ should allow requests when within limits (36 ms)
+    Property 48: Usage Statistics Aggregation
+      ΓêÜ should aggregate statistics correctly for user queries (69 ms)
+      ΓêÜ should aggregate statistics correctly for project queries (52 ms)
+      ΓêÜ should correctly aggregate breakdown by user (53 ms)
+      ΓêÜ should correctly aggregate breakdown by project (49 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        2.107 s
+Ran all test suites matching /cost-tracker.property.test.ts/i.
