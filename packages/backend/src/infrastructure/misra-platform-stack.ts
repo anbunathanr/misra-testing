@@ -8,12 +8,14 @@ import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
@@ -25,6 +27,7 @@ import { ScreenshotsBucket } from './screenshots-bucket';
 import { NotificationPreferencesTable } from './notification-preferences-table';
 import { NotificationTemplatesTable } from './notification-templates-table';
 import { NotificationHistoryTable } from './notification-history-table';
+import { AIUsageTable } from './ai-usage-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -68,6 +71,96 @@ export class MisraPlatformStack extends cdk.Stack {
           ttl: cdk.Duration.minutes(5),
         },
       ],
+    });
+
+    // Cognito User Pool for authentication
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      userPoolName: 'misra-platform-users',
+      selfSignUpEnabled: true,
+      signInAliases: {
+        email: true,
+        username: false,
+      },
+      autoVerify: {
+        email: true,
+      },
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+        fullname: {
+          required: true,
+          mutable: true,
+        },
+      },
+      customAttributes: {
+        organizationId: new cognito.StringAttribute({ 
+          minLen: 1, 
+          maxLen: 256,
+          mutable: true,
+        }),
+        role: new cognito.StringAttribute({ 
+          minLen: 1, 
+          maxLen: 50,
+          mutable: true,
+        }),
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false,
+        tempPasswordValidity: cdk.Duration.days(7),
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      mfa: cognito.Mfa.OPTIONAL,
+      mfaSecondFactor: {
+        sms: false,
+        otp: true,
+      },
+      userVerification: {
+        emailSubject: 'Verify your email for Misra Platform',
+        emailBody: 'Thank you for signing up! Your verification code is {####}',
+        emailStyle: cognito.VerificationEmailStyle.CODE,
+      },
+      userInvitation: {
+        emailSubject: 'Welcome to Misra Platform',
+        emailBody: 'Hello {username}, you have been invited to join Misra Platform. Your temporary password is {####}',
+      },
+      deviceTracking: {
+        challengeRequiredOnNewDevice: true,
+        deviceOnlyRememberedOnUserPrompt: true,
+      },
+    });
+
+    const userPoolClient = userPool.addClient('WebClient', {
+      userPoolClientName: 'misra-platform-web-client',
+      generateSecret: false,
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+      },
+      preventUserExistenceErrors: true,
+      refreshTokenValidity: cdk.Duration.days(30),
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      enableTokenRevocation: true,
+      readAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({
+          email: true,
+          emailVerified: true,
+          fullname: true,
+        })
+        .withCustomAttributes('organizationId', 'role'),
+      writeAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({
+          email: true,
+          fullname: true,
+        })
+        .withCustomAttributes('organizationId', 'role'),
     });
 
     // DynamoDB Tables
@@ -202,6 +295,9 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: 'dev'
     });
 
+    // AI Usage Table for AI Test Generation
+    const aiUsageTable = new AIUsageTable(this, 'AIUsageTable');
+
     // SNS Topics for Notification Delivery
     const emailNotificationTopic = new sns.Topic(this, 'EmailNotificationTopic', {
       topicName: 'aibts-notifications-email',
@@ -258,10 +354,10 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: {
         TEST_EXECUTIONS_TABLE: testExecutionsTable.table.tableName,
         NOTIFICATION_QUEUE_URL: notificationQueue.queueUrl,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.minutes(5),
-      memorySize: 512,
+      memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant permissions to scheduled reports function
@@ -300,10 +396,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     const updatePreferencesFunction = new lambda.Function(this, 'UpdatePreferencesFunction', {
@@ -313,10 +409,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Notification History API Lambda Functions
@@ -327,10 +423,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     const getNotificationFunction = new lambda.Function(this, 'GetNotificationFunction', {
@@ -340,10 +436,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Notification Template API Lambda Functions (Admin Only)
@@ -354,10 +450,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     const updateTemplateFunction = new lambda.Function(this, 'UpdateTemplateFunction', {
@@ -367,10 +463,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     const getTemplatesFunction = new lambda.Function(this, 'GetTemplatesFunction', {
@@ -380,10 +476,10 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('src'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant permissions to notification API functions
@@ -446,6 +542,7 @@ export class MisraPlatformStack extends cdk.Stack {
         N8N_API_KEY: process.env.N8N_API_KEY || '',
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
@@ -458,6 +555,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // File Upload Lambda Functions
@@ -472,6 +570,7 @@ export class MisraPlatformStack extends cdk.Stack {
         ENVIRONMENT: 'dev',
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const uploadCompleteFunction = new lambda.Function(this, 'UploadCompleteFunction', {
@@ -485,6 +584,7 @@ export class MisraPlatformStack extends cdk.Stack {
         STATE_MACHINE_ARN: '', // Will be set after workflow is created
       },
       timeout: cdk.Duration.minutes(5),
+      reservedConcurrentExecutions: 0,
     });
 
     const getFilesFunction = new lambda.Function(this, 'GetFilesFunction', {
@@ -497,6 +597,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Project Management Lambda Functions
@@ -510,6 +611,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const getProjectsFunction = new lambda.Function(this, 'GetProjectsFunction', {
@@ -522,6 +624,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const updateProjectFunction = new lambda.Function(this, 'UpdateProjectFunction', {
@@ -534,6 +637,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Test Suite Management Lambda Functions
@@ -547,6 +651,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const getTestSuitesFunction = new lambda.Function(this, 'GetTestSuitesFunction', {
@@ -559,6 +664,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const updateTestSuiteFunction = new lambda.Function(this, 'UpdateTestSuiteFunction', {
@@ -571,6 +677,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Test Case Management Lambda Functions
@@ -584,6 +691,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const getTestCasesFunction = new lambda.Function(this, 'GetTestCasesFunction', {
@@ -596,6 +704,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     const updateTestCaseFunction = new lambda.Function(this, 'UpdateTestCaseFunction', {
@@ -608,6 +717,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant permissions
@@ -652,6 +762,72 @@ export class MisraPlatformStack extends cdk.Stack {
     jwtSecret.grantRead(getTestCasesFunction);
     jwtSecret.grantRead(updateTestCaseFunction);
 
+    // AI Test Generation Lambda Functions
+    const aiAnalyzeFunction = new lambda.Function(this, 'AIAnalyzeFunction', {
+      functionName: 'aibts-ai-analyze',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai-test-generation/analyze.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {},
+      timeout: cdk.Duration.minutes(5), // Browser automation can take time
+      memorySize: 2048, // Puppeteer needs more memory
+      reservedConcurrentExecutions: 0,
+    });
+
+    const aiGenerateTestFunction = new lambda.Function(this, 'AIGenerateTestFunction', {
+      functionName: 'aibts-ai-generate',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai-test-generation/generate.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        AI_USAGE_TABLE: aiUsageTable.table.tableName,
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+      },
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 1024,
+      reservedConcurrentExecutions: 0,
+    });
+
+    const aiBatchGenerateFunction = new lambda.Function(this, 'AIBatchGenerateFunction', {
+      functionName: 'aibts-ai-batch',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai-test-generation/batch.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        AI_USAGE_TABLE: aiUsageTable.table.tableName,
+        TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+      },
+      timeout: cdk.Duration.minutes(15), // Batch processing can take longer
+      memorySize: 2048,
+      reservedConcurrentExecutions: 0,
+    });
+
+    const aiGetUsageStatsFunction = new lambda.Function(this, 'AIGetUsageStatsFunction', {
+      functionName: 'aibts-ai-usage',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/ai-test-generation/get-usage.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        AI_USAGE_TABLE: aiUsageTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      reservedConcurrentExecutions: 0,
+    });
+
+    // Grant permissions to AI test generation functions
+    aiUsageTable.table.grantReadWriteData(aiGenerateTestFunction);
+    aiUsageTable.table.grantReadWriteData(aiBatchGenerateFunction);
+    aiUsageTable.table.grantReadData(aiGetUsageStatsFunction);
+    testCasesTable.table.grantReadWriteData(aiGenerateTestFunction);
+    testCasesTable.table.grantReadWriteData(aiBatchGenerateFunction);
+    jwtSecret.grantRead(aiGenerateTestFunction);
+    jwtSecret.grantRead(aiBatchGenerateFunction);
+    jwtSecret.grantRead(aiGetUsageStatsFunction);
+
     // Test Execution Lambda Functions
     const testExecutorFunction = new lambda.Function(this, 'TestExecutorFunction', {
       functionName: 'misra-platform-test-executor',
@@ -662,10 +838,10 @@ export class MisraPlatformStack extends cdk.Stack {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         SCREENSHOTS_BUCKET_NAME: screenshotsBucket.bucket.bucketName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.minutes(15), // Maximum Lambda timeout
       memorySize: 2048, // Increased memory for browser automation
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant test executor permissions
@@ -674,10 +850,10 @@ export class MisraPlatformStack extends cdk.Stack {
     screenshotsBucket.bucket.grantReadWrite(testExecutorFunction);
 
     // Grant EventBridge permissions to test executor for publishing events
-    testExecutorFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: ['events:PutEvents'],
-      resources: ['*'], // EventBridge default bus
-    }));
+    // testExecutorFunction.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ['events:PutEvents'],
+    //   resources: ['*'], // EventBridge default bus
+    // }));
 
     // Add SQS trigger for test executor
     testExecutorFunction.addEventSource(
@@ -702,6 +878,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant trigger function permissions
@@ -722,6 +899,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant status function permissions
@@ -740,6 +918,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant results function permissions
@@ -758,6 +937,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant history function permissions
@@ -775,6 +955,7 @@ export class MisraPlatformStack extends cdk.Stack {
         JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant suite results function permissions
@@ -801,6 +982,7 @@ export class MisraPlatformStack extends cdk.Stack {
       },
       timeout: cdk.Duration.minutes(5),
       memorySize: 512,
+      reservedConcurrentExecutions: 0,
     });
 
     // Notification Processor Lambda Function
@@ -821,14 +1003,14 @@ export class MisraPlatformStack extends cdk.Stack {
         N8N_API_KEY: process.env.N8N_API_KEY || '',
       },
       timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      reservedConcurrentExecutions: 100,
+      memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Add SQS trigger for notification processor
     notificationProcessorFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(notificationQueue, {
-        batchSize: 10, // Process up to 10 messages at once
+        batchSize: 1, // Process 1 message at a time to avoid concurrency issues
         maxBatchingWindow: cdk.Duration.seconds(5),
       })
     );
@@ -852,6 +1034,7 @@ export class MisraPlatformStack extends cdk.Stack {
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant permissions to seed templates function
@@ -875,6 +1058,7 @@ export class MisraPlatformStack extends cdk.Stack {
         USERS_TABLE_NAME: usersTable.tableName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant permissions for analysis and notification functions
@@ -894,6 +1078,7 @@ export class MisraPlatformStack extends cdk.Stack {
         ENVIRONMENT: this.stackName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // User Stats Lambda Function
@@ -906,6 +1091,7 @@ export class MisraPlatformStack extends cdk.Stack {
         ENVIRONMENT: this.stackName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant query and stats functions access to analysis results
@@ -923,6 +1109,7 @@ export class MisraPlatformStack extends cdk.Stack {
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant AI insights function access to analysis results
@@ -939,6 +1126,7 @@ export class MisraPlatformStack extends cdk.Stack {
         ENVIRONMENT: this.stackName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant feedback function access to store feedback
@@ -954,6 +1142,7 @@ export class MisraPlatformStack extends cdk.Stack {
         ENVIRONMENT: this.stackName,
       },
       timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
     });
 
     // Grant report function access to metadata
@@ -1183,6 +1372,31 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetTemplatesIntegration', getTemplatesFunction),
     });
 
+    // Add AI test generation routes
+    api.addRoutes({
+      path: '/ai-test-generation/analyze',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AIAnalyzeIntegration', aiAnalyzeFunction),
+    });
+
+    api.addRoutes({
+      path: '/ai-test-generation/generate',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AIGenerateTestIntegration', aiGenerateTestFunction),
+    });
+
+    api.addRoutes({
+      path: '/ai-test-generation/batch',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AIBatchGenerateIntegration', aiBatchGenerateFunction),
+    });
+
+    api.addRoutes({
+      path: '/ai-test-generation/usage',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('AIGetUsageStatsIntegration', aiGetUsageStatsFunction),
+    });
+
     // Output important values
     new cdk.CfnOutput(this, 'FileStorageBucketName', {
       value: fileStorageBucket.bucketName,
@@ -1242,6 +1456,11 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WebhookNotificationTopicArn', {
       value: webhookNotificationTopic.topicArn,
       description: 'SNS topic for webhook notifications',
+    });
+
+    new cdk.CfnOutput(this, 'AIUsageTableName', {
+      value: aiUsageTable.table.tableName,
+      description: 'DynamoDB table for AI usage tracking',
     });
 
     // CloudWatch Alarms for Notification System
@@ -1462,6 +1681,25 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'NotificationDashboardUrl', {
       value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${notificationDashboard.dashboardName}`,
       description: 'CloudWatch Dashboard for Notification System',
+    });
+
+    // Cognito outputs
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value: userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+      exportName: 'misra-platform-user-pool-id',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+      description: 'Cognito User Pool Client ID',
+      exportName: 'misra-platform-user-pool-client-id',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolArn', {
+      value: userPool.userPoolArn,
+      description: 'Cognito User Pool ARN',
+      exportName: 'misra-platform-user-pool-arn',
     });
   }
 }

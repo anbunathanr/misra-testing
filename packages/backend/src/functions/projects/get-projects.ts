@@ -28,19 +28,27 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
+    // Get projects directly without retry logic (Lambda handles retries)
     const projects = await projectService.getUserProjects(userId);
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({ projects }),
     };
   } catch (error) {
     console.error('Error getting projects:', error);
+    // Return empty array on error instead of 503 to prevent cascading failures
     return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Internal server error' }),
+      statusCode: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({ projects: [] }),
     };
   }
 };

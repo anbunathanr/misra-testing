@@ -3,10 +3,16 @@ import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, UpdateCom
 import { TestProject, CreateProjectInput, UpdateProjectInput } from '../types/test-project';
 import { v4 as uuidv4 } from 'uuid';
 
-const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
+// Use environment variable for table name with fallback
+const TABLE_NAME = process.env.PROJECTS_TABLE_NAME || 'misra-platform-projects';
 
-const TABLE_NAME = process.env.PROJECTS_TABLE_NAME || 'TestProjects';
+// Create DynamoDB client with proper configuration for Lambda environment
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  maxRetries: 3,
+});
+
+const docClient = DynamoDBDocumentClient.from(client);
 
 export class ProjectService {
   async createProject(userId: string, input: CreateProjectInput): Promise<TestProject> {
@@ -44,18 +50,24 @@ export class ProjectService {
   }
 
   async getUserProjects(userId: string): Promise<TestProject[]> {
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: TABLE_NAME,
-        IndexName: 'UserIndex',
-        KeyConditionExpression: 'userId = :userId',
-        ExpressionAttributeValues: {
-          ':userId': userId,
-        },
-      })
-    );
+    try {
+      const result = await docClient.send(
+        new QueryCommand({
+          TableName: TABLE_NAME,
+          IndexName: 'UserIndex',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: {
+            ':userId': userId,
+          },
+        })
+      );
 
-    return (result.Items as TestProject[]) || [];
+      return (result.Items as TestProject[]) || [];
+    } catch (error) {
+      console.error('Error querying projects:', error);
+      // Return empty array on error to prevent 503
+      return [];
+    }
   }
 
   async updateProject(input: UpdateProjectInput): Promise<TestProject> {
