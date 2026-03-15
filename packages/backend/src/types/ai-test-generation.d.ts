@@ -170,13 +170,20 @@ export interface TestPattern {
  */
 export interface AILearningRecord {
     domain: string;
-    recordType: string;
+    timestamp: number;
+    recordType: 'execution' | 'selector-failure' | 'pattern-success';
+    testCaseId?: string;
+    executionId?: string;
+    success?: boolean;
     selectorStrategy?: SelectorStrategy;
-    successCount?: number;
-    failureCount?: number;
     selector?: string;
-    pattern?: TestPattern;
-    lastUpdated: string;
+    failureReason?: string;
+    testPattern?: string;
+    metadata?: {
+        url?: string;
+        scenario?: string;
+        [key: string]: any;
+    };
 }
 /**
  * Token usage for an LLM API call

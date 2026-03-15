@@ -35,15 +35,33 @@ export declare class SNSDeliveryService {
      */
     sendWebhook(webhookUrl: string, payload: object): Promise<SNSDeliveryResult>;
     /**
-     * Send notification to Slack with Block Kit formatting
+     * Send notification to Slack with Block Kit formatting and action buttons
      *
      * @param webhookUrl - Slack webhook URL
      * @param blocks - Slack Block Kit blocks
+     * @param actionButtons - Optional action buttons (view test, view logs, re-run test)
      * @returns SNS delivery result
      */
-    sendToSlack(webhookUrl: string, blocks: SlackBlock[]): Promise<SNSDeliveryResult>;
+    sendToSlack(webhookUrl: string, blocks: SlackBlock[], actionButtons?: Array<{
+        text: string;
+        url: string;
+        value?: string;
+    }>): Promise<SNSDeliveryResult>;
     /**
-     * Publish message to SNS topic with retry logic
+     * Create Slack action buttons for test execution
+     *
+     * @param executionId - Test execution ID
+     * @param testCaseId - Test case ID
+     * @param baseUrl - Base URL for the application
+     * @returns Array of action buttons
+     */
+    createSlackActionButtons(executionId: string, testCaseId: string, baseUrl: string): Array<{
+        text: string;
+        url: string;
+        value?: string;
+    }>;
+    /**
+     * Publish message to SNS topic with retry logic and rate limiting
      *
      * @param topicArn - SNS topic ARN
      * @param message - Message content

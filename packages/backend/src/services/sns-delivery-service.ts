@@ -6,8 +6,9 @@
  */
 
 import { SNSClient, PublishCommand, PublishCommandInput } from '@aws-sdk/client-sns';
-import { SNSDeliveryOptions, SNSDeliveryResult, NotificationChannel, SlackBlock } from '../types/notification';
+import { SNSDeliveryResult, NotificationChannel, SlackBlock } from '../types/notification';
 import { retryHandlerService } from './retry-handler-service';
+import { rateLimiterService } from './rate-limiter-service';
 
 export class SNSDeliveryService {
   private snsClient: SNSClient;
@@ -87,13 +88,35 @@ export class SNSDeliveryService {
   }
 
   /**
-   * Send notification to Slack with Block Kit formatting
+   * Send notification to Slack with Block Kit formatting and action buttons
    * 
    * @param webhookUrl - Slack webhook URL
    * @param blocks - Slack Block Kit blocks
+   * @param actionButtons - Optional action buttons (view test, view logs, re-run test)
    * @returns SNS delivery result
    */
-  async sendToSlack(webhookUrl: string, blocks: SlackBlock[]): Promise<SNSDeliveryResult> {
+  async sendToSlack(
+    webhookUrl: string,
+    blocks: SlackBlock[],
+    actionButtons?: Array<{ text: string; url: string; value?: string }>
+  ): Promise<SNSDeliveryResult> {
+    // Add action buttons if provided
+    if (actionButtons && actionButtons.length > 0) {
+      const actionsBlock: SlackBlock = {
+        type: 'actions',
+        elements: actionButtons.map((button) => ({
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: button.text,
+          },
+          url: button.url,
+          value: button.value || button.text,
+        })),
+      };
+      blocks.push(actionsBlock);
+    }
+
     const payload = {
       blocks,
     };
@@ -102,7 +125,39 @@ export class SNSDeliveryService {
   }
 
   /**
-   * Publish message to SNS topic with retry logic
+   * Create Slack action buttons for test execution
+   * 
+   * @param executionId - Test execution ID
+   * @param testCaseId - Test case ID
+   * @param baseUrl - Base URL for the application
+   * @returns Array of action buttons
+   */
+  createSlackActionButtons(
+    executionId: string,
+    testCaseId: string,
+    baseUrl: string
+  ): Array<{ text: string; url: string; value?: string }> {
+    return [
+      {
+        text: '📊 View Test',
+        url: `${baseUrl}/executions/${executionId}`,
+        value: 'view_test',
+      },
+      {
+        text: '📝 View Logs',
+        url: `${baseUrl}/executions/${executionId}/logs`,
+        value: 'view_logs',
+      },
+      {
+        text: '🔄 Re-run Test',
+        url: `${baseUrl}/test-cases/${testCaseId}/execute`,
+        value: 'rerun_test',
+      },
+    ];
+  }
+
+  /**
+   * Publish message to SNS topic with retry logic and rate limiting
    * 
    * @param topicArn - SNS topic ARN
    * @param message - Message content
@@ -122,6 +177,17 @@ export class SNSDeliveryService {
         channel: (attributes?.channel as NotificationChannel) || 'email',
         status: 'failed',
         errorMessage: `Payload size ${payloadSize} bytes exceeds limit of ${this.MAX_PAYLOAD_SIZE} bytes`,
+      };
+    }
+
+    // Check rate limit before attempting to publish
+    const rateLimitResult = await rateLimiterService.checkRateLimit(topicArn);
+    if (!rateLimitResult.allowed) {
+      return {
+        messageId: '',
+        channel: (attributes?.channel as NotificationChannel) || 'email',
+        status: 'failed',
+        errorMessage: `Rate limit exceeded. Retry after ${rateLimitResult.retryAfterMs}ms`,
       };
     }
 

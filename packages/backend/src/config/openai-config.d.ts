@@ -67,10 +67,10 @@ export declare const OPENAI_CONFIG: {
     };
 };
 /**
- * Get OpenAI API key from environment
+ * Get OpenAI API key from Secrets Manager or environment
  * @throws Error if API key is not configured
  */
-export declare function getOpenAIApiKey(): string;
+export declare function getOpenAIApiKey(): Promise<string>;
 /**
  * Get model name for a specific operation
  */

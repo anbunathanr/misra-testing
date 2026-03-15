@@ -235,7 +235,10 @@ export interface SlackBlock {
   };
   elements?: Array<{
     type: string;
-    text?: string;
+    text?: string | {
+      type: string;
+      text: string;
+    };
     url?: string;
     value?: string;
   }>;

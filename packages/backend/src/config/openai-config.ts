@@ -2,6 +2,11 @@
  * OpenAI API configuration for AI test generation
  */
 
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+
+const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-1' });
+let cachedApiKey: string | null = null;
+
 export const OPENAI_CONFIG = {
   // API Configuration
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -91,17 +96,39 @@ export const OPENAI_CONFIG = {
 } as const;
 
 /**
- * Get OpenAI API key from environment
+ * Get OpenAI API key from Secrets Manager or environment
  * @throws Error if API key is not configured
  */
-export function getOpenAIApiKey(): string {
-  const apiKey = process.env.OPENAI_API_KEY;
-  
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
+export async function getOpenAIApiKey(): Promise<string> {
+  // Return cached key if available
+  if (cachedApiKey) {
+    return cachedApiKey;
   }
   
-  return apiKey;
+  // Check if using environment variable (for local development or mock mode)
+  if (process.env.OPENAI_API_KEY) {
+    cachedApiKey = process.env.OPENAI_API_KEY;
+    return cachedApiKey;
+  }
+  
+  // Retrieve from Secrets Manager
+  try {
+    const secretName = process.env.OPENAI_SECRET_NAME || 'aibts/openai-api-key';
+    const command = new GetSecretValueCommand({
+      SecretId: secretName,
+    });
+    
+    const response = await secretsClient.send(command);
+    
+    if (!response.SecretString) {
+      throw new Error('OpenAI API key not found in Secrets Manager');
+    }
+    
+    cachedApiKey = response.SecretString;
+    return cachedApiKey;
+  } catch (error) {
+    throw new Error(`Failed to retrieve OpenAI API key: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
