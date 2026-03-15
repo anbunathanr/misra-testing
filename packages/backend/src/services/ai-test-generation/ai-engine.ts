@@ -20,6 +20,8 @@ import {
   getRetryDelay,
   getTimeout,
 } from '../../config/openai-config';
+import { MockAIService } from './mock-ai-service';
+import { HuggingFaceEngine } from './huggingface-engine';
 
 // ============================================================================
 // Zod Schemas for Response Validation
@@ -155,17 +157,11 @@ class APILogger {
 // ============================================================================
 
 export class AIEngine {
-  private client: OpenAI;
+  private client: OpenAI | null = null;
   private circuitBreaker: CircuitBreaker;
   private logger: APILogger;
 
   constructor() {
-    this.client = new OpenAI({
-      apiKey: getOpenAIApiKey(),
-      organization: OPENAI_CONFIG.organization,
-      timeout: getTimeout('request'),
-    });
-
     this.circuitBreaker = new CircuitBreaker(
       OPENAI_CONFIG.circuitBreaker.failureThreshold,
       OPENAI_CONFIG.circuitBreaker.resetTimeoutMs,
@@ -176,6 +172,25 @@ export class AIEngine {
   }
 
   /**
+   * Get or create OpenAI client with API key from Secrets Manager
+   */
+  private async getClient(): Promise<OpenAI> {
+    if (this.client) {
+      return this.client;
+    }
+
+    const apiKey = await getOpenAIApiKey();
+
+    this.client = new OpenAI({
+      apiKey,
+      organization: OPENAI_CONFIG.organization,
+      timeout: getTimeout('request'),
+    });
+
+    return this.client;
+  }
+
+  /**
    * Generate test specification from application analysis
    */
   async generateTestSpecification(
@@ -183,6 +198,25 @@ export class AIEngine {
     scenario: string,
     context?: LearningContext
   ): Promise<TestSpecification> {
+    // Use mock service if in mock mode
+    if (MockAIService.isMockMode()) {
+      console.log('[AIEngine] Using mock mode for test generation');
+      const mockService = new MockAIService();
+      const { specification } = await mockService.generateTestSpecification(
+        analysis.url,
+        scenario
+      );
+      return specification;
+    }
+
+    // Check if using Hugging Face instead of OpenAI
+    if (process.env.USE_HUGGINGFACE === 'true') {
+      console.log('[AIEngine] Using Hugging Face for test generation');
+      const hfEngine = new HuggingFaceEngine();
+      return await hfEngine.generateTestSpecification(analysis, scenario, context);
+    }
+
+    // Default: Use OpenAI
     const startTime = Date.now();
     const model = getModelForOperation('generation');
 
@@ -230,12 +264,14 @@ export class AIEngine {
     model: string,
     prompt: string
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    const client = await this.getClient();
+    
     return this.circuitBreaker.execute(async () => {
       let lastError: Error | null = null;
 
       for (let attempt = 1; attempt <= OPENAI_CONFIG.retry.maxAttempts; attempt++) {
         try {
-          const response = await this.client.chat.completions.create({
+          const response = await client.chat.completions.create({
             model,
             messages: [
               {

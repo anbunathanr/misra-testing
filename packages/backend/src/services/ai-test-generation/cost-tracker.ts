@@ -107,9 +107,9 @@ export class CostTracker {
     duration: number = 0
   ): Promise<void> {
     const cost = this.calculateCost(tokens, model);
-    const timestamp = new Date().toISOString();
+    const timestamp = Date.now(); // Store as number (milliseconds since epoch)
 
-    const record: AIUsageRecord = {
+    const record: any = {
       userId,
       timestamp,
       projectId,
@@ -175,6 +175,50 @@ export class CostTracker {
       return true;
     }
   }
+  /**
+   * Check if user or project has exceeded usage limits
+   * Throws error if limit exceeded
+   *
+   * @param userId - User ID
+   * @param projectId - Project ID
+   * @throws Error if limit exceeded
+   */
+  async checkLimits(userId: string, projectId: string): Promise<void> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    try {
+      // Check user limit
+      if (this.limits.perUserMonthly) {
+        const userCost = await this.getUserCostSince(userId, startOfMonth);
+        if (userCost >= this.limits.perUserMonthly) {
+          throw new Error(
+            `Monthly usage limit exceeded. You have used $${userCost.toFixed(2)} of your $${this.limits.perUserMonthly} monthly limit. Please upgrade your plan or wait until next month.`
+          );
+        }
+      }
+
+      // Check project limit
+      if (this.limits.perProjectMonthly) {
+        const projectCost = await this.getProjectCostSince(projectId, startOfMonth);
+        if (projectCost >= this.limits.perProjectMonthly) {
+          throw new Error(
+            `Project monthly usage limit exceeded. This project has used $${projectCost.toFixed(2)} of its $${this.limits.perProjectMonthly} monthly limit.`
+          );
+        }
+      }
+    } catch (error) {
+      // If it's already a limit exceeded error, re-throw it
+      if (error instanceof Error && error.message.includes('limit exceeded')) {
+        throw error;
+      }
+
+      // For other errors, log and fail open (allow request)
+      console.error('[Cost Tracker] Failed to check limits:', error);
+      // Don't throw - fail open to avoid blocking users due to infrastructure issues
+    }
+  }
+
 
   /**
    * Get total cost for user since a specific date
@@ -185,6 +229,8 @@ export class CostTracker {
    */
   private async getUserCostSince(userId: string, startDate: string): Promise<number> {
     try {
+      const startTimestamp = new Date(startDate).getTime();
+      
       const result = await this.docClient.send(
         new QueryCommand({
           TableName: this.tableName,
@@ -194,7 +240,7 @@ export class CostTracker {
           },
           ExpressionAttributeValues: {
             ':userId': userId,
-            ':startDate': startDate,
+            ':startDate': startTimestamp,
           },
         })
       );
@@ -219,17 +265,19 @@ export class CostTracker {
    */
   private async getProjectCostSince(projectId: string, startDate: string): Promise<number> {
     try {
+      const startTimestamp = new Date(startDate).getTime();
+      
       const result = await this.docClient.send(
         new QueryCommand({
           TableName: this.tableName,
-          IndexName: 'ProjectIndex',
+          IndexName: 'projectId-timestamp-index',
           KeyConditionExpression: 'projectId = :projectId AND #ts >= :startDate',
           ExpressionAttributeNames: {
             '#ts': 'timestamp',
           },
           ExpressionAttributeValues: {
             ':projectId': projectId,
-            ':startDate': startDate,
+            ':startDate': startTimestamp,
           },
         })
       );
@@ -331,29 +379,35 @@ export class CostTracker {
     const expressionAttributeValues: any = {
       ':userId': userId,
     };
+    const expressionAttributeNames: any = {};
 
     if (startDate && endDate) {
       keyConditionExpression += ' AND #ts BETWEEN :startDate AND :endDate';
       expressionAttributeValues[':startDate'] = startDate;
       expressionAttributeValues[':endDate'] = endDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     } else if (startDate) {
       keyConditionExpression += ' AND #ts >= :startDate';
       expressionAttributeValues[':startDate'] = startDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     } else if (endDate) {
       keyConditionExpression += ' AND #ts <= :endDate';
       expressionAttributeValues[':endDate'] = endDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     }
 
-    const result = await this.docClient.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeNames: {
-          '#ts': 'timestamp',
-        },
-        ExpressionAttributeValues: expressionAttributeValues,
-      })
-    );
+    const queryParams: any = {
+      TableName: this.tableName,
+      KeyConditionExpression: keyConditionExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
+    };
+
+    // Only add ExpressionAttributeNames if we have date filters
+    if (Object.keys(expressionAttributeNames).length > 0) {
+      queryParams.ExpressionAttributeNames = expressionAttributeNames;
+    }
+
+    const result = await this.docClient.send(new QueryCommand(queryParams));
 
     return result.Items || [];
   }
@@ -366,30 +420,36 @@ export class CostTracker {
     const expressionAttributeValues: any = {
       ':projectId': projectId,
     };
+    const expressionAttributeNames: any = {};
 
     if (startDate && endDate) {
       keyConditionExpression += ' AND #ts BETWEEN :startDate AND :endDate';
       expressionAttributeValues[':startDate'] = startDate;
       expressionAttributeValues[':endDate'] = endDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     } else if (startDate) {
       keyConditionExpression += ' AND #ts >= :startDate';
       expressionAttributeValues[':startDate'] = startDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     } else if (endDate) {
       keyConditionExpression += ' AND #ts <= :endDate';
       expressionAttributeValues[':endDate'] = endDate;
+      expressionAttributeNames['#ts'] = 'timestamp';
     }
 
-    const result = await this.docClient.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'ProjectIndex',
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeNames: {
-          '#ts': 'timestamp',
-        },
-        ExpressionAttributeValues: expressionAttributeValues,
-      })
-    );
+    const queryParams: any = {
+      TableName: this.tableName,
+      IndexName: 'projectId-timestamp-index',
+      KeyConditionExpression: keyConditionExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
+    };
+
+    // Only add ExpressionAttributeNames if we have date filters
+    if (Object.keys(expressionAttributeNames).length > 0) {
+      queryParams.ExpressionAttributeNames = expressionAttributeNames;
+    }
+
+    const result = await this.docClient.send(new QueryCommand(queryParams));
 
     return result.Items || [];
   }

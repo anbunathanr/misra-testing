@@ -194,6 +194,7 @@ export class ApplicationAnalyzer {
       // @ts-ignore - Browser context has DOM types
       const path = await page.evaluate((el) => {
         const parts: string[] = [];
+        // @ts-ignore - Element type exists in browser context
         let current = el as Element | null;
 
         while (current && current.nodeType === 1) { // ELEMENT_NODE = 1
@@ -217,6 +218,7 @@ export class ApplicationAnalyzer {
           // Add nth-child if needed for uniqueness
           if (current.parentElement) {
             const siblings = Array.from(current.parentElement.children);
+            // @ts-ignore - Element type exists in browser context
             const sameTagSiblings = siblings.filter((s: Element) => s.tagName === current!.tagName);
             if (sameTagSiblings.length > 1) {
               const index = sameTagSiblings.indexOf(current) + 1;
@@ -249,6 +251,7 @@ export class ApplicationAnalyzer {
       // @ts-ignore - Browser context has DOM types
       const xpath = await page.evaluate((el) => {
         const parts: string[] = [];
+        // @ts-ignore - Element type exists in browser context
         let current = el as Element | null;
 
         while (current && current.nodeType === 1) { // ELEMENT_NODE = 1
@@ -750,7 +753,9 @@ export class ApplicationAnalyzer {
       // Check for common SPA frameworks and patterns
       // @ts-ignore - Browser context has window and document
       const spaIndicators = await page.evaluate(() => {
+        // @ts-ignore - window exists in browser context
         const win = window as any;
+        // @ts-ignore - document exists in browser context
         const doc = document;
         
         const indicators = {

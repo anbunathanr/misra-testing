@@ -1,5 +1,6 @@
 import { ApplicationAnalyzer } from './application-analyzer';
 import { TestGenerator } from './test-generator';
+import { AIEngine } from './ai-engine';
 import { BatchResult, FailedGeneration, AnalysisOptions } from '../../types/ai-test-generation';
 import { TestCase } from '../../types/test-case';
 
@@ -26,6 +27,7 @@ const DEFAULT_CONFIG: BatchProcessorConfig = {
 export class BatchProcessor {
   private analyzer: ApplicationAnalyzer;
   private generator: TestGenerator;
+  private aiEngine: AIEngine;
   private config: BatchProcessorConfig;
 
   constructor(
@@ -35,6 +37,7 @@ export class BatchProcessor {
   ) {
     this.analyzer = analyzer;
     this.generator = generator;
+    this.aiEngine = new AIEngine();
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
@@ -202,9 +205,13 @@ export class BatchProcessor {
     try {
       console.log(`[Batch Processor] Generating test for scenario: ${scenario.substring(0, 50)}...`);
 
+      // First, generate test specification from AI
+      const specification = await this.aiEngine.generateTestSpecification(analysis, scenario);
+      
+      // Then, generate the test case from the specification
       const testCase = await this.generator.generate(
+        specification,
         analysis,
-        scenario,
         projectId,
         suiteId,
         userId

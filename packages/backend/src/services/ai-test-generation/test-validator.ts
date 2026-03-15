@@ -214,6 +214,9 @@ export class TestValidator {
       case 'wait':
         this.validateWaitStep(step, stepPrefix, errors);
         break;
+      case 'api-call':
+        this.validateApiCallStep(step, stepPrefix, errors);
+        break;
     }
   }
 
@@ -334,6 +337,39 @@ export class TestValidator {
       errors.push({
         field: `${stepPrefix}.target`,
         message: 'Wait step target must be a non-negative number (milliseconds)',
+      });
+    }
+  }
+
+  /**
+   * Validate API call step
+   * 
+   * @param step - Test step to validate
+   * @param stepPrefix - Prefix for error field
+   * @param errors - Array to collect errors
+   */
+  private validateApiCallStep(step: TestStep, stepPrefix: string, errors: ValidationError[]): void {
+    if (!step.target || step.target.trim() === '') {
+      errors.push({
+        field: `${stepPrefix}.target`,
+        message: 'API call step must have a target URL',
+      });
+      return;
+    }
+
+    // Validate URL format (HTTP/HTTPS only)
+    try {
+      const url = new URL(step.target);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        errors.push({
+          field: `${stepPrefix}.target`,
+          message: 'API call URL must use HTTP or HTTPS protocol',
+        });
+      }
+    } catch (error) {
+      errors.push({
+        field: `${stepPrefix}.target`,
+        message: 'API call target must be a valid URL',
       });
     }
   }
