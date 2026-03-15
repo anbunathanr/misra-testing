@@ -2615,8 +2615,8 @@ describe('Property 26: Suite Result Completeness', () => {
             suiteExecutionId: fc.uuid(),
             status: fc.constantFrom('queued', 'running', 'completed', 'error'),
             result: fc.option(fc.constantFrom('pass', 'fail', 'error'), { nil: undefined }),
-            startTime: fc.date().map(d => d.toISOString()),
-            endTime: fc.option(fc.date().map(d => d.toISOString()), { nil: undefined }),
+            startTime: fc.integer({ min: 1577836800000, max: 1893456000000 }).map(ts => new Date(ts).toISOString()),
+            endTime: fc.option(fc.integer({ min: 1577836800000, max: 1893456000000 }).map(ts => new Date(ts).toISOString()), { nil: undefined }),
             duration: fc.option(fc.integer({ min: 0, max: 300000 }), { nil: undefined }),
             steps: fc.array(fc.record({
               stepIndex: fc.integer({ min: 0, max: 20 }),
@@ -2628,8 +2628,8 @@ describe('Property 26: Suite Result Completeness', () => {
             metadata: fc.record({
               triggeredBy: fc.uuid(),
             }),
-            createdAt: fc.date().map(d => d.toISOString()),
-            updatedAt: fc.date().map(d => d.toISOString()),
+            createdAt: fc.integer({ min: 1577836800000, max: 1893456000000 }).map(ts => new Date(ts).toISOString()),
+            updatedAt: fc.integer({ min: 1577836800000, max: 1893456000000 }).map(ts => new Date(ts).toISOString()),
           }),
           { minLength: 1, maxLength: 10 }
         ),
