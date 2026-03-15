@@ -112,7 +112,9 @@ if ($deploy -ne "yes") {
 
 Write-Host ""
 Write-Host "Deploying infrastructure..." -ForegroundColor Yellow
+Set-Location packages/backend
 cdk deploy --require-approval never
+Set-Location ..
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Deployment failed" -ForegroundColor Red
@@ -156,7 +158,7 @@ if ($apiUrl) {
     Write-Host "✓ Frontend built successfully" -ForegroundColor Green
 
     Write-Host ""
-    Write-Host "Frontend build is ready in: packages/frontend/dist/" -ForegroundColor Green
+    Write-Host "Frontend build is ready in: dist/" -ForegroundColor Green
     Write-Host ""
     Write-Host "To deploy frontend to S3:" -ForegroundColor Yellow
     Write-Host "1. Create S3 bucket: aws s3 mb s3://misra-platform-frontend" -ForegroundColor Gray
