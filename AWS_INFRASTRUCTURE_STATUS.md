@@ -152,7 +152,7 @@ All Lambda functions are deployed and operational:
 - **Last Changed**: 2026-03-09 19:36:41 IST
 - **Description**: Hugging Face API key for AIBTS AI test generation
 - **Purpose**: Store Hugging Face API token securely
-- **Token**: [REDACTED] (Read access)
+- **Token**: [REDACTED - Set in Vercel environment variables] (Read access)
 
 #### aibts/openai-api-key
 - **Status**: ✅ ACTIVE (Placeholder)
