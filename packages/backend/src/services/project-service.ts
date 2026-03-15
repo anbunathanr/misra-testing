@@ -9,7 +9,6 @@ const TABLE_NAME = process.env.PROJECTS_TABLE_NAME || 'misra-platform-projects';
 // Create DynamoDB client with proper configuration for Lambda environment
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1',
-  maxRetries: 3,
 });
 
 const docClient = DynamoDBDocumentClient.from(client);
