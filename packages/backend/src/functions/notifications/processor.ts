@@ -70,9 +70,42 @@ async function processNotificationMessage(record: SQSRecord): Promise<void> {
 
   // Check if this is a critical alert
   const isCriticalAlert = eventType === 'critical_alert';
+  
+  // Check if this is a summary report
+  const isSummaryReport = eventType === 'summary_report';
 
   // Get user preferences
   const preferences = await notificationPreferencesService.getPreferences(userId);
+
+  // For summary reports, check frequency preference
+  if (isSummaryReport && payload.reportData?.reportType) {
+    const shouldReceive = await notificationPreferencesService.shouldReceiveReport(
+      userId,
+      payload.reportData.reportType
+    );
+    
+    if (!shouldReceive) {
+      console.log(`User ${userId} should not receive ${payload.reportData.reportType} report based on frequency preference`);
+      
+      // Record filtered notification
+      await notificationHistoryService.recordNotification({
+        userId,
+        eventType,
+        eventId,
+        channel: 'email',
+        deliveryMethod: 'sns',
+        deliveryStatus: 'failed',
+        recipient: userId,
+        retryCount: 0,
+        metadata: {
+          projectId: payload.projectId,
+        },
+        errorMessage: `Filtered by report frequency preference: ${payload.reportData.reportType}`,
+      });
+      
+      return;
+    }
+  }
 
   // Check if notifications are enabled for this event type (unless critical alert)
   if (!isCriticalAlert) {
@@ -333,6 +366,18 @@ async function deliverViaSNS(
           payload.slackWebhook,
           payload.slackBlocks || []
         );
+        
+        // If Slack delivery fails, fallback to email
+        if (result.status === 'failed') {
+          logger.warn('Slack delivery failed, falling back to email');
+          logger.warn(`Slack error: ${result.errorMessage}`);
+          
+          result = await snsDeliveryService.sendEmail(
+            payload.recipientEmail || payload.triggeredBy,
+            `Test Execution ${payload.status || 'Completed'} (Slack Fallback)`,
+            content
+          );
+        }
         break;
 
       case 'webhook':

@@ -69,6 +69,25 @@ export declare class NotificationPreferencesService {
      */
     private getPreferenceKey;
     /**
+     * Check if user should receive summary report based on frequency preference
+     *
+     * @param userId - User ID
+     * @param reportType - Report type (daily, weekly, monthly)
+     * @returns True if user should receive the report
+     */
+    shouldReceiveReport(userId: string, reportType: 'daily' | 'weekly' | 'monthly'): Promise<boolean>;
+    /**
+     * Get Slack webhooks for user and event type
+     *
+     * @param userId - User ID
+     * @param eventType - Event type
+     * @returns Array of Slack webhook configurations
+     */
+    getSlackWebhooks(userId: string, eventType: string): Promise<Array<{
+        webhookUrl: string;
+        channel: string;
+    }>>;
+    /**
      * Validate email address format
      *
      * @param email - Email address

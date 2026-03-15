@@ -287,6 +287,74 @@ export class NotificationPreferencesService {
   }
 
   /**
+   * Check if user should receive summary report based on frequency preference
+   * 
+   * @param userId - User ID
+   * @param reportType - Report type (daily, weekly, monthly)
+   * @returns True if user should receive the report
+   */
+  async shouldReceiveReport(
+    userId: string,
+    reportType: 'daily' | 'weekly' | 'monthly'
+  ): Promise<boolean> {
+    const preferences = await this.getPreferences(userId);
+
+    // Check if summary reports are enabled
+    if (!preferences.preferences.summaryReport.enabled) {
+      return false;
+    }
+
+    // Check if report frequency matches
+    const configuredFrequency = preferences.preferences.summaryReport.frequency;
+    
+    // If disabled, don't send any reports
+    if (configuredFrequency === 'disabled') {
+      return false;
+    }
+
+    // Match report type with configured frequency
+    // Daily reports: send only if frequency is daily
+    // Weekly reports: send if frequency is weekly or daily
+    // Monthly reports: send if frequency is monthly, weekly, or daily
+    switch (reportType) {
+      case 'daily':
+        return configuredFrequency === 'daily';
+      case 'weekly':
+        return configuredFrequency === 'weekly' || configuredFrequency === 'daily';
+      case 'monthly':
+        return configuredFrequency === 'monthly' || configuredFrequency === 'weekly' || configuredFrequency === 'daily';
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Get Slack webhooks for user and event type
+   * 
+   * @param userId - User ID
+   * @param eventType - Event type
+   * @returns Array of Slack webhook configurations
+   */
+  async getSlackWebhooks(
+    userId: string,
+    eventType: string
+  ): Promise<Array<{ webhookUrl: string; channel: string }>> {
+    const preferences = await this.getPreferences(userId);
+
+    if (!preferences.slackWebhooks || preferences.slackWebhooks.length === 0) {
+      return [];
+    }
+
+    // Filter webhooks by event type
+    return preferences.slackWebhooks
+      .filter((webhook) => webhook.eventTypes.includes(eventType))
+      .map((webhook) => ({
+        webhookUrl: webhook.webhookUrl,
+        channel: webhook.channel,
+      }));
+  }
+
+  /**
    * Validate email address format
    * 
    * @param email - Email address

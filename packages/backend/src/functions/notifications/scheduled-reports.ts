@@ -7,7 +7,7 @@
 
 import { Handler, ScheduledEvent } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { TestExecution } from '../../types/test-execution';
 
@@ -94,8 +94,8 @@ export const handler: Handler<ScheduledEvent, ReportResult> = async (event): Pro
     // Calculate trends
     const trends = calculateTrends(stats, previousStats);
 
-    // Identify top failing tests
-    const topFailingTests = identifyTopFailingTests(currentExecutions);
+    // Identify top failing tests with batch optimization
+    const topFailingTests = await identifyTopFailingTests(docClient, currentExecutions);
 
     // Build report data
     const reportData: SummaryReportData = {
@@ -217,7 +217,7 @@ function calculatePreviousPeriod(
 }
 
 /**
- * Query test executions for a time period
+ * Query test executions for a time period with batch optimization
  */
 async function queryExecutions(
   docClient: DynamoDBDocumentClient,
@@ -227,6 +227,9 @@ async function queryExecutions(
 ): Promise<TestExecution[]> {
   const executions: TestExecution[] = [];
   let lastEvaluatedKey: Record<string, any> | undefined;
+
+  // Use batch size of 100 for optimal performance
+  const BATCH_SIZE = 100;
 
   do {
     const command = new QueryCommand({
@@ -242,6 +245,7 @@ async function queryExecutions(
         ':startDate': startDate,
         ':endDate': endDate,
       },
+      Limit: BATCH_SIZE, // Batch size optimization
       ExclusiveStartKey: lastEvaluatedKey,
     });
 
@@ -255,6 +259,63 @@ async function queryExecutions(
   } while (lastEvaluatedKey);
 
   return executions;
+}
+
+/**
+ * Batch get test case details for multiple test cases
+ * Uses DynamoDB BatchGetItem for efficient retrieval
+ */
+async function batchGetTestCaseDetails(
+  docClient: DynamoDBDocumentClient,
+  testCaseIds: string[]
+): Promise<Map<string, { testName: string }>> {
+  const testCaseMap = new Map<string, { testName: string }>();
+  
+  if (testCaseIds.length === 0) {
+    return testCaseMap;
+  }
+
+  // DynamoDB BatchGetItem supports up to 100 items per request
+  const BATCH_SIZE = 100;
+  const batches: string[][] = [];
+  
+  for (let i = 0; i < testCaseIds.length; i += BATCH_SIZE) {
+    batches.push(testCaseIds.slice(i, i + BATCH_SIZE));
+  }
+
+  // Process batches in parallel for better performance
+  await Promise.all(
+    batches.map(async (batch) => {
+      const command = new BatchGetCommand({
+        RequestItems: {
+          TestCases: {
+            Keys: batch.map(id => ({ testCaseId: id })),
+            ProjectionExpression: 'testCaseId, #name',
+            ExpressionAttributeNames: {
+              '#name': 'name',
+            },
+          },
+        },
+      });
+
+      try {
+        const response = await docClient.send(command);
+        
+        if (response.Responses?.TestCases) {
+          response.Responses.TestCases.forEach((item: any) => {
+            testCaseMap.set(item.testCaseId, {
+              testName: item.name || `Test ${item.testCaseId.substring(0, 8)}`,
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Error batch getting test case details:', error);
+        // Continue with other batches even if one fails
+      }
+    })
+  );
+
+  return testCaseMap;
 }
 
 /**
@@ -322,14 +383,17 @@ function calculateTrends(
 }
 
 /**
- * Identify top failing tests
+ * Identify top failing tests with batch optimization
  */
-function identifyTopFailingTests(executions: TestExecution[]): Array<{
+async function identifyTopFailingTests(
+  docClient: DynamoDBDocumentClient,
+  executions: TestExecution[]
+): Promise<Array<{
   testCaseId: string;
   testName: string;
   failureCount: number;
   lastFailure: string;
-}> {
+}>> {
   // Group failures by test case
   const failureMap = new Map<string, { count: number; lastFailure: string }>();
 
@@ -352,11 +416,17 @@ function identifyTopFailingTests(executions: TestExecution[]): Array<{
       }
     });
 
+  // Get test case IDs for batch retrieval
+  const testCaseIds = Array.from(failureMap.keys());
+  
+  // Batch get test case details for better performance
+  const testCaseDetails = await batchGetTestCaseDetails(docClient, testCaseIds);
+
   // Convert to array and sort by failure count
   const topFailing = Array.from(failureMap.entries())
     .map(([testCaseId, data]) => ({
       testCaseId,
-      testName: `Test ${testCaseId.substring(0, 8)}`, // Placeholder - would need to fetch actual test name
+      testName: testCaseDetails.get(testCaseId)?.testName || `Test ${testCaseId.substring(0, 8)}`,
       failureCount: data.count,
       lastFailure: data.lastFailure,
     }))
@@ -367,7 +437,7 @@ function identifyTopFailingTests(executions: TestExecution[]): Array<{
 }
 
 /**
- * Publish report event to notification queue
+ * Publish report event to notification queue with frequency filtering
  */
 async function publishReportEvent(
   sqsClient: SQSClient,
@@ -381,6 +451,7 @@ async function publishReportEvent(
     payload: {
       projectId: 'all', // Summary across all projects
       reportData,
+      reportType: reportData.reportType, // Include report type for frequency filtering
       triggeredBy: 'system',
     },
   };
@@ -391,5 +462,8 @@ async function publishReportEvent(
   });
 
   await sqsClient.send(command);
-  console.log('Report event published to notification queue', { eventId: message.eventId });
+  console.log('Report event published to notification queue', { 
+    eventId: message.eventId,
+    reportType: reportData.reportType,
+  });
 }
