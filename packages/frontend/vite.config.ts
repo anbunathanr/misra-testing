@@ -15,6 +15,16 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: false, // Disable source maps in production
+    minify: 'esbuild', // Use esbuild instead of terser
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          mui: ['@mui/material', '@mui/icons-material'],
+          redux: ['@reduxjs/toolkit', 'react-redux'],
+        },
+      },
+    },
   }
 })

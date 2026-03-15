@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Chip, CircularProgress, Box, Tooltip } from '@mui/material';
+import { Chip, CircularProgress, Tooltip } from '@mui/material';
 import {
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
@@ -15,16 +15,26 @@ interface ExecutionStatusBadgeProps {
   onStatusChange?: (status: string, result?: string) => void;
 }
 
+interface ExecutionStatusResponse {
+  status: string;
+  result?: string;
+  currentStep?: number;
+  totalSteps?: number;
+  error?: string;
+}
+
 export function ExecutionStatusBadge({
   executionId,
   showProgress = true,
   size = 'small',
   onStatusChange,
 }: ExecutionStatusBadgeProps) {
-  const { data: statusData, isLoading } = useGetExecutionStatusQuery(executionId, {
-    pollingInterval: statusData?.status === 'running' || statusData?.status === 'queued' ? 3000 : 0,
+  const queryResult = useGetExecutionStatusQuery(executionId, {
+    pollingInterval: 3000,
     skip: !executionId,
   });
+  const statusData = queryResult.data as ExecutionStatusResponse | undefined;
+  const isLoading = queryResult.isLoading;
 
   useEffect(() => {
     if (statusData && onStatusChange) {
@@ -99,7 +109,7 @@ export function ExecutionStatusBadge({
         label: 'Error',
         color: 'error' as const,
         icon: <ErrorIcon />,
-        tooltip: statusData.errorMessage || 'Execution encountered an error',
+        tooltip: (statusData as any).errorMessage || statusData.error || 'Execution encountered an error',
       };
     }
 

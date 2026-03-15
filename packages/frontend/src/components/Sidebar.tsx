@@ -14,11 +14,11 @@ import FolderIcon from '@mui/icons-material/Folder'
 import AssessmentIcon from '@mui/icons-material/Assessment'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import WorkIcon from '@mui/icons-material/Work'
-import PlayCircleIcon from '@mui/icons-material/PlayCircle'
 import LogoutIcon from '@mui/icons-material/Logout'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { logout } from '../store/slices/authSlice.ts'
+import { logoutUser } from '../store/slices/authSlice.ts'
+import type { AppDispatch } from '../store/index'
 
 interface SidebarProps {
   drawerWidth: number
@@ -37,10 +37,10 @@ const menuItems = [
 function Sidebar({ drawerWidth, mobileOpen, onDrawerToggle }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
 
   const handleLogout = () => {
-    dispatch(logout())
+    dispatch(logoutUser())
     navigate('/login')
   }
 

@@ -1,37 +1,34 @@
-import { Navigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { Alert, Box } from '@mui/material'
-import type { RootState } from '../store'
+import { Navigate, useLocation } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../store';
+import { useEffect } from 'react';
+import { checkAuth } from '../store/slices/authSlice';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
-  requiredRole?: string[]
+  children: React.ReactNode;
 }
 
-function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth)
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const dispatch = useDispatch();
+  const location = useLocation();
+  const { isAuthenticated, loading } = useSelector((state: RootState) => state.auth);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  // Check role-based access if required
-  if (requiredRole && user) {
-    const hasRequiredRole = requiredRole.includes(user.role)
-    
-    if (!hasRequiredRole) {
-      return (
-        <Box p={3}>
-          <Alert severity="error">
-            Access Denied: You don't have permission to access this page.
-            Required role: {requiredRole.join(' or ')}
-          </Alert>
-        </Box>
-      )
+  useEffect(() => {
+    // Check authentication status on mount
+    if (!isAuthenticated) {
+      dispatch(checkAuth() as any);
     }
+  }, [dispatch, isAuthenticated]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
-  return <>{children}</>
-}
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-export default ProtectedRoute
+  return <>{children}</>;
+};

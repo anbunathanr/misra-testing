@@ -25,7 +25,6 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  PlayArrow as RunIcon,
   Delete as DeleteIcon,
   History as HistoryIcon,
 } from '@mui/icons-material';

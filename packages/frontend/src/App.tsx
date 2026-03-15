@@ -1,17 +1,18 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { Box } from '@mui/material'
-import Layout from './components/Layout.tsx'
-import ProtectedRoute from './components/ProtectedRoute.tsx'
-import LoginPage from './pages/LoginPage.tsx'
-import DashboardPage from './pages/DashboardPage.tsx'
-import FilesPage from './pages/FilesPage.tsx'
-import AnalysisPage from './pages/AnalysisPage.tsx'
-import InsightsPage from './pages/InsightsPage.tsx'
-import ProfilePage from './pages/ProfilePage.tsx'
-import { ProjectsPage } from './pages/ProjectsPage.tsx'
-import { TestSuitesPage } from './pages/TestSuitesPage.tsx'
-import { TestCasesPage } from './pages/TestCasesPage.tsx'
-import { TestExecutionsPage } from './pages/TestExecutionsPage.tsx'
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Box } from '@mui/material';
+import Layout from './components/Layout.tsx';
+import { ProtectedRoute } from './components/ProtectedRoute.tsx';
+import LoginPage from './pages/LoginPage.tsx';
+import RegisterPage from './pages/RegisterPage.tsx';
+import DashboardPage from './pages/DashboardPage.tsx';
+import FilesPage from './pages/FilesPage.tsx';
+import AnalysisPage from './pages/AnalysisPage.tsx';
+import InsightsPage from './pages/InsightsPage.tsx';
+import ProfilePage from './pages/ProfilePage.tsx';
+import { ProjectsPage } from './pages/ProjectsPage.tsx';
+import { TestSuitesPage } from './pages/TestSuitesPage.tsx';
+import { TestCasesPage } from './pages/TestCasesPage.tsx';
+import { TestExecutionsPage } from './pages/TestExecutionsPage.tsx';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
         {/* Protected routes */}
         <Route
@@ -45,7 +47,7 @@ function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Box>
-  )
+  );
 }
 
-export default App
+export default App;

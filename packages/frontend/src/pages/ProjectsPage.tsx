@@ -15,6 +15,8 @@ import {
   MenuItem,
   Chip,
   IconButton,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -23,9 +25,10 @@ import { useGetProjectsQuery, useCreateProjectMutation, CreateProjectInput } fro
 export const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: projects, isLoading } = useGetProjectsQuery();
-  const [createProject] = useCreateProjectMutation();
+  const [createProject, { isLoading: isCreating }] = useCreateProjectMutation();
   
   const [openDialog, setOpenDialog] = useState(false);
+  const [error, setError] = useState<string>('');
   const [formData, setFormData] = useState<CreateProjectInput>({
     name: '',
     description: '',
@@ -35,11 +38,14 @@ export const ProjectsPage: React.FC = () => {
 
   const handleCreateProject = async () => {
     try {
+      setError('');
       await createProject(formData).unwrap();
       setOpenDialog(false);
       setFormData({ name: '', description: '', targetUrl: '', environment: 'dev' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create project:', error);
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create project. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -122,16 +128,22 @@ export const ProjectsPage: React.FC = () => {
         </Box>
       )}
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={() => !isCreating && setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create New Project</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            {error && (
+              <Alert severity="error" onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <TextField
               label="Project Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               fullWidth
               required
+              disabled={isCreating}
             />
             <TextField
               label="Description"
@@ -141,6 +153,7 @@ export const ProjectsPage: React.FC = () => {
               multiline
               rows={3}
               required
+              disabled={isCreating}
             />
             <TextField
               label="Target URL"
@@ -149,6 +162,7 @@ export const ProjectsPage: React.FC = () => {
               fullWidth
               placeholder="https://example.com"
               required
+              disabled={isCreating}
             />
             <TextField
               label="Environment"
@@ -157,6 +171,7 @@ export const ProjectsPage: React.FC = () => {
               select
               fullWidth
               required
+              disabled={isCreating}
             >
               <MenuItem value="dev">Development</MenuItem>
               <MenuItem value="staging">Staging</MenuItem>
@@ -165,13 +180,14 @@ export const ProjectsPage: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => setOpenDialog(false)} disabled={isCreating}>Cancel</Button>
           <Button
             onClick={handleCreateProject}
             variant="contained"
-            disabled={!formData.name || !formData.description || !formData.targetUrl}
+            disabled={!formData.name || !formData.description || !formData.targetUrl || isCreating}
+            startIcon={isCreating ? <CircularProgress size={20} /> : null}
           >
-            Create
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

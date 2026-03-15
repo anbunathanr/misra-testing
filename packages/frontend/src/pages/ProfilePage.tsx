@@ -63,12 +63,14 @@ function ProfilePage() {
             <Typography variant="h5" mt={2} fontWeight="bold">
               {user.name}
             </Typography>
-            <Chip
-              label={user.role.toUpperCase()}
-              color={getRoleColor(user.role)}
-              size="small"
-              sx={{ mt: 1 }}
-            />
+            {user.role && (
+              <Chip
+                label={user.role.toUpperCase()}
+                color={getRoleColor(user.role)}
+                size="small"
+                sx={{ mt: 1 }}
+              />
+            )}
           </Paper>
         </Grid>
 
