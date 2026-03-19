@@ -5,6 +5,7 @@ import { NotificationService } from '../../services/notification-service';
 import { ErrorHandlerService, ErrorSeverity } from '../../services/error-handler-service';
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
 import { AnalysisStatus } from '../../types/file-metadata';
+import { MisraRuleSet } from '../../types/misra-rules';
 
 const bucketName = process.env.FILE_STORAGE_BUCKET_NAME || '';
 const region = process.env.AWS_REGION || 'us-east-1';
@@ -152,16 +153,17 @@ export const handler: Handler = async (event) => {
     // TODO: Implement actual MISRA analysis when the service is available
     // For now, simulate a successful analysis
     const result = {
-      success: true,
+      fileId,
+      fileName,
+      ruleSet: MisraRuleSet.C_2004,
+      violations: [],
       violationsCount: 0,
       rulesChecked: ['MISRA-C-2004 Rule 10.1', 'MISRA-C-2004 Rule 11.3'],
       analysisTimestamp: Math.floor(Date.now() / 1000),
-      violations: [],
-      errorMessage: undefined
+      success: true
     };
 
-    if (result.success) {
-      // Store analysis results in DynamoDB
+    // Store analysis results in DynamoDB
       const storedResult = await resultsService.storeAnalysisResult(
         result,
         userId,
@@ -208,50 +210,7 @@ export const handler: Handler = async (event) => {
         },
         violations: result.violations
       };
-    } else {
-      // Store failed analysis result
-      await resultsService.storeAnalysisResult(result, userId, organizationId);
-
-      // Update status to FAILED (use seconds, not milliseconds)
-      await metadataService.updateFileMetadata(fileId, {
-        analysis_status: AnalysisStatus.FAILED,
-        analysis_results: {
-          violations_count: 0,
-          rules_checked: [],
-          completion_timestamp: Math.floor(Date.now() / 1000),
-          error_message: result.errorMessage
-        },
-        updated_at: Math.floor(Date.now() / 1000)
-      });
-
-      // Log error
-      const error = new Error(result.errorMessage || 'Analysis failed');
-      ErrorHandlerService.handleError(error, { userId, fileId, fileName, operation: 'misra-analysis' }, ErrorSeverity.HIGH);
-
-      // Send failure notification
-      try {
-        await notificationService.notifyAnalysisFailure(
-          userId,
-          fileId,
-          fileName,
-          result.errorMessage || 'Unknown error',
-          userEmail
-        );
-      } catch (notifError) {
-        ErrorHandlerService.handleError(notifError as Error, { userId, fileId, operation: 'send-notification' }, ErrorSeverity.LOW);
-      }
-
-      console.error(`Analysis failed for ${fileId}:`, result.errorMessage);
-
-      return {
-        statusCode: 500,
-        status: 'FAILED',
-        fileId,
-        analysisId: fileId,
-        error: result.errorMessage
-      };
-    }
-  } catch (error) {
+    } catch (error) {
     console.error('Error during analysis:', error);
 
     const errorLog = ErrorHandlerService.handleError(error as Error, { userId, fileId, fileName, operation: 'analyze-file' }, ErrorSeverity.CRITICAL);
