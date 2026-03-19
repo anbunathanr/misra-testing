@@ -12,9 +12,10 @@ import {
   LifecycleRule,
   StorageClass,
   Transition,
-  HttpMethods
+  HttpMethods,
+  EventType
 } from 'aws-cdk-lib/aws-s3'
-import { RemovalPolicy, Duration, aws_iam as iam } from 'aws-cdk-lib'
+import { RemovalPolicy, Duration, aws_iam as iam, aws_lambda as lambda, aws_lambda_destinations as destinations } from 'aws-cdk-lib'
 
 export class FileStorageBucket extends Construct {
   public readonly bucket: Bucket
@@ -151,5 +152,16 @@ export class FileStorageBucket extends Construct {
    */
   public grantPresignedUrl(grantee: any) {
     return this.bucket.grantReadWrite(grantee)
+  }
+
+  /**
+   * Add S3 event notification to trigger Lambda on file upload
+   */
+  public addUploadNotification(lambdaFunction: lambda.Function) {
+    this.bucket.addEventNotification(
+      EventType.OBJECT_CREATED_PUT,
+      new destinations.LambdaDestination(lambdaFunction),
+      { prefix: 'uploads/' }
+    )
   }
 }

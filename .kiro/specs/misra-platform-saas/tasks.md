@@ -66,18 +66,18 @@
 
 ## Phase 5: Analysis Integration
 
-- [ ] 5.1 Connect analysis workflow to file upload
-  - [ ] 5.1.1 Configure S3 event notification for upload-complete
-  - [ ] 5.1.2 Set up Step Functions workflow
-  - [ ] 5.1.3 Configure analysis Lambda trigger
-- [ ] 5.2 Implement analysis status updates
-  - [ ] 5.2.1 Update status to IN_PROGRESS on analysis start
-  - [ ] 5.2.2 Update status to COMPLETED on success
-  - [ ] 5.2.3 Update status to FAILED on error
-- [ ] 5.3 Store and retrieve analysis results
-  - [ ] 5.3.1 Implement analysis results storage
-  - [ ] 5.3.2 Implement analysis results retrieval
-  - [ ] 5.3.3 Add error handling for missing results
+- [x] 5.1 Connect analysis workflow to file upload
+  - [x] 5.1.1 Configure S3 event notification for upload-complete
+  - [x] 5.1.2 Set up Step Functions workflow
+  - [x] 5.1.3 Configure analysis Lambda trigger
+- [x] 5.2 Implement analysis status updates
+  - [x] 5.2.1 Update status to IN_PROGRESS on analysis start
+  - [x] 5.2.2 Update status to COMPLETED on success
+  - [x] 5.2.3 Update status to FAILED on error
+- [x] 5.3 Store and retrieve analysis results
+  - [x] 5.3.1 Implement analysis results storage
+  - [x] 5.3.2 Implement analysis results retrieval
+  - [x] 5.3.3 Add error handling for missing results
 
 ## Phase 6: Testing
 

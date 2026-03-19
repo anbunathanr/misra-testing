@@ -5,6 +5,7 @@ import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import * as path from 'path';
+import { FileStorageBucket } from './file-storage-bucket';
 
 /**
  * Simplified CDK Stack using pre-bundled Lambda functions
@@ -205,6 +206,34 @@ export class MisraPlatformStackV2 extends cdk.Stack {
       'update-template',
       'notifications/update-template'
     );
+
+    // File Storage Bucket (must be defined before Lambda functions that use it)
+    const fileStorageBucket = new FileStorageBucket(this, 'FileStorageBucket', {
+      environment
+    });
+
+    // Analysis Lambda Function (for S3 event notifications)
+    const analyzeFileFunction = createLambdaFunction(
+      'analyze-file',
+      'analysis/analyze-file',
+      {
+        FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucket.bucketName,
+        ENVIRONMENT: environment
+      }
+    );
+
+    // Grant S3 permission to invoke Lambda
+    analyzeFileFunction.addPermission('S3InvokePermission', {
+      action: 'lambda:InvokeFunction',
+      principal: new iam.ServicePrincipal('s3.amazonaws.com'),
+      sourceArn: fileStorageBucket.bucket.bucketArn
+    });
+
+    // Grant Lambda permission to read from S3
+    fileStorageBucket.grantRead(analyzeFileFunction);
+
+    // Add S3 event notification to trigger Lambda on file upload
+    fileStorageBucket.addUploadNotification(analyzeFileFunction);
 
     // API Routes - Projects
     httpApi.addRoutes({
