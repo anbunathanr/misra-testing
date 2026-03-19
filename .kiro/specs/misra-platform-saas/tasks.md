@@ -51,18 +51,18 @@
 
 ## Phase 4: File Upload
 
-- [-] 4.1 Fix file metadata service validation
-  - [ ] 4.1.1 Review and fix validation logic
-  - [ ] 4.1.2 Ensure all required fields are validated
-  - [ ] 4.1.3 Add proper error messages
-- [ ] 4.2 Ensure presigned URL generation works
-  - [ ] 4.2.1 Verify S3 client configuration
-  - [ ] 4.2.2 Test presigned URL generation
-  - [ ] 4.2.3 Add URL expiration configuration
-- [ ] 4.3 Implement file metadata creation on upload
-  - [ ] 4.3.1 Create file metadata record after S3 upload
-  - [ ] 4.3.2 Set analysis_status to PENDING
-  - [ ] 4.3.3 Log errors without failing upload
+- [x] 4.1 Fix file metadata service validation
+  - [x] 4.1.1 Review and fix validation logic
+  - [x] 4.1.2 Ensure all required fields are validated
+  - [x] 4.1.3 Add proper error messages
+- [x] 4.2 Ensure presigned URL generation works
+  - [x] 4.2.1 Verify S3 client configuration
+  - [x] 4.2.2 Test presigned URL generation
+  - [x] 4.2.3 Add URL expiration configuration
+- [x] 4.3 Implement file metadata creation on upload
+  - [x] 4.3.1 Create file metadata record after S3 upload
+  - [x] 4.3.2 Set analysis_status to PENDING
+  - [x] 4.3.3 Log errors without failing upload
 
 ## Phase 5: Analysis Integration
 
