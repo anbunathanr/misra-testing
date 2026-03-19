@@ -113,17 +113,82 @@ export const executionsApi = api.injectEndpoints({
 
     // Get execution status (with polling support)
     getExecutionStatus: builder.query<ExecutionStatusResponse, string>({
-      query: (executionId) => `/executions/${executionId}/status`,
+      queryFn: async (executionId) => {
+        // Mock data for demo
+        return {
+          data: {
+            executionId,
+            status: 'completed',
+            result: 'pass',
+            currentStep: 4,
+            totalSteps: 4,
+            startTime: new Date(Date.now() - 60000).toISOString(),
+            duration: 60,
+          },
+        };
+      },
       providesTags: (_result, _error, executionId) => [
         { type: 'Executions', id: `${executionId}-status` },
       ],
-      // Enable polling for status updates
-      // Polling will be controlled by the component using pollingInterval option
     }),
 
     // Get execution results
     getExecutionResults: builder.query<ExecutionResultsResponse, string>({
-      query: (executionId) => `/executions/${executionId}`,
+      queryFn: async (executionId) => {
+        // Mock data for demo
+        return {
+          data: {
+            execution: {
+              executionId,
+              projectId: 'proj-001',
+              testCaseId: 'tc-001',
+              status: 'completed',
+              result: 'pass',
+              startTime: new Date(Date.now() - 60000).toISOString(),
+              endTime: new Date().toISOString(),
+              duration: 60,
+              steps: [
+                {
+                  stepIndex: 0,
+                  action: 'navigate',
+                  status: 'pass',
+                  duration: 2,
+                  details: { url: 'https://example.com/login' },
+                },
+                {
+                  stepIndex: 1,
+                  action: 'type',
+                  status: 'pass',
+                  duration: 1,
+                  details: { selector: 'input[name="email"]', value: 'user@example.com' },
+                },
+                {
+                  stepIndex: 2,
+                  action: 'type',
+                  status: 'pass',
+                  duration: 1,
+                  details: { selector: 'input[name="password"]', value: 'password123' },
+                },
+                {
+                  stepIndex: 3,
+                  action: 'click',
+                  status: 'pass',
+                  duration: 56,
+                  details: { selector: 'button[type="submit"]' },
+                },
+              ],
+              screenshots: [],
+              metadata: {
+                triggeredBy: 'user-123',
+                environment: 'staging',
+              },
+              createdAt: new Date(Date.now() - 60000).toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+            screenshotUrls: [],
+          },
+        };
+      },
       providesTags: (_result, _error, executionId) => [
         { type: 'Executions', id: executionId },
       ],
@@ -131,23 +196,116 @@ export const executionsApi = api.injectEndpoints({
 
     // Get execution history
     getExecutionHistory: builder.query<ExecutionHistoryResponse, ExecutionHistoryParams>({
-      query: (params) => {
-        const queryParams = new URLSearchParams();
-        if (params.projectId) queryParams.append('projectId', params.projectId);
-        if (params.testCaseId) queryParams.append('testCaseId', params.testCaseId);
-        if (params.testSuiteId) queryParams.append('testSuiteId', params.testSuiteId);
-        if (params.startDate) queryParams.append('startDate', params.startDate);
-        if (params.endDate) queryParams.append('endDate', params.endDate);
-        if (params.limit) queryParams.append('limit', params.limit.toString());
-        
-        return `/executions/history?${queryParams.toString()}`;
+      queryFn: async () => {
+        // Mock data for demo
+        return {
+          data: {
+            executions: [
+              {
+                executionId: 'exec-001',
+                projectId: 'proj-001',
+                testCaseId: 'tc-001',
+                status: 'completed',
+                result: 'pass',
+                startTime: new Date(Date.now() - 3600000).toISOString(),
+                endTime: new Date(Date.now() - 3540000).toISOString(),
+                duration: 60,
+                steps: [],
+                screenshots: [],
+                metadata: {
+                  triggeredBy: 'user-123',
+                  environment: 'staging',
+                },
+                createdAt: new Date(Date.now() - 3600000).toISOString(),
+                updatedAt: new Date(Date.now() - 3540000).toISOString(),
+              },
+              {
+                executionId: 'exec-002',
+                projectId: 'proj-001',
+                testCaseId: 'tc-002',
+                status: 'completed',
+                result: 'fail',
+                startTime: new Date(Date.now() - 7200000).toISOString(),
+                endTime: new Date(Date.now() - 7140000).toISOString(),
+                duration: 60,
+                steps: [],
+                screenshots: [],
+                errorMessage: 'Assertion failed: Expected element not found',
+                metadata: {
+                  triggeredBy: 'user-123',
+                  environment: 'staging',
+                },
+                createdAt: new Date(Date.now() - 7200000).toISOString(),
+                updatedAt: new Date(Date.now() - 7140000).toISOString(),
+              },
+            ],
+          },
+        };
       },
       providesTags: ['Executions'],
     }),
 
     // Get suite execution results
     getSuiteExecutionResults: builder.query<SuiteExecutionResultsResponse, string>({
-      query: (suiteExecutionId) => `/executions/suites/${suiteExecutionId}`,
+      queryFn: async (suiteExecutionId) => {
+        // Mock data for demo
+        return {
+          data: {
+            suiteExecutionId,
+            suiteId: 'suite-001',
+            status: 'completed',
+            stats: {
+              total: 2,
+              passed: 1,
+              failed: 1,
+              errors: 0,
+              duration: 120,
+            },
+            testCaseExecutions: [
+              {
+                executionId: 'exec-001',
+                projectId: 'proj-001',
+                testCaseId: 'tc-001',
+                status: 'completed',
+                result: 'pass',
+                startTime: new Date(Date.now() - 120000).toISOString(),
+                endTime: new Date(Date.now() - 60000).toISOString(),
+                duration: 60,
+                steps: [],
+                screenshots: [],
+                metadata: {
+                  triggeredBy: 'user-123',
+                  environment: 'staging',
+                },
+                createdAt: new Date(Date.now() - 120000).toISOString(),
+                updatedAt: new Date(Date.now() - 60000).toISOString(),
+              },
+              {
+                executionId: 'exec-002',
+                projectId: 'proj-001',
+                testCaseId: 'tc-002',
+                status: 'completed',
+                result: 'fail',
+                startTime: new Date(Date.now() - 60000).toISOString(),
+                endTime: new Date().toISOString(),
+                duration: 60,
+                steps: [],
+                screenshots: [],
+                errorMessage: 'Assertion failed',
+                metadata: {
+                  triggeredBy: 'user-123',
+                  environment: 'staging',
+                },
+                createdAt: new Date(Date.now() - 60000).toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+            startTime: new Date(Date.now() - 120000).toISOString(),
+            endTime: new Date().toISOString(),
+            duration: 120,
+          },
+        };
+      },
       providesTags: (_result, _error, suiteExecutionId) => [
         { type: 'Executions', id: `suite-${suiteExecutionId}` },
       ],

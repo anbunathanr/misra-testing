@@ -617,8 +617,10 @@ export class MisraPlatformStack extends cdk.Stack {
     const getProjectsFunction = new lambda.Function(this, 'GetProjectsFunction', {
       functionName: 'misra-platform-get-projects',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/projects/get-projects.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'functions/projects/get-projects-minimal.handler',
+      code: lambda.Code.fromAsset('src', {
+        exclude: ['**/*.test.ts', '**/*.spec.ts', 'services/**', 'middleware/**', 'database/**', 'config/**', 'infrastructure/**', 'utils/**', 'validation/**', '__tests__/**'],
+      }),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
