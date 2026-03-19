@@ -1,7 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { ProjectService } from '../../services/project-service';
 import { JWTService } from '../../services/auth/jwt-service';
-import { CreateProjectInput } from '../../types/test-project';
 
 const projectService = new ProjectService();
 const jwtService = new JWTService();
@@ -32,35 +31,25 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    const input = JSON.parse(event.body || '{}');
-
-    // Validation
-    if (!input.name || !input.targetUrl || !input.environment) {
+    const projectId = event.pathParameters?.projectId;
+    if (!projectId) {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Missing required fields: name, targetUrl, environment' }),
+        body: JSON.stringify({ error: 'Missing projectId' }),
       };
     }
 
-    // Create project input
-    const createInput: CreateProjectInput = {
-      name: input.name,
-      description: input.description || '',
-      targetUrl: input.targetUrl,
-      environment: input.environment,
-    };
-
-    // Create project using service
-    const project = await projectService.createProject(tokenPayload.userId, createInput);
+    // Delete project using service
+    await projectService.deleteProject(projectId);
 
     return {
-      statusCode: 201,
+      statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify(project),
+      body: JSON.stringify({ message: 'Project deleted successfully' }),
     };
   } catch (error) {
-    console.error('Error creating project:', error);
+    console.error('Error deleting project:', error);
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },

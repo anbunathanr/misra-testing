@@ -4,7 +4,7 @@ import { TestProject, CreateProjectInput, UpdateProjectInput } from '../types/te
 import { v4 as uuidv4 } from 'uuid';
 
 // Use environment variable for table name with fallback
-const TABLE_NAME = process.env.PROJECTS_TABLE_NAME || 'misra-platform-projects';
+const TABLE_NAME = process.env.PROJECTS_TABLE_NAME || 'TestProjects';
 
 // Create DynamoDB client with proper configuration for Lambda environment
 const client = new DynamoDBClient({

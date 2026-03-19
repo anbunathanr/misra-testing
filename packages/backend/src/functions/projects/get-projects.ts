@@ -1,4 +1,9 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { ProjectService } from '../../services/project-service';
+import { JWTService } from '../../services/auth/jwt-service';
+
+const projectService = new ProjectService();
+const jwtService = new JWTService();
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
@@ -12,45 +17,40 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    // Return demo projects for working demo
+    // Verify JWT token
+    const token = authHeader.substring(7);
+    let tokenPayload;
+    
+    try {
+      tokenPayload = await jwtService.verifyAccessToken(token);
+    } catch (error) {
+      return {
+        statusCode: 401,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ error: 'Invalid or expired token' }),
+      };
+    }
+
+    // Get projects for the authenticated user from DynamoDB
+    const projects = await projectService.getUserProjects(tokenPayload.userId);
+
     return {
       statusCode: 200,
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ 
-        projects: [
-          {
-            projectId: 'demo-proj-1',
-            name: 'E-Commerce Platform',
-            description: 'Test automation for e-commerce site',
-            targetUrl: 'https://example-ecommerce.com',
-            environment: 'dev',
-            createdAt: Math.floor(Date.now() / 1000),
-            updatedAt: Math.floor(Date.now() / 1000),
-          },
-          {
-            projectId: 'demo-proj-2',
-            name: 'Social Media App',
-            description: 'Test automation for social platform',
-            targetUrl: 'https://example-social.com',
-            environment: 'staging',
-            createdAt: Math.floor(Date.now() / 1000),
-            updatedAt: Math.floor(Date.now() / 1000),
-          },
-        ] 
-      }),
+      body: JSON.stringify({ projects }),
     };
   } catch (error) {
     console.error('Error getting projects:', error);
     return {
-      statusCode: 200,
+      statusCode: 500,
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ projects: [] }),
+      body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
 };
