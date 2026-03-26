@@ -58,6 +58,48 @@ export const authApi = api.injectEndpoints({
     getUserProfile: builder.query<UserProfile, void>({
       query: () => '/auth/profile',
       providesTags: ['User']
+    }),
+    registerUser: builder.mutation<void, { email: string; password: string; name: string }>({
+      query: (credentials) => ({
+        url: '/auth/register',
+        method: 'POST',
+        body: credentials
+      })
+    }),
+    confirmRegistration: builder.mutation<void, { email: string; code: string }>({
+      query: (credentials) => ({
+        url: '/auth/confirm-registration',
+        method: 'POST',
+        body: credentials
+      })
+    }),
+    resendConfirmationCode: builder.mutation<void, string>({
+      query: (email) => ({
+        url: '/auth/resend-confirmation',
+        method: 'POST',
+        body: { email }
+      })
+    }),
+    changePassword: builder.mutation<void, { oldPassword: string; newPassword: string }>({
+      query: (credentials) => ({
+        url: '/auth/change-password',
+        method: 'POST',
+        body: credentials
+      })
+    }),
+    forgotPassword: builder.mutation<void, string>({
+      query: (email) => ({
+        url: '/auth/forgot-password',
+        method: 'POST',
+        body: { email }
+      })
+    }),
+    confirmPassword: builder.mutation<void, { email: string; code: string; newPassword: string }>({
+      query: (credentials) => ({
+        url: '/auth/confirm-password',
+        method: 'POST',
+        body: credentials
+      })
     })
   })
 })
@@ -65,5 +107,11 @@ export const authApi = api.injectEndpoints({
 export const {
   useLoginMutation,
   useRefreshTokenMutation,
-  useGetUserProfileQuery
+  useGetUserProfileQuery,
+  useRegisterUserMutation,
+  useConfirmRegistrationMutation,
+  useResendConfirmationCodeMutation,
+  useChangePasswordMutation,
+  useForgotPasswordMutation,
+  useConfirmPasswordMutation
 } = authApi

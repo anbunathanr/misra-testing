@@ -10,6 +10,9 @@ build
 .env.local
 .env.production
 
+# Auth configuration (contains sensitive data)
+src/config/auth-config.json
+
 # IDE
 .vscode
 .idea
