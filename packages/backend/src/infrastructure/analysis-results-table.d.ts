@@ -11,5 +11,6 @@ export declare class AnalysisResultsTable extends Construct {
     });
     grantReadData(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
     grantWriteData(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
+    grantReadWriteData(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
     grantFullAccess(grantee: any): import("aws-cdk-lib/aws-iam").Grant;
 }

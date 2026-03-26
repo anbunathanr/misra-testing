@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { MisraPlatformStackV2 } from './misra-platform-stack-v2';
+import { MisraPlatformStack } from './misra-platform-stack';
 
 const app = new cdk.App();
 
-// Deploy Full Platform Stack V2 with pre-bundled Lambda functions
-new MisraPlatformStackV2(app, 'MisraPlatformStackV2', {
+// Deploy Full Platform Stack with authentication functions
+new MisraPlatformStack(app, 'MisraPlatformStack', {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION || 'us-east-1',

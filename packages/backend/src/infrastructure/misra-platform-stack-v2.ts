@@ -15,6 +15,8 @@ export class MisraPlatformStackV2 extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const environment = process.env.ENVIRONMENT || 'dev';
+
     // HTTP API Gateway
     const httpApi = new apigateway.HttpApi(this, 'HttpApi', {
       apiName: 'misra-platform-api',
@@ -61,7 +63,7 @@ export class MisraPlatformStackV2 extends cdk.Stack {
 
     const createProjectFunction = createLambdaFunction(
       'create-project',
-      'projects/create-project'
+      'projects/create-project-simple'
     );
 
     const updateProjectFunction = createLambdaFunction(
@@ -159,6 +161,11 @@ export class MisraPlatformStackV2 extends cdk.Stack {
     const loginFunction = createLambdaFunction(
       'login',
       'auth/login'
+    );
+
+    const registerFunction = createLambdaFunction(
+      'register',
+      'auth/register'
     );
 
     const refreshFunction = createLambdaFunction(
@@ -361,6 +368,12 @@ export class MisraPlatformStackV2 extends cdk.Stack {
       path: '/auth/login',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('LoginIntegration', loginFunction),
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/register',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('RegisterIntegration', registerFunction),
     });
 
     httpApi.addRoutes({
