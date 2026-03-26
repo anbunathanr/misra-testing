@@ -1,0 +1,56 @@
+═══════════════════════════════════════════════════════════════
+  VERCEL ENVIRONMENT VARIABLES - CORRECT VALUES
+═══════════════════════════════════════════════════════════════
+
+Copy and paste these values into Vercel Dashboard:
+Settings → Environment Variables → Add New Variable
+
+───────────────────────────────────────────────────────────────
+Variable 1 of 4
+───────────────────────────────────────────────────────────────
+Key:   VITE_API_URL
+Value: https://ljvcr2fpl3.execute-api.us-east-1.amazonaws.com
+Env:   ☑ Production
+
+───────────────────────────────────────────────────────────────
+Variable 2 of 4
+───────────────────────────────────────────────────────────────
+Key:   VITE_AWS_REGION
+Value: us-east-1
+Env:   ☑ Production
+
+───────────────────────────────────────────────────────────────
+Variable 3 of 4
+───────────────────────────────────────────────────────────────
+Key:   VITE_USER_POOL_ID
+Value: us-east-1_yTX8thfy9
+Env:   ☑ Production
+
+───────────────────────────────────────────────────────────────
+Variable 4 of 4
+───────────────────────────────────────────────────────────────
+Key:   VITE_USER_POOL_CLIENT_ID
+Value: 7ltt7flg73m2or3lfq534fbmee
+Env:   ☑ Production
+
+═══════════════════════════════════════════════════════════════
+  AFTER ADDING ALL VARIABLES
+═══════════════════════════════════════════════════════════════
+
+1. Go to Deployments tab
+2. Click ⋯ on latest deployment
+3. Click "Redeploy"
+4. Wait for deployment to complete
+5. Test: https://aibts-platform.vercel.app
+
+═══════════════════════════════════════════════════════════════
+  VERIFICATION
+═══════════════════════════════════════════════════════════════
+
+✓ Open https://aibts-platform.vercel.app
+✓ Press F12 (Developer Tools)
+✓ Check Console tab
+✓ Should see NO errors about UserPoolId/ClientId
+✓ Login/Register page should load correctly
+
+═══════════════════════════════════════════════════════════════
