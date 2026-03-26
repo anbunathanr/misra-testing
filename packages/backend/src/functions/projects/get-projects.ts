@@ -1,38 +1,29 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyResult } from 'aws-lambda';
 import { ProjectService } from '../../services/project-service';
-import { JWTService } from '../../services/auth/jwt-service';
+import { withAuth, AuthenticatedEvent, getUser } from '../../middleware/auth-middleware';
 
 const projectService = new ProjectService();
-const jwtService = new JWTService();
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = withAuth(async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
   try {
-    // Extract token from Authorization header
-    const authHeader = event.headers.Authorization || event.headers.authorization;
-    if (!authHeader) {
+    // ✅ Get authenticated user from middleware
+    const user = getUser(event);
+
+    if (!user) {
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Missing Authorization header' }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: 'Unauthorized' }),
       };
     }
 
-    // Verify JWT token
-    const token = authHeader.substring(7);
-    let tokenPayload;
-    
-    try {
-      tokenPayload = await jwtService.verifyAccessToken(token);
-    } catch (error) {
-      return {
-        statusCode: 401,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Invalid or expired token' }),
-      };
-    }
+    console.log("Authenticated user:", user.userId);
 
-    // Get projects for the authenticated user from DynamoDB
-    const projects = await projectService.getUserProjects(tokenPayload.userId);
+    // ✅ Fetch projects for this user
+    const projects = await projectService.getUserProjects(user.userId);
 
     return {
       statusCode: 200,
@@ -44,6 +35,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     };
   } catch (error) {
     console.error('Error getting projects:', error);
+
     return {
       statusCode: 500,
       headers: { 
@@ -53,4 +45,4 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
-};
+});
