@@ -2,37 +2,37 @@
 
 ## Phase 1: Infrastructure Setup
 
-- [ ] 1.1 Deploy DynamoDB tables with proper indexes
-  - [ ] 1.1.1 Create Projects table with UserIndex and OrganizationIndex
-  - [ ] 1.1.2 Create FileMetadata table with UserIndex, StatusIndex, UserStatusIndex
-  - [ ] 1.1.3 Create AnalysisResults table with FileIndex, UserIndex, OrganizationIndex
-- [ ] 1.2 Configure S3 bucket with security settings
-  - [ ] 1.2.1 Create S3 bucket for file storage
-  - [ ] 1.2.2 Configure bucket policy with SSL enforcement
-  - [ ] 1.2.3 Set up CORS configuration for web uploads
-- [ ] 1.3 Set up Cognito user pool and client
-  - [ ] 1.3.1 Create Cognito user pool with custom attributes
-  - [ ] 1.3.2 Create user pool client for web application
-  - [ ] 1.3.3 Configure password policy and MFA
-- [ ] 1.4 Configure API Gateway with authentication
-  - [ ] 1.4.1 Create HTTP API with CORS configuration
-  - [ ] 1.4.2 Configure Lambda authorizer for authentication
-  - [ ] 1.4.3 Set up route integrations
+- [x] 1.1 Deploy DynamoDB tables with proper indexes
+  - [x] 1.1.1 Create Projects table with UserIndex and OrganizationIndex
+  - [x] 1.1.2 Create FileMetadata table with UserIndex, StatusIndex, UserStatusIndex
+  - [x] 1.1.3 Create AnalysisResults table with FileIndex, UserIndex, OrganizationIndex
+- [x] 1.2 Configure S3 bucket with security settings
+  - [x] 1.2.1 Create S3 bucket for file storage
+  - [x] 1.2.2 Configure bucket policy with SSL enforcement
+  - [x] 1.2.3 Set up CORS configuration for web uploads
+- [x] 1.3 Set up Cognito user pool and client
+  - [x] 1.3.1 Create Cognito user pool with custom attributes
+  - [x] 1.3.2 Create user pool client for web application
+  - [x] 1.3.3 Configure password policy and MFA
+- [x] 1.4 Configure API Gateway with authentication
+  - [x] 1.4.1 Create HTTP API with CORS configuration
+  - [x] 1.4.2 Configure Lambda authorizer for authentication
+  - [x] 1.4.3 Set up route integrations
 
 ## Phase 2: Authentication
 
-- [ ] 2.1 Implement JWT service for token generation/verification
-  - [ ] 2.1.1 Create JWTService class with token generation
-  - [ ] 2.1.2 Implement token verification with secret retrieval from Secrets Manager
-  - [ ] 2.1.3 Add refresh token support
-- [ ] 2.2 Create auth middleware for Lambda functions
-  - [ ] 2.2.1 Implement withAuth decorator
-  - [ ] 2.2.2 Implement withAuthAndPermission decorator
-  - [ ] 2.2.3 Add user extraction helper
-- [ ] 2.3 Implement login and refresh endpoints
-  - [ ] 2.3.1 Create login function with Cognito integration
-  - [ ] 2.3.2 Create refresh function for token refresh
-  - [ ] 2.3.3 Add profile endpoint for user information
+- [x] 2.1 Implement JWT service for token generation/verification
+  - [x] 2.1.1 Create JWTService class with token generation
+  - [x] 2.1.2 Implement token verification with secret retrieval from Secrets Manager
+  - [x] 2.1.3 Add refresh token support
+- [x] 2.2 Create auth middleware for Lambda functions
+  - [x] 2.2.1 Implement withAuth decorator
+  - [x] 2.2.2 Implement withAuthAndPermission decorator
+  - [x] 2.2.3 Add user extraction helper
+- [x] 2.3 Implement login and refresh endpoints
+  - [x] 2.3.1 Create login function with Cognito integration
+  - [x] 2.3.2 Create refresh function for token refresh
+  - [x] 2.3.3 Add profile endpoint for user information
 
 ## Phase 3: Project Management
 

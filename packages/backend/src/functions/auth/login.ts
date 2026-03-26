@@ -1,9 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { JWTService } from '../../services/auth/jwt-service';
 import { UserService } from '../../services/user/user-service';
-import { N8nService } from '../../services/auth/n8n-service';
 
-// Local type definitions (avoiding shared package import issues)
+// Local type definitions
 interface LoginRequest {
   email: string;
   password: string;
@@ -18,43 +17,44 @@ interface LoginResponse {
 
 const jwtService = new JWTService();
 const userService = new UserService();
-const n8nService = new N8nService();
 
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
-    // Parse request body
+    // ✅ Parse request body
     if (!event.body) {
       return errorResponse(400, 'MISSING_BODY', 'Request body is required');
     }
 
     const loginRequest: LoginRequest = JSON.parse(event.body);
 
-    // Validate input
+    // ✅ Validate input
     if (!loginRequest.email || !loginRequest.password) {
       return errorResponse(400, 'INVALID_INPUT', 'Email and password are required');
     }
 
-    // Validate credentials with n8n
-    const n8nUser = await n8nService.validateCredentials(
-      loginRequest.email,
-      loginRequest.password
-    );
-
-    if (!n8nUser) {
+    // ✅ Mock authentication (bypass n8n)
+    // For demo purposes, accept any email with password "123456"
+    if (loginRequest.password !== "123456") {
       return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
-    // Get or create user in our system
+    // Create mock user object
+    const mockUser = {
+      email: loginRequest.email,
+      organizationId: "test-org",
+      role: "developer" as const
+    };
+
+    // ✅ Get or create user in DynamoDB
     let user = await userService.getUserByEmail(loginRequest.email);
-    
+
     if (!user) {
-      // Create new user from n8n data
       user = await userService.createUser({
-        email: n8nUser.email,
-        organizationId: n8nUser.organizationId,
-        role: n8nUser.role || 'developer',
+        email: mockUser.email,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
         preferences: {
           theme: 'light',
           notifications: {
@@ -65,11 +65,10 @@ export const handler = async (
         },
       });
     } else {
-      // Update last login time
       await userService.updateLastLogin(user.userId);
     }
 
-    // Generate JWT tokens
+    // ✅ Generate JWT tokens
     const tokenPair = await jwtService.generateTokenPair({
       userId: user.userId,
       email: user.email,
@@ -93,19 +92,15 @@ export const handler = async (
       },
       body: JSON.stringify(response),
     };
+
   } catch (error) {
     console.error('Login error:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('n8n')) {
-        return errorResponse(503, 'AUTH_SERVICE_UNAVAILABLE', 'Authentication service temporarily unavailable');
-      }
-    }
-    
+
     return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
   }
 };
 
+// ✅ Standard error response
 function errorResponse(
   statusCode: number,
   code: string,

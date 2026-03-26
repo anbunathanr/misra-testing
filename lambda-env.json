@@ -1,0 +1,1 @@
+{"Variables":{"ENVIRONMENT":"dev","FILE_METADATA_TABLE_NAME":"FileMetadata-dev","PROJECTS_TABLE_NAME":"TestProjects-dev","SUITES_TABLE_NAME":"TestSuites-dev","CASES_TABLE_NAME":"TestCases-dev","EXECUTIONS_TABLE_NAME":"ExecutionMonitoring-dev","FILE_STORAGE_BUCKET_NAME":"misra-platform-files-dev"}}

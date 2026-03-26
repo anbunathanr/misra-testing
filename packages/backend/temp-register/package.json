@@ -1,0 +1,8 @@
+{
+  "name": "misra-platform-register",
+  "version": "1.0.0",
+  "main": "register.js",
+  "dependencies": {
+    "aws-lambda": "^1.0.7"
+  }
+}

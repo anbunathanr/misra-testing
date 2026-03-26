@@ -28,5 +28,15 @@ export class ProjectsTable extends Construct {
       },
       projectionType: dynamodb.ProjectionType.ALL,
     });
+
+    // GSI for querying projects by organization
+    this.table.addGlobalSecondaryIndex({
+      indexName: 'OrganizationIndex',
+      partitionKey: {
+        name: 'organizationId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
   }
 }

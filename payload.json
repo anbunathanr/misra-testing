@@ -1,1 +1,1 @@
-{"version":"2.0","routeKey":"GET /projects","rawPath":"/projects","requestContext":{"http":{"method":"GET","path":"/projects"}}}
+﻿{"body":"{\"email\":\"test@example.com\",\"password\":\"Test123!\",\"name\":\"Test User\"}","httpMethod":"POST"}

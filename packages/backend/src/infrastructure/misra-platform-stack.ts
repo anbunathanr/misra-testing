@@ -545,6 +545,21 @@ export class MisraPlatformStack extends cdk.Stack {
       reservedConcurrentExecutions: 0,
     });
 
+    const registerFunction = new lambda.Function(this, 'RegisterFunction', {
+      functionName: 'misra-platform-register',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'functions/auth/register.handler',
+      code: lambda.Code.fromAsset('src'),
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+        N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || '',
+        N8N_API_KEY: process.env.N8N_API_KEY || '',
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
       functionName: 'misra-platform-refresh',
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -1185,6 +1200,12 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/auth/login',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('LoginIntegration', loginFunction),
+    });
+
+    api.addRoutes({
+      path: '/auth/register',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('RegisterIntegration', registerFunction),
     });
 
     api.addRoutes({

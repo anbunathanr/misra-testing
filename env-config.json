@@ -1,0 +1,8 @@
+﻿{
+    "Variables":  {
+                      "USERS_TABLE_NAME":  "misra-platform-users",
+                      "N8N_API_KEY":  "placeholder",
+                      "JWT_SECRET_NAME":  "misra-platform-jwt-secret",
+                      "N8N_WEBHOOK_URL":  "placeholder"
+                  }
+}

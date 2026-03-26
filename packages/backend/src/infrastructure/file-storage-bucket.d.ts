@@ -3,7 +3,7 @@
  */
 import { Construct } from 'constructs';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
-import { aws_iam as iam } from 'aws-cdk-lib';
+import { aws_iam as iam, aws_lambda as lambda } from 'aws-cdk-lib';
 export declare class FileStorageBucket extends Construct {
     readonly bucket: Bucket;
     constructor(scope: Construct, id: string, props?: {
@@ -25,4 +25,8 @@ export declare class FileStorageBucket extends Construct {
      * Grant permissions to generate presigned URLs
      */
     grantPresignedUrl(grantee: any): iam.Grant;
+    /**
+     * Add S3 event notification to trigger Lambda on file upload
+     */
+    addUploadNotification(lambdaFunction: lambda.Function): void;
 }

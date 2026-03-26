@@ -1,0 +1,10 @@
+{
+  "TableName": "TestCases-dev",
+  "KeySchema": [
+    { "AttributeName": "testCaseId", "KeyType": "HASH" }
+  ],
+  "AttributeDefinitions": [
+    { "AttributeName": "testCaseId", "AttributeType": "S" }
+  ],
+  "BillingMode": "PAY_PER_REQUEST"
+}
