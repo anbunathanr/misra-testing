@@ -51,14 +51,13 @@ export class MisraPlatformStackV2 extends cdk.Stack {
         environment,
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
-        reservedConcurrentExecutions: 0,
       });
     };
 
     // Projects API Functions
     const getProjectsFunction = createLambdaFunction(
       'get-projects',
-      'projects/get-projects'
+      'projects/get-projects-simple'
     );
 
     const createProjectFunction = createLambdaFunction(
