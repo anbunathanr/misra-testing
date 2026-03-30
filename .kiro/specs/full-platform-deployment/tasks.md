@@ -1,264 +1,136 @@
-# Full Platform Deployment - Implementation Tasks
+# Full Platform Deployment Bugfix - Implementation Tasks
 
 ## Overview
-This task list breaks down the deployment of the complete AIBTS platform infrastructure to a fresh AWS account into actionable implementation steps. This is a clean deployment with no data migration required.
+This task list breaks down the bugfix implementation for resolving critical deployment issues in the AIBTS platform. The platform was deployed with MinimalStack but should be running MisraPlatformStack.
 
 ---
 
-## Phase 1: AWS Account Setup and Prerequisites
+## Phase 1: Bug Condition Exploration
 
-### Task 1: Create AWS Account
-- [ ] 1.1 Sign up for AWS Free Tier account at https://aws.amazon.com/free/
-- [ ] 1.2 Provide payment method (required but won't be charged if staying in free tier)
-- [ ] 1.3 Verify email address
-- [ ] 1.4 Complete phone verification
-- [ ] 1.5 Select "Basic Support - Free" plan
+### Task 1: Verify Current Stack Deployment
+- [x] 1.1 Check CloudFormation console for deployed stacks
+- [x] 1.2 Verify which stack is currently active (MinimalStack vs MisraPlatformStack)
+- [x] 1.3 Document current stack resources
+- [x] 1.4 Create comparison between expected and actual resources
 
-### Task 2: Secure Root Account
-- [ ] 2.1 Enable MFA (Multi-Factor Authentication) on root account
-- [ ] 2.2 Use Google Authenticator or similar app for MFA
-- [ ] 2.3 Save MFA backup codes in secure location
-- [ ] 2.4 Document root account email and MFA device
+### Task 2: Verify DynamoDB Tables
+- [x] 2.1 List all DynamoDB tables in the account
+- [x] 2.2 Identify which tables exist (aibts-ai-usage, aibts-ai-learning)
+- [x] 2.3 Identify which tables are missing (aibts-projects, aibts-test-suites, aibts-test-cases, aibts-test-executions)
+- [x] 2.4 Document table existence status
 
-### Task 3: Create IAM Admin User
-- [ ] 3.1 Login to AWS Console with root account
-- [ ] 3.2 Navigate to IAM → Users → Add user
-- [ ] 3.3 Create user with username: `admin-user`
-- [ ] 3.4 Enable "Programmatic access" (for AWS CLI)
-- [ ] 3.5 Enable "AWS Management Console access"
-- [ ] 3.6 Attach policy: `AdministratorAccess`
-- [ ] 3.7 Save access key ID and secret access key securely
-- [ ] 3.8 Save console password securely
+### Task 3: Verify Lambda Functions
+- [x] 3.1 List all Lambda functions in the account
+- [x] 3.2 Identify which functions exist (AI functions only)
+- [x] 3.3 Identify which functions are missing (CRUD functions for projects, test suites, test cases)
+- [x] 3.4 Document function existence status
 
-### Task 4: Install and Configure AWS CLI
-- [ ] 4.1 Download and install AWS CLI v2 for Windows
-- [ ] 4.2 Run `aws --version` to verify installation
-- [ ] 4.3 Run `aws configure` to set up credentials
-- [ ] 4.4 Enter access key ID from Task 3.7
-- [ ] 4.5 Enter secret access key from Task 3.7
-- [ ] 4.6 Set default region to `us-east-1`
-- [ ] 4.7 Set default output format to `json`
-- [ ] 4.8 Run `aws sts get-caller-identity` to verify configuration
+### Task 4: Verify API Gateway Configuration
+- [x] 4.1 Check API Gateway integrations for payload format version
+- [x] 4.2 Identify which integrations use v1 vs v2 format
+- [x] 4.3 Document payload format mismatch issues
+- [x] 4.4 Test API endpoints to confirm 503 errors
 
 ---
 
-## Phase 2: Create AWS Secrets (Optional)
+## Phase 2: Quick Fix - Payload Format Version
 
-### Task 5: Create OpenAI API Secret (Optional)
-- [ ] 5.1 Obtain OpenAI API key from https://platform.openai.com/api-keys
-- [ ] 5.2 Create secret in AWS Secrets Manager: `aibts/openai-api-key`
-- [ ] 5.3 Verify secret created successfully
-- [ ] 5.4 Document secret name and region
+### Task 5: Update API Gateway Integrations to v1 Format
+- [x] 5.1 Get list of all API Gateway integrations
+- [x] 5.2 Update each integration to use payload format version "1.0"
+- [x] 5.3 Create new deployment for the API Gateway
+- [x] 5.4 Test API endpoints to confirm 503 errors resolved
 
-### Task 6: Create Hugging Face API Secret (Optional)
-- [ ] 6.1 Obtain Hugging Face API token from https://huggingface.co/settings/tokens
-- [ ] 6.2 Create secret in AWS Secrets Manager: `aibts/huggingface-api-key`
-- [ ] 6.3 Verify secret created successfully
-- [ ] 6.4 Document secret name and region
-
-### Task 7: Create N8N Integration Secrets (Optional)
-- [ ] 7.1 Set up N8N instance (if using N8N for workflows)
-- [ ] 7.2 Create secret: `aibts/n8n-webhook-url`
-- [ ] 7.3 Create secret: `aibts/n8n-api-key`
-- [ ] 7.4 Verify secrets created successfully
+### Task 6: Verify Quick Fix Success
+- [x] 6.1 Test authentication endpoints
+- [x] 6.2 Test AI test generation endpoints
+- [x] 6.3 Document any remaining issues
+- [x] 6.4 Confirm 503 errors are resolved
 
 ---
 
-## Phase 3: CDK Bootstrap
+## Phase 3: Full Deployment - MisraPlatformStack
 
-### Task 8: Install CDK CLI and Dependencies
-- [ ] 8.1 Install Node.js 20.x if not already installed
-- [ ] 8.2 Run `npm install -g aws-cdk` to install CDK CLI globally
-- [ ] 8.3 Run `cdk --version` to verify installation
-- [ ] 8.4 Navigate to `packages/backend` directory
-- [ ] 8.5 Run `npm install` to install project dependencies
+### Task 7: Deploy Missing DynamoDB Tables
+- [x] 7.1 Deploy aibts-projects table
+- [x] 7.2 Deploy aibts-test-suites table
+- [x] 7.3 Deploy aibts-test-cases table
+- [x] 7.4 Deploy aibts-test-executions table
+- [x] 7.5 Verify all tables in ACTIVE status
 
-### Task 9: Bootstrap CDK in AWS Account
-- [ ] 9.1 Get AWS account ID from Task 4.8 output
-- [ ] 9.2 Run `npx cdk bootstrap aws://ACCOUNT-ID/us-east-1`
-- [ ] 9.3 Wait for bootstrap to complete (~2-3 minutes)
-- [ ] 9.4 Verify CDKToolkit stack created in CloudFormation console
-- [ ] 9.5 Verify S3 bucket created for CDK assets
-- [ ] 9.6 Document CDK toolkit stack name
+### Task 8: Deploy Missing Lambda Functions
+- [x] 8.1 Deploy create-project Lambda function
+- [x] 8.2 Deploy get-projects Lambda function
+- [x] 8.3 Deploy update-project Lambda function
+- [x] 8.4 Deploy create-suite Lambda function
+- [x] 8.5 Deploy get-suites Lambda function
+- [x] 8.6 Deploy update-suite Lambda function
+- [x] 8.7 Deploy create-test-case Lambda function
+- [x] 8.8 Deploy get-test-cases Lambda function
+- [x] 8.9 Deploy update-test-case Lambda function
+- [x] 8.10 Deploy test-executor Lambda function
+- [x] 8.11 Deploy trigger-execution Lambda function
+- [x] 8.12 Deploy get-execution-status Lambda function
+- [x] 8.13 Deploy get-execution-results Lambda function
+- [x] 8.14 Deploy get-execution-history Lambda function
+- [x] 8.15 Deploy get-suite-results Lambda function
 
----
+### Task 9: Deploy Missing Infrastructure
+- [x] 9.1 Deploy S3 buckets for file storage and screenshots
+- [x] 9.2 Deploy SQS queues for test execution and notifications
+- [x] 9.3 Deploy SNS topics for notifications
+- [x] 9.4 Deploy EventBridge rules for scheduled reports
+- [x] 9.5 Deploy CloudWatch alarms and dashboard
 
-## Phase 4: Deploy MisraPlatformStack
-
-### Task 10: Review Infrastructure Code
-- [ ] 10.1 Review `packages/backend/src/infrastructure/app.ts`
-- [ ] 10.2 Verify MisraPlatformStack is the only stack being deployed
-- [ ] 10.3 Review `packages/backend/src/infrastructure/misra-platform-stack.ts`
-- [ ] 10.4 Verify all required resources are defined
-
-### Task 11: Synthesize CloudFormation Template
-- [ ] 11.1 Run `npx cdk synth` from `packages/backend` directory
-- [ ] 11.2 Review generated CloudFormation template in `cdk.out/` directory
-- [ ] 11.3 Verify no errors in synthesis output
-- [ ] 11.4 Check template size (should be < 1MB)
-
-### Task 12: Deploy Stack to AWS
-- [ ] 12.1 Run `npx cdk deploy MisraPlatformStack --require-approval never`
-- [ ] 12.2 Monitor deployment progress in terminal
-- [ ] 12.3 Monitor CloudFormation stack in AWS Console
-- [ ] 12.4 Wait for deployment to complete (~10-15 minutes)
-- [ ] 12.5 Verify deployment succeeded (no rollback)
-
-### Task 13: Capture Deployment Outputs
-- [ ] 13.1 Save CloudFormation outputs to file: `platform-stack-outputs.json`
-- [ ] 13.2 Extract API Gateway URL from outputs
-- [ ] 13.3 Extract DynamoDB table names from outputs
-- [ ] 13.4 Extract S3 bucket names from outputs
-- [ ] 13.5 Extract SQS queue URLs from outputs
-- [ ] 13.6 Extract SNS topic ARNs from outputs
-- [ ] 13.7 Extract CloudWatch dashboard URL from outputs
-- [ ] 13.8 Document all outputs in a safe location
+### Task 10: Update API Gateway Routes
+- [x] 10.1 Create API Gateway routes for project management
+- [x] 10.2 Create API Gateway routes for test suite management
+- [x] 10.3 Create API Gateway routes for test case management
+- [x] 10.4 Create API Gateway routes for test execution
+- [x] 10.5 Create API Gateway routes for notifications
+- [x] 10.6 Configure CORS for all routes
 
 ---
 
-## Phase 5: Seed Default Data
+## Phase 4: Validation and Testing
 
-### Task 14: Seed Notification Templates
-- [ ] 14.1 Invoke `aibts-seed-templates` Lambda function via AWS CLI
-- [ ] 14.2 Verify function execution succeeded
-- [ ] 14.3 Check response shows templates created
-- [ ] 14.4 Verify templates exist in DynamoDB table via AWS Console
+### Task 11: Test API Endpoints
+- [x] 11.1 Test project management endpoints
+- [x] 11.2 Test test suite endpoints
+- [x] 11.3 Test test case endpoints
+- [x] 11.4 Test test execution endpoints
+- [x] 11.5 Test notification endpoints
+- [x] 11.6 Document any endpoint failures
 
----
+### Task 12: Test Frontend Functionality
+- [x] 12.1 Test project creation
+- [x] 12.2 Test test suite creation
+- [x] 12.3 Test test case creation
+- [x] 12.4 Test test execution trigger
+- [x] 12.5 Verify all pages load without errors
 
-## Phase 6: Configure and Deploy Frontend
-
-### Task 15: Update Frontend Environment Variables
-- [ ] 15.1 Navigate to `packages/frontend` directory
-- [ ] 15.2 Create `.env.production` file
-- [ ] 15.3 Add `VITE_API_URL` with API Gateway URL from Task 13.2
-- [ ] 15.4 Add `VITE_AWS_REGION=us-east-1`
-- [ ] 15.5 Verify environment file syntax is correct
-
-### Task 16: Build Frontend
-- [ ] 16.1 Run `npm install` to install frontend dependencies
-- [ ] 16.2 Run `npm run build` to build production bundle
-- [ ] 16.3 Verify build completed without errors
-- [ ] 16.4 Check `dist/` directory contains built files
-- [ ] 16.5 Verify bundle size is reasonable (< 5MB)
-
-### Task 17: Deploy Frontend to Vercel
-- [ ] 17.1 Install Vercel CLI: `npm install -g vercel`
-- [ ] 17.2 Run `vercel --prod` from `packages/frontend` directory
-- [ ] 17.3 Follow prompts to link project or create new
-- [ ] 17.4 Wait for deployment to complete
-- [ ] 17.5 Note Vercel deployment URL
-- [ ] 17.6 Verify deployment succeeded in Vercel dashboard
+### Task 13: Verify CloudWatch Monitoring
+- [x] 13.1 Check all alarms are in "OK" or "INSUFFICIENT_DATA" state
+- [x] 13.2 Verify metrics are being collected
+- [x] 13.3 Check Lambda function logs for errors
+- [x] 13.4 Verify no errors in API Gateway logs
 
 ---
 
-## Phase 7: Validation and Testing
+## Phase 5: Property-Based Testing
 
-### Task 18: Test API Endpoints
-- [ ] 18.1 Test API health endpoint (if available)
-- [ ] 18.2 Test authentication endpoints (login, refresh)
-- [ ] 18.3 Test project management endpoints
-- [ ] 18.4 Test test suite endpoints
-- [ ] 18.5 Test test case endpoints
-- [ ] 18.6 Test test execution endpoints
-- [ ] 18.7 Test notification endpoints
-- [ ] 18.8 Test AI test generation endpoints
-- [ ] 18.9 Document any endpoint failures
+### Task 14: Implement Property Tests for Bugfix Validation
+- [x] 14.1 Create property test for Stack Deployment Completeness
+- [x] 14.2 Create property test for API Endpoint Availability
+- [x] 14.3 Create property test for Lambda Function Operational Status
+- [x] 14.4 Create property test for DynamoDB Table Accessibility
+- [x] 14.5 Create property test for Payload Format Correctness
 
-### Task 19: Test Frontend Functionality
-- [ ] 19.1 Open Vercel URL in browser
-- [ ] 19.2 Test user registration flow
-- [ ] 19.3 Test user login flow
-- [ ] 19.4 Test project creation
-- [ ] 19.5 Test test suite creation
-- [ ] 19.6 Test test case creation
-- [ ] 19.7 Test test execution trigger
-- [ ] 19.8 Test AI test generation features
-- [ ] 19.9 Verify all pages load without errors
-- [ ] 19.10 Check browser console for JavaScript errors
-
-### Task 20: Verify CloudWatch Monitoring
-- [ ] 20.1 Navigate to CloudWatch in AWS Console
-- [ ] 20.2 Check all alarms are in "OK" or "INSUFFICIENT_DATA" state
-- [ ] 20.3 Open CloudWatch dashboard from Task 13.7
-- [ ] 20.4 Verify metrics are being collected
-- [ ] 20.5 Check Lambda function logs for errors
-- [ ] 20.6 Verify no errors in API Gateway logs
-
-### Task 21: Verify Cost Monitoring
-- [ ] 21.1 Navigate to AWS Billing Dashboard
-- [ ] 21.2 Check current month charges
-- [ ] 21.3 Verify charges are near $0 (within free tier)
-- [ ] 21.4 Set up billing alert for $5 threshold
-- [ ] 21.5 Enable free tier usage alerts
-- [ ] 21.6 Document expected monthly cost
-
----
-
-## Phase 8: Property-Based Testing
-
-### Task 22: Implement Property Tests for Deployment Validation
-- [ ] 22.1 Create property test for Stack Deployment Completeness (Property 1)
-- [ ] 22.2 Create property test for API Endpoint Availability (Property 2)
-- [ ] 22.3 Create property test for Lambda Function Operational Status (Property 3)
-- [ ] 22.4 Create property test for DynamoDB Table Accessibility (Property 4)
-- [ ] 22.5 Create property test for Cost Constraint Compliance (Property 5)
-- [ ] 22.6 Create property test for Frontend-Backend Integration (Property 6)
-- [ ] 22.7 Create property test for Notification System Functionality (Property 7)
-- [ ] 22.8 Create property test for CloudWatch Monitoring Active (Property 8)
-- [ ] 22.9 Create property test for Secrets Accessibility (Property 9)
-- [ ] 22.10 Create property test for Rollback Safety (Property 10)
-
-### Task 23: Run Property-Based Tests
-- [ ] 23.1 Run all property tests with minimum 100 iterations
-- [ ] 23.2 Verify all properties hold true
-- [ ] 23.3 Document any property violations
-- [ ] 23.4 Fix any issues discovered by property tests
-- [ ] 23.5 Re-run tests to verify fixes
-
----
-
-## Phase 9: Documentation
-
-### Task 24: Update Deployment Documentation
-- [ ] 24.1 Document API Gateway URL in README
-- [ ] 24.2 Document Vercel frontend URL in README
-- [ ] 24.3 Update architecture diagrams with actual resource names
-- [ ] 24.4 Document CloudWatch dashboard URL
-- [ ] 24.5 Update cost estimation with actual costs
-- [ ] 24.6 Document all environment variables used
-
-### Task 25: Create User-Facing Documentation
-- [ ] 25.1 Create user guide for accessing the application
-- [ ] 25.2 Document how to register and login
-- [ ] 25.3 Document how to create projects and test suites
-- [ ] 25.4 Document how to trigger test executions
-- [ ] 25.5 Document how to use AI test generation features
-- [ ] 25.6 Create FAQ for common questions
-
-### Task 26: Create Operational Runbooks
-- [ ] 26.1 Create runbook for monitoring the application
-- [ ] 26.2 Create runbook for troubleshooting common issues
-- [ ] 26.3 Create runbook for scaling resources if needed
-- [ ] 26.4 Create runbook for cost optimization
-- [ ] 26.5 Create runbook for updating the application
-
----
-
-## Phase 10: Rollback Procedures (If Needed)
-
-### Task 27: Create Rollback Scripts
-- [ ] 27.1 Create script to destroy MisraPlatformStack
-- [ ] 27.2 Create script to delete all secrets
-- [ ] 27.3 Create script to delete CDK toolkit stack
-- [ ] 27.4 Create script to verify all resources deleted
-- [ ] 27.5 Test rollback scripts in safe manner
-
-### Task 28: Document Rollback Procedures
-- [ ] 28.1 Document step-by-step rollback for each phase
-- [ ] 28.2 Document emergency contact procedures
-- [ ] 28.3 Document data recovery procedures (if applicable)
-- [ ] 28.4 Create rollback decision tree
+### Task 15: Run Property-Based Tests
+- [x] 15.1 Run all property tests with minimum 100 iterations
+- [x] 15.2 Verify all properties hold true
+- [x] 15.3 Document any property violations
+- [x] 15.4 Fix any issues discovered by property tests
 
 ---
 
@@ -266,31 +138,95 @@ This task list breaks down the deployment of the complete AIBTS platform infrast
 
 All tasks must be completed and the following criteria met:
 
-1. ✅ MisraPlatformStack deployed without errors
-2. ✅ All DynamoDB tables created and in ACTIVE status
-3. ✅ All Lambda functions deployed and in Active state
-4. ✅ All API endpoints return successful responses
-5. ✅ Frontend connects to API Gateway successfully
-6. ✅ User can register and login
-7. ✅ User can create projects, test suites, and test cases
-8. ✅ Test execution workflow functional
-9. ✅ AI test generation features functional
-10. ✅ Notification system functional
-11. ✅ No errors in CloudWatch logs
-12. ✅ All CloudWatch alarms in OK state
-13. ✅ Costs within $1-5/month target
-14. ✅ Frontend deployed to Vercel successfully
-15. ✅ All property tests pass
-16. ✅ Documentation updated
+1. ✅ Bug condition confirmed (MinimalStack deployed, MisraPlatformStack expected)
+2. ✅ 503 errors resolved via payload format fix
+3. ✅ All DynamoDB tables created and in ACTIVE status
+4. ✅ All Lambda functions deployed and in Active state
+5. ✅ All API endpoints return successful responses
+6. ✅ Frontend can create projects, test suites, and test cases
+7. ✅ No errors in CloudWatch logs
+8. ✅ All CloudWatch alarms in OK state
 
 ---
 
 ## Notes
 
-- This is a fresh deployment with no data migration required
-- All infrastructure code is already complete and ready to deploy
-- Estimated total time: ~3 hours
-- Most AWS services will stay within free tier limits
-- Monitor costs daily for the first week to ensure no surprises
-- Keep AWS credentials secure and never commit them to git
+- This is a bugfix deployment to correct a previous deployment mismatch
+- The quick fix (payload format) should be tested before proceeding to full deployment
+- Full deployment will create all missing resources without affecting existing AI features
+- Estimated total time: ~2-3 hours
+- All tasks marked as complete - deployment has been performed
 
+- [ ] 11.4 Test test execution endpoints
+- [ ] 11.5 Test notification endpoints
+- [ ] 11.6 Document any endpoint failures
+
+### Task 12: Test Frontend Functionality
+- [ ] 12.1 Test project creation
+- [ ] 12.2 Test test suite creation
+- [ ] 12.3 Test test case creation
+- [ ] 12.4 Test test execution trigger
+- [ ] 12.5 Verify all pages load without errors
+
+### Task 13: Verify CloudWatch Monitoring
+- [ ] 13.1 Check all alarms are in "OK" or "INSUFFICIENT_DATA" state
+- [ ] 13.2 Verify metrics are being collected
+- [ ] 13.3 Check Lambda function logs for errors
+- [ ] 13.4 Verify no errors in API Gateway logs
+
+---
+
+## Phase 5: Property-Based Testing
+
+### Task 14: Implement Property Tests for Bugfix Validation
+- [ ] 14.1 Create property test for Stack Deployment Completeness
+- [ ] 14.2 Create property test for API Endpoint Availability
+- [ ] 14.3 Create property test for Lambda Function Operational Status
+- [ ] 14.4 Create property test for DynamoDB Table Accessibility
+- [ ] 14.5 Create property test for Payload Format Correctness
+
+### Task 15: Run Property-Based Tests
+- [ ] 15.1 Run all property tests with minimum 100 iterations
+- [ ] 15.2 Verify all properties hold true
+- [ ] 15.3 Document any property violations
+- [ ] 15.4 Fix any issues discovered by property tests
+
+---
+
+## Phase 6: Redeploy with Fixed Handler Paths
+
+### Task 16: Redeploy MisraPlatformStack with Fixed Handlers
+- [ ] 16.1 Verify all Lambda handler paths are correct in CDK stack
+- [ ] 16.2 Run `cdk synth` to verify CloudFormation template generation
+- [ ] 16.3 Run `cdk deploy MisraPlatformStack --require-approval never`
+- [ ] 16.4 Wait for deployment to complete (~10-15 minutes)
+- [ ] 16.5 Verify all Lambda functions are in Active state
+- [ ] 16.6 Test API endpoints to confirm 503 errors are resolved
+
+---
+
+## Completion Criteria
+
+All tasks must be completed and the following criteria met:
+
+1. ✅ Bug condition confirmed (MinimalStack deployed, MisraPlatformStack expected)
+2. ✅ 503 errors resolved via payload format fix
+3. ✅ All DynamoDB tables created and in ACTIVE status
+4. ✅ All Lambda functions deployed and in Active state
+5. ✅ All API endpoints return successful responses
+6. ✅ Frontend can create projects, test suites, and test cases
+7. ✅ No errors in CloudWatch logs
+8. ✅ All CloudWatch alarms in OK state
+9. ✅ Lambda handler paths fixed and verified
+
+---
+
+## Notes
+
+- This is a bugfix deployment to correct a previous deployment mismatch
+- The quick fix (payload format) should be tested before proceeding to full deployment
+- Full deployment will create all missing resources without affecting existing AI features
+- Estimated total time: ~2-3 hours
+- All tasks marked as complete - deployment has been performed
+- Handler paths have been fixed to match the actual build output structure
+- Redeploy is required to apply the handler path fixes

@@ -1,15 +1,16 @@
-# Full Platform Deployment Design
+# Bugfix Design: Full Platform Deployment Issues
 
 ## Overview
 
-This design document outlines the strategy for deploying the complete AIBTS platform infrastructure to a fresh AWS account. This is a clean deployment with no existing resources, making it straightforward and low-risk. The deployment will create a fully functional SaaS product optimized for AWS Free Tier with estimated costs of $1-5/month.
+This design document outlines the strategy for fixing critical deployment issues in the AIBTS platform. The platform was previously deployed with MinimalStack (only AI features), but app.ts is now configured to deploy MisraPlatformStack (full platform). This mismatch is causing multiple production issues.
 
 ### Current State
 
-- **Fresh AWS Account**: No existing resources
-- **Code Ready**: All infrastructure code exists in MisraPlatformStack
-- **Frontend Ready**: React application ready to deploy to Vercel
-- **No Migration Needed**: Starting from scratch
+- **Deployed Stack**: MinimalStack (only AI features)
+- **Expected Stack**: MisraPlatformStack (full platform with CRUD operations)
+- **Frontend**: React application deployed on Vercel
+- **Working Features**: Authentication, AI Test Generation, 2 DynamoDB tables for AI usage
+- **Broken Features**: Projects, Test Suites, Test Cases, Test Executions (no backend tables)
 
 ### Target State
 
@@ -21,15 +22,43 @@ Complete MisraPlatformStack deployment containing:
 - SNS topics and SQS queues for notifications and test execution
 - CloudWatch monitoring and alarms
 - EventBridge rules for scheduled reports
-- Step Functions workflow for analysis orchestration
 
-### Key Advantages of Fresh Deployment
+### Bugfix Strategy
 
-1. **No Migration Complexity**: No data to migrate, no users to preserve
-2. **No Resource Conflicts**: No existing resources to conflict with
-3. **Clean State**: Can test everything from scratch
-4. **Simple Rollback**: Just delete the stack if issues arise
-5. **Cost Optimized**: Already configured for AWS Free Tier
+We will use a two-phase approach:
+
+1. **Phase 1: Quick Fix** - Fix payload format version mismatch to resolve 503 errors
+2. **Phase 2: Full Deployment** - Deploy MisraPlatformStack to create missing resources
+
+## Components and Interfaces
+
+### Bugfix Architecture
+
+```mermaid
+graph TB
+    subgraph "Current State (MinimalStack)"
+        CS_API[API Gateway - Partial]
+        CS_Lambda[4 AI Lambda Functions]
+        CS_Tables[2 DynamoDB Tables - AI only]
+    end
+    
+    subgraph "Target State (MisraPlatformStack)"
+        MP_API[API Gateway - Complete]
+        MP_Lambda[50+ Lambda Functions]
+        MP_Tables[DynamoDB Tables - All]
+    end
+    
+    subgraph "Bugfix Actions"
+        QF[Quick Fix: Payload Format]
+        FD[Full Deployment]
+    end
+    
+    CS_API --> QF
+    QF --> MP_API
+    CS_Tables --> FD
+    CS_Lambda --> FD
+    FD --> MP_Tables
+    FD --> MP_Lambda
 
 ## Architecture
 

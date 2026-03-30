@@ -1,30 +1,39 @@
-# Requirements Document: Full AIBTS Platform Infrastructure Deployment
+# Bugfix Requirements: Full AIBTS Platform Infrastructure Issues
 
 ## Introduction
 
-This document specifies the requirements for deploying the complete AIBTS (AI-Based Testing System) platform infrastructure to a fresh AWS account. This is a clean deployment with no existing resources or data to migrate.
+This document specifies the bugfix requirements for resolving critical deployment issues in the AIBTS (AI-Based Testing System) platform. The platform was previously deployed with MinimalStack (only AI features), but app.ts is now configured to deploy MisraPlatformStack (full platform). This mismatch is causing multiple production issues that need to be resolved.
 
-The deployment will create a complete SaaS product with all features operational: Projects, Test Cases, Test Suites, Test Executions, AI Test Generation, Screenshots storage, Authentication, and the Notification System.
+## Bug Condition
+
+**C(X):** When the application is deployed with MisraPlatformStack configuration but the actual AWS resources were created by MinimalStack, the following bugs occur:
+
+1. **503 errors** occur on API Gateway routes that integrate with Lambda functions expecting v1 payload format but receiving v2 format from API Gateway
+2. **Missing DynamoDB tables** for Projects, TestSuites, TestCases, and Executions cause project creation and other CRUD operations to fail
+3. **Missing Lambda functions** for CRUD operations result in 404 errors when frontend calls these endpoints
+4. **API Gateway routes** exist but integrate with non-existent or misconfigured Lambda functions
+
+## Bug Condition Exploration
+
+To confirm this bug condition, we need to:
+
+1. Verify the current CloudFormation stack is MinimalStack instead of MisraPlatformStack
+2. Check which DynamoDB tables actually exist vs. which are expected
+3. Verify Lambda function configurations and payload format settings
+4. Test API Gateway integration settings
 
 ## Glossary
 
 - **AIBTS**: AI-Based Testing System - the complete platform for web application testing
 - **MisraPlatformStack**: Complete platform CDK stack with all features (Projects, Test Suites, Test Cases, Test Executions, AI Generation, Notifications, Authentication)
+- **MinimalStack**: Minimal CDK stack with only AI features (no CRUD operations)
 - **CDK**: AWS Cloud Development Kit - infrastructure as code framework
 - **DynamoDB**: AWS NoSQL database service for storing application data
 - **Lambda**: AWS serverless compute service for running backend functions
 - **API_Gateway**: AWS service for creating and managing HTTP APIs
-- **S3**: AWS Simple Storage Service for object storage
-- **SQS**: AWS Simple Queue Service for message queuing
-- **SNS**: AWS Simple Notification Service for pub/sub messaging
-- **EventBridge**: AWS event bus service for event-driven architecture
-- **Cognito**: AWS authentication and user management service (not used in current implementation)
-- **CloudWatch**: AWS monitoring and observability service
-- **Deployment_Script**: PowerShell or bash script that executes CDK deployment commands
-- **Frontend**: React application deployed on Vercel
-- **Backend_API**: API Gateway endpoint serving Lambda functions
-- **Infrastructure_Code**: CDK TypeScript code defining AWS resources
-- **Free_Tier**: AWS Free Tier - 12 months of free usage for most services
+- **Payload_Format_V1**: Legacy API Gateway integration format
+- **Payload_Format_V2**: Modern API Gateway integration format
+- **CRUD**: Create, Read, Update, Delete operations for data
 
 ## Requirements
 

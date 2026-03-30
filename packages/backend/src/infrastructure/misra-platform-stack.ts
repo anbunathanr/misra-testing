@@ -163,7 +163,7 @@ export class MisraPlatformStack extends cdk.Stack {
         .withCustomAttributes('organizationId', 'role'),
     });
 
-    // DynamoDB Tables
+    // DynamoDB Tables - Using existing table names from previous deployment
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
       tableName: 'misra-platform-users',
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
@@ -184,20 +184,14 @@ export class MisraPlatformStack extends cdk.Stack {
       partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
     });
 
+    // Use existing TestProjects table
     const projectsTable = new dynamodb.Table(this, 'ProjectsTable', {
-      tableName: 'misra-platform-projects',
+      tableName: 'TestProjects',
       partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'organizationId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
-    });
-
-    // Add GSI for organization-based queries
-    projectsTable.addGlobalSecondaryIndex({
-      indexName: 'organizationId-createdAt-index',
-      partitionKey: { name: 'organizationId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.NUMBER },
     });
 
     const analysesTable = new dynamodb.Table(this, 'AnalysesTable', {
@@ -265,16 +259,16 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: 'dev'
     });
 
-    // Projects Table for Web App Testing System
+    // Projects Table for Web App Testing System - Using existing TestProjects table
     const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
 
-    // Test Suites Table for Web App Testing System
+    // Test Suites Table for Web App Testing System - Using existing TestSuites table
     const testSuitesTable = new TestSuitesTable(this, 'TestSuitesTable');
 
-    // Test Cases Table for Web App Testing System
+    // Test Cases Table for Web App Testing System - Using existing TestCases table
     const testCasesTable = new TestCasesTable(this, 'TestCasesTable');
 
-    // Test Executions Table for Web App Testing System
+    // Test Executions Table for Web App Testing System - Using existing TestExecutions table
     const testExecutionsTable = new TestExecutionsTable(this, 'TestExecutionsTable');
 
     // Screenshots Bucket for Test Execution Failures
@@ -295,7 +289,7 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: 'dev'
     });
 
-    // AI Usage Table for AI Test Generation
+    // AI Usage Table for AI Test Generation - Using existing AIUsage table
     const aiUsageTable = new AIUsageTable(this, 'AIUsageTable');
 
     // SNS Topics for Notification Delivery
@@ -349,8 +343,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const scheduledReportsFunction = new lambda.Function(this, 'ScheduledReportsFunction', {
       functionName: 'aibts-scheduled-reports',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/scheduled-reports.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/scheduled-reports'),
       environment: {
         TEST_EXECUTIONS_TABLE: testExecutionsTable.table.tableName,
         NOTIFICATION_QUEUE_URL: notificationQueue.queueUrl,
@@ -392,8 +386,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getPreferencesFunction = new lambda.Function(this, 'GetPreferencesFunction', {
       functionName: 'aibts-get-preferences',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/get-preferences.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/get-preferences'),
       environment: {
         NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
       },
@@ -405,8 +399,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const updatePreferencesFunction = new lambda.Function(this, 'UpdatePreferencesFunction', {
       functionName: 'aibts-update-preferences',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/update-preferences.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/update-preferences'),
       environment: {
         NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
       },
@@ -419,8 +413,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getHistoryFunction = new lambda.Function(this, 'GetHistoryFunction', {
       functionName: 'aibts-get-history',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/get-history.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/get-history'),
       environment: {
         NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
       },
@@ -432,8 +426,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getNotificationFunction = new lambda.Function(this, 'GetNotificationFunction', {
       functionName: 'aibts-get-notification',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/get-notification.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/get-notification'),
       environment: {
         NOTIFICATION_HISTORY_TABLE: notificationHistoryTable.table.tableName,
       },
@@ -446,8 +440,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const createTemplateFunction = new lambda.Function(this, 'CreateTemplateFunction', {
       functionName: 'aibts-create-template',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/create-template.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/create-template'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
       },
@@ -459,8 +453,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const updateTemplateFunction = new lambda.Function(this, 'UpdateTemplateFunction', {
       functionName: 'aibts-update-template',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/update-template.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/update-template'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
       },
@@ -472,8 +466,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getTemplatesFunction = new lambda.Function(this, 'GetTemplatesFunction', {
       functionName: 'aibts-get-templates',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/get-templates.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/get-templates'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
       },
@@ -533,8 +527,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const loginFunction = new lambda.Function(this, 'LoginFunction', {
       functionName: 'misra-platform-login',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/auth/login.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/login'),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -548,8 +542,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const registerFunction = new lambda.Function(this, 'RegisterFunction', {
       functionName: 'misra-platform-register',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/auth/register.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/register'),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -563,8 +557,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
       functionName: 'misra-platform-refresh',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/auth/refresh.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/refresh'),
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -577,8 +571,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const fileUploadFunction = new lambda.Function(this, 'FileUploadFunction', {
       functionName: 'misra-platform-file-upload',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/file/upload.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/upload'),
       environment: {
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -591,8 +585,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const uploadCompleteFunction = new lambda.Function(this, 'UploadCompleteFunction', {
       functionName: 'misra-platform-upload-complete',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/file/upload-complete.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/upload-complete'),
       environment: {
         PROCESSING_QUEUE_URL: processingQueue.queueUrl,
         ENVIRONMENT: 'dev',
@@ -605,8 +599,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getFilesFunction = new lambda.Function(this, 'GetFilesFunction', {
       functionName: 'misra-platform-get-files',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/file/get-files.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/get-files'),
       environment: {
         ENVIRONMENT: 'dev',
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -619,8 +613,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const createProjectFunction = new lambda.Function(this, 'CreateProjectFunction', {
       functionName: 'misra-platform-create-project',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/projects/create-project.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/projects/create-project'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -632,10 +626,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getProjectsFunction = new lambda.Function(this, 'GetProjectsFunction', {
       functionName: 'misra-platform-get-projects',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/projects/get-projects-minimal.handler',
-      code: lambda.Code.fromAsset('src', {
-        exclude: ['**/*.test.ts', '**/*.spec.ts', 'services/**', 'middleware/**', 'database/**', 'config/**', 'infrastructure/**', 'utils/**', 'validation/**', '__tests__/**'],
-      }),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/projects/get-projects-minimal'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -647,8 +639,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const updateProjectFunction = new lambda.Function(this, 'UpdateProjectFunction', {
       functionName: 'misra-platform-update-project',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/projects/update-project.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/projects/update-project'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -661,8 +653,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const createTestSuiteFunction = new lambda.Function(this, 'CreateTestSuiteFunction', {
       functionName: 'misra-platform-create-test-suite',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-suites/create-suite.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-suites/create-suite'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -674,8 +666,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getTestSuitesFunction = new lambda.Function(this, 'GetTestSuitesFunction', {
       functionName: 'misra-platform-get-test-suites',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-suites/get-suites.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-suites/get-suites'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -687,8 +679,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const updateTestSuiteFunction = new lambda.Function(this, 'UpdateTestSuiteFunction', {
       functionName: 'misra-platform-update-test-suite',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-suites/update-suite.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-suites/update-suite'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -701,8 +693,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const createTestCaseFunction = new lambda.Function(this, 'CreateTestCaseFunction', {
       functionName: 'misra-platform-create-test-case',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-cases/create-test-case.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-cases/create-test-case'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -714,8 +706,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getTestCasesFunction = new lambda.Function(this, 'GetTestCasesFunction', {
       functionName: 'misra-platform-get-test-cases',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-cases/get-test-cases.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-cases/get-test-cases'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -727,8 +719,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const updateTestCaseFunction = new lambda.Function(this, 'UpdateTestCaseFunction', {
       functionName: 'misra-platform-update-test-case',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/test-cases/update-test-case.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/test-cases/update-test-case'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -783,8 +775,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiAnalyzeFunction = new lambda.Function(this, 'AIAnalyzeFunction', {
       functionName: 'aibts-ai-analyze',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai-test-generation/analyze.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/analyze'),
       environment: {},
       timeout: cdk.Duration.minutes(5), // Browser automation can take time
       memorySize: 2048, // Puppeteer needs more memory
@@ -794,8 +786,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiGenerateTestFunction = new lambda.Function(this, 'AIGenerateTestFunction', {
       functionName: 'aibts-ai-generate',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai-test-generation/generate.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/generate'),
       environment: {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
@@ -809,8 +801,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiBatchGenerateFunction = new lambda.Function(this, 'AIBatchGenerateFunction', {
       functionName: 'aibts-ai-batch',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai-test-generation/batch.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/batch'),
       environment: {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
@@ -824,8 +816,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiGetUsageStatsFunction = new lambda.Function(this, 'AIGetUsageStatsFunction', {
       functionName: 'aibts-ai-usage',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai-test-generation/get-usage.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/get-usage'),
       environment: {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -849,8 +841,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const testExecutorFunction = new lambda.Function(this, 'TestExecutorFunction', {
       functionName: 'misra-platform-test-executor',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/executor.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/executor'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
@@ -885,8 +877,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const triggerExecutionFunction = new lambda.Function(this, 'TriggerExecutionFunction', {
       functionName: 'misra-platform-trigger-execution',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/trigger.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/trigger'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
@@ -909,8 +901,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getExecutionStatusFunction = new lambda.Function(this, 'GetExecutionStatusFunction', {
       functionName: 'misra-platform-get-execution-status',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/get-status.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/get-status'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -927,8 +919,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getExecutionResultsFunction = new lambda.Function(this, 'GetExecutionResultsFunction', {
       functionName: 'misra-platform-get-execution-results',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/get-results.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/get-results'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         SCREENSHOTS_BUCKET_NAME: screenshotsBucket.bucket.bucketName,
@@ -947,8 +939,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getExecutionHistoryFunction = new lambda.Function(this, 'GetExecutionHistoryFunction', {
       functionName: 'misra-platform-get-execution-history',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/get-history.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/get-history'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -965,8 +957,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const getSuiteResultsFunction = new lambda.Function(this, 'GetSuiteResultsFunction', {
       functionName: 'misra-platform-get-suite-results',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/executions/get-suite-results.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/executions/get-suite-results'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         JWT_SECRET_NAME: jwtSecret.secretName,
@@ -990,8 +982,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const analysisFunction = new lambda.Function(this, 'AnalysisFunction', {
       functionName: 'misra-platform-analysis',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/analysis/analyze-file.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/analysis/analyze-file'),
       environment: {
         ANALYSES_TABLE_NAME: analysesTable.tableName,
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
@@ -1006,8 +998,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const notificationProcessorFunction = new lambda.Function(this, 'NotificationProcessorFunction', {
       functionName: 'aibts-notification-processor',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/processor.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/processor'),
       environment: {
         NOTIFICATION_PREFERENCES_TABLE: notificationPreferencesTable.table.tableName,
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
@@ -1044,8 +1036,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const seedTemplatesFunction = new lambda.Function(this, 'SeedTemplatesFunction', {
       functionName: 'aibts-seed-templates',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/notifications/seed-templates.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/notifications/seed-templates'),
       environment: {
         NOTIFICATION_TEMPLATES_TABLE: notificationTemplatesTable.table.tableName,
       },
@@ -1089,8 +1081,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const queryResultsFunction = new lambda.Function(this, 'QueryResultsFunction', {
       functionName: 'misra-platform-query-results',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/analysis/query-results.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/analysis/query-results'),
       environment: {
         ENVIRONMENT: this.stackName,
       },
@@ -1102,8 +1094,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const userStatsFunction = new lambda.Function(this, 'UserStatsFunction', {
       functionName: 'misra-platform-user-stats',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/analysis/get-user-stats.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/analysis/get-user-stats'),
       environment: {
         ENVIRONMENT: this.stackName,
       },
@@ -1119,8 +1111,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiInsightsFunction = new lambda.Function(this, 'AIInsightsFunction', {
       functionName: 'misra-platform-ai-insights',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai/generate-insights.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai/generate-insights'),
       environment: {
         ENVIRONMENT: this.stackName,
       },
@@ -1137,8 +1129,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const aiFeedbackFunction = new lambda.Function(this, 'AIFeedbackFunction', {
       functionName: 'misra-platform-ai-feedback',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/ai/submit-feedback.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/ai/submit-feedback'),
       environment: {
         ENVIRONMENT: this.stackName,
       },
@@ -1153,8 +1145,8 @@ export class MisraPlatformStack extends cdk.Stack {
     const reportFunction = new lambda.Function(this, 'ReportFunction', {
       functionName: 'misra-platform-get-report',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'functions/reports/get-violation-report.handler',
-      code: lambda.Code.fromAsset('src'),
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/reports/get-violation-report'),
       environment: {
         ENVIRONMENT: this.stackName,
       },
@@ -1199,225 +1191,295 @@ export class MisraPlatformStack extends cdk.Stack {
     api.addRoutes({
       path: '/auth/login',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('LoginIntegration', loginFunction),
+      integration: new integrations.HttpLambdaIntegration('LoginIntegration', loginFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/auth/register',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('RegisterIntegration', registerFunction),
+      integration: new integrations.HttpLambdaIntegration('RegisterIntegration', registerFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/auth/refresh',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('RefreshIntegration', refreshFunction),
+      integration: new integrations.HttpLambdaIntegration('RefreshIntegration', refreshFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add file upload routes
     api.addRoutes({
       path: '/files/upload',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction),
+      integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/files',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetFilesIntegration', getFilesFunction),
+      integration: new integrations.HttpLambdaIntegration('GetFilesIntegration', getFilesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add report routes
     api.addRoutes({
       path: '/reports/{fileId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction),
+      integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add analysis query routes
     api.addRoutes({
       path: '/analysis/query',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('QueryResultsIntegration', queryResultsFunction),
+      integration: new integrations.HttpLambdaIntegration('QueryResultsIntegration', queryResultsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add user stats routes
     api.addRoutes({
       path: '/analysis/stats/{userId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction),
+      integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add AI insights routes
     api.addRoutes({
       path: '/ai/insights',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction),
+      integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add AI feedback routes
     api.addRoutes({
       path: '/ai/feedback',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction),
+      integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add project management routes
     api.addRoutes({
       path: '/projects',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('CreateProjectIntegration', createProjectFunction),
+      integration: new integrations.HttpLambdaIntegration('CreateProjectIntegration', createProjectFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/projects',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetProjectsIntegration', getProjectsFunction),
+      integration: new integrations.HttpLambdaIntegration('GetProjectsIntegration', getProjectsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/projects/{projectId}',
       methods: [apigateway.HttpMethod.PUT],
-      integration: new integrations.HttpLambdaIntegration('UpdateProjectIntegration', updateProjectFunction),
+      integration: new integrations.HttpLambdaIntegration('UpdateProjectIntegration', updateProjectFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add test suite management routes
     api.addRoutes({
       path: '/test-suites',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('CreateTestSuiteIntegration', createTestSuiteFunction),
+      integration: new integrations.HttpLambdaIntegration('CreateTestSuiteIntegration', createTestSuiteFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/test-suites',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetTestSuitesIntegration', getTestSuitesFunction),
+      integration: new integrations.HttpLambdaIntegration('GetTestSuitesIntegration', getTestSuitesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/test-suites/{suiteId}',
       methods: [apigateway.HttpMethod.PUT],
-      integration: new integrations.HttpLambdaIntegration('UpdateTestSuiteIntegration', updateTestSuiteFunction),
+      integration: new integrations.HttpLambdaIntegration('UpdateTestSuiteIntegration', updateTestSuiteFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add test case management routes
     api.addRoutes({
       path: '/test-cases',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('CreateTestCaseIntegration', createTestCaseFunction),
+      integration: new integrations.HttpLambdaIntegration('CreateTestCaseIntegration', createTestCaseFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/test-cases',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetTestCasesIntegration', getTestCasesFunction),
+      integration: new integrations.HttpLambdaIntegration('GetTestCasesIntegration', getTestCasesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/test-cases/{testCaseId}',
       methods: [apigateway.HttpMethod.PUT],
-      integration: new integrations.HttpLambdaIntegration('UpdateTestCaseIntegration', updateTestCaseFunction),
+      integration: new integrations.HttpLambdaIntegration('UpdateTestCaseIntegration', updateTestCaseFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add test execution routes
     api.addRoutes({
       path: '/executions/trigger',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('TriggerExecutionIntegration', triggerExecutionFunction),
+      integration: new integrations.HttpLambdaIntegration('TriggerExecutionIntegration', triggerExecutionFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/executions/{executionId}/status',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetExecutionStatusIntegration', getExecutionStatusFunction),
+      integration: new integrations.HttpLambdaIntegration('GetExecutionStatusIntegration', getExecutionStatusFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/executions/{executionId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetExecutionResultsIntegration', getExecutionResultsFunction),
+      integration: new integrations.HttpLambdaIntegration('GetExecutionResultsIntegration', getExecutionResultsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/executions/history',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetExecutionHistoryIntegration', getExecutionHistoryFunction),
+      integration: new integrations.HttpLambdaIntegration('GetExecutionHistoryIntegration', getExecutionHistoryFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/executions/suites/{suiteExecutionId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetSuiteResultsIntegration', getSuiteResultsFunction),
+      integration: new integrations.HttpLambdaIntegration('GetSuiteResultsIntegration', getSuiteResultsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add notification preferences routes
     api.addRoutes({
       path: '/notifications/preferences',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetPreferencesIntegration', getPreferencesFunction),
+      integration: new integrations.HttpLambdaIntegration('GetPreferencesIntegration', getPreferencesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/notifications/preferences',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('UpdatePreferencesIntegration', updatePreferencesFunction),
+      integration: new integrations.HttpLambdaIntegration('UpdatePreferencesIntegration', updatePreferencesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add notification history routes
     api.addRoutes({
       path: '/notifications/history',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetHistoryIntegration', getHistoryFunction),
+      integration: new integrations.HttpLambdaIntegration('GetHistoryIntegration', getHistoryFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/notifications/history/{notificationId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetNotificationIntegration', getNotificationFunction),
+      integration: new integrations.HttpLambdaIntegration('GetNotificationIntegration', getNotificationFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add notification template routes (admin only)
     api.addRoutes({
       path: '/notifications/templates',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('CreateTemplateIntegration', createTemplateFunction),
+      integration: new integrations.HttpLambdaIntegration('CreateTemplateIntegration', createTemplateFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/notifications/templates/{templateId}',
       methods: [apigateway.HttpMethod.PUT],
-      integration: new integrations.HttpLambdaIntegration('UpdateTemplateIntegration', updateTemplateFunction),
+      integration: new integrations.HttpLambdaIntegration('UpdateTemplateIntegration', updateTemplateFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/notifications/templates',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('GetTemplatesIntegration', getTemplatesFunction),
+      integration: new integrations.HttpLambdaIntegration('GetTemplatesIntegration', getTemplatesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Add AI test generation routes
     api.addRoutes({
       path: '/ai-test-generation/analyze',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIAnalyzeIntegration', aiAnalyzeFunction),
+      integration: new integrations.HttpLambdaIntegration('AIAnalyzeIntegration', aiAnalyzeFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/ai-test-generation/generate',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIGenerateTestIntegration', aiGenerateTestFunction),
+      integration: new integrations.HttpLambdaIntegration('AIGenerateTestIntegration', aiGenerateTestFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/ai-test-generation/batch',
       methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIBatchGenerateIntegration', aiBatchGenerateFunction),
+      integration: new integrations.HttpLambdaIntegration('AIBatchGenerateIntegration', aiBatchGenerateFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     api.addRoutes({
       path: '/ai-test-generation/usage',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('AIGetUsageStatsIntegration', aiGetUsageStatsFunction),
+      integration: new integrations.HttpLambdaIntegration('AIGetUsageStatsIntegration', aiGetUsageStatsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
     });
 
     // Output important values
@@ -1726,3 +1788,9 @@ export class MisraPlatformStack extends cdk.Stack {
     });
   }
 }
+
+
+
+
+
+
