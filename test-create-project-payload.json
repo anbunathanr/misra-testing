@@ -1,0 +1,15 @@
+{
+  "body": "{\"name\":\"Test Project\",\"description\":\"Testing project creation\",\"targetUrl\":\"https://example.com\",\"environment\":\"Development\"}",
+  "headers": {
+    "Authorization": "Bearer test-token",
+    "Content-Type": "application/json"
+  },
+  "requestContext": {
+    "authorizer": {
+      "claims": {
+        "sub": "test-user-123",
+        "email": "sanjanar0011@gmail.com"
+      }
+    }
+  }
+}

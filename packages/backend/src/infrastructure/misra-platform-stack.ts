@@ -6,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as authorizers from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -522,6 +523,23 @@ export class MisraPlatformStack extends cdk.Stack {
         excludeCharacters: '"@/\\',
       },
     });
+
+    // Lambda Authorizer for JWT verification
+    const authorizerFunction = new lambda.Function(this, 'AuthorizerFunction', {
+      functionName: 'misra-platform-authorizer',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/authorizer'),
+      environment: {
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(5),
+      memorySize: 256,
+      reservedConcurrentExecutions: 0,
+    });
+
+    // Grant Secrets Manager read access to authorizer
+    jwtSecret.grantRead(authorizerFunction);
 
     // Authentication Lambda Functions
     const loginFunction = new lambda.Function(this, 'LoginFunction', {
@@ -1185,6 +1203,14 @@ export class MisraPlatformStack extends cdk.Stack {
         ],
         allowHeaders: ['Content-Type', 'Authorization'],
       },
+    });
+
+    // Create HTTP API Lambda Authorizer for JWT verification
+    const authorizer = new authorizers.HttpLambdaAuthorizer('JWTAuthorizer', authorizerFunction, {
+      authorizerName: 'jwt-authorizer',
+      identitySource: ['$request.header.Authorization'],
+      responseTypes: [authorizers.HttpLambdaResponseType.SIMPLE],
+      resultsCacheTtl: cdk.Duration.seconds(300), // 5 minutes
     });
 
     // Add authentication routes

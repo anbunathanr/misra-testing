@@ -1,30 +1,31 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { TestSuiteService } from '../../services/test-suite-service';
+import { getUserFromContext } from '../../utils/auth-util';
 import { UpdateTestSuiteInput } from '../../types/test-suite';
-import * as jwt from 'jsonwebtoken';
 
 const testSuiteService = new TestSuiteService();
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  console.log('Update test suite request', { path: event.path });
+
   try {
-    const authHeader = event.headers.Authorization || event.headers.authorization;
-    if (!authHeader) {
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing Authorization header' }),
-      };
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.decode(token) as any;
-    const userId = decoded?.userId || decoded?.sub;
-
-    if (!userId) {
-      return {
-        statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Invalid token' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -32,8 +33,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!suiteId) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing suiteId parameter' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Missing suiteId parameter',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -46,15 +56,27 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(suite),
     };
   } catch (error) {
-    console.error('Error updating test suite:', error);
+    console.error('Error updating test suite', { error });
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Internal server error' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to update test suite',
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

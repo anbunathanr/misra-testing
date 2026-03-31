@@ -16,41 +16,90 @@ export interface TokenPair {
   expiresIn: number;
 }
 
+// Module-level cache for JWT secret to prevent multiple calls to Secrets Manager
+let cachedJwtSecret: string | null = null;
+let secretFetchInProgress: Promise<string> | null = null;
+
 export class JWTService {
   private secretsClient: SecretsManagerClient;
-  private jwtSecret: string | null = null;
   private readonly ACCESS_TOKEN_EXPIRES_IN = '15m';
   private readonly REFRESH_TOKEN_EXPIRES_IN = '7d';
 
   constructor() {
     this.secretsClient = new SecretsManagerClient({
       region: process.env.AWS_REGION || 'us-east-1',
+      requestTimeout: 3000, // 3 second timeout for Secrets Manager calls
+      connectionTimeout: 3000, // 3 second connection timeout
     });
   }
 
   private async getJWTSecret(): Promise<string> {
-    if (this.jwtSecret) {
-      return this.jwtSecret;
+    // Check module-level cache first
+    if (cachedJwtSecret) {
+      return cachedJwtSecret;
     }
-
-    try {
-      const command = new GetSecretValueCommand({
-        SecretId: process.env.JWT_SECRET_NAME || 'misra-platform-jwt-secret',
-      });
-      
-      const response = await this.secretsClient.send(command);
-      const secretData = JSON.parse(response.SecretString || '{}');
-      this.jwtSecret = secretData.secret;
-      
-      if (!this.jwtSecret) {
-        throw new Error('JWT secret not found in Secrets Manager');
+    
+    // Check if a fetch is already in progress
+    if (secretFetchInProgress) {
+      // Wait for the in-progress fetch to complete
+      return secretFetchInProgress;
+    }
+    
+    // Check environment variable fallback first
+    const envSecret = process.env.JWT_SECRET;
+    if (envSecret) {
+      cachedJwtSecret = envSecret;
+      console.warn('Using JWT secret from environment variable fallback');
+      return cachedJwtSecret;
+    }
+    
+    // If we get here, we need to fetch from Secrets Manager
+    secretFetchInProgress = (async () => {
+      try {
+        const secretName = process.env.JWT_SECRET_NAME || 'misra-platform-jwt-secret';
+        const command = new GetSecretValueCommand({
+          SecretId: secretName,
+        });
+        
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Secrets Manager timeout after 3 seconds')), 3000);
+        });
+        
+        const fetchPromise = this.secretsClient.send(command);
+        
+        // Race between the fetch and timeout
+        const response = await Promise.race([
+          fetchPromise,
+          timeoutPromise
+        ]);
+        
+        if (response.SecretString) {
+          const secretData = JSON.parse(response.SecretString);
+          cachedJwtSecret = secretData.secret || secretData;
+          return cachedJwtSecret;
+        } else {
+          throw new Error('No secret value found in response');
+        }
+      } catch (error) {
+        console.error('Failed to retrieve JWT secret from Secrets Manager:', error);
+        
+        // Check for specific AWS errors
+        if (error.name === 'AccessDeniedException') {
+          throw new Error('Access denied to Secrets Manager. Check IAM permissions.');
+        } else if (error.name === 'ResourceNotFoundException') {
+          throw new Error(`Secret not found: ${process.env.JWT_SECRET_NAME || 'misra-platform-jwt-secret'}`);
+        } else if (error.message.includes('timeout')) {
+          throw new Error('Secrets Manager call timed out. Check network connectivity and IAM permissions.');
+        } else {
+          throw new Error(`Unable to retrieve JWT secret: ${error.message}`);
+        }
+      } finally {
+        secretFetchInProgress = null;
       }
-      
-      return this.jwtSecret;
-    } catch (error) {
-      console.error('Failed to retrieve JWT secret:', error);
-      throw new Error('Unable to retrieve JWT secret');
-    }
+    })();
+    
+    return secretFetchInProgress;
   }
 
   async generateTokenPair(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<TokenPair> {
@@ -117,10 +166,12 @@ export class JWTService {
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new Error('Refresh token expired');
-      } else if (error instanceof jwt.JsonWebTokenError) {
-        throw new Error('Invalid refresh token');
+      } else if (error.message === 'Invalid refresh token') {
+        // Re-throw our custom error for non-refresh tokens
+        throw error;
       } else {
-        throw new Error('Refresh token verification failed');
+        // All other errors (including JsonWebTokenError) should throw "Invalid refresh token"
+        throw new Error('Invalid refresh token');
       }
     }
   }
