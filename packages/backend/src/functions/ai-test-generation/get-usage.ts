@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { CostTracker } from '../../services/ai-test-generation/cost-tracker';
+import { getUserFromContext } from '../../utils/auth-util';
 
 /**
  * GET /api/ai-test-generation/usage
@@ -11,13 +12,15 @@ import { CostTracker } from '../../services/ai-test-generation/cost-tracker';
  * - projectId?: string
  * - startDate?: string (ISO format)
  * - endDate?: string (ISO format)
+ * - provider?: string (OPENAI, BEDROCK, HUGGINGFACE)
  * 
  * Response:
  * {
  *   today: { requests, tokens, cost },
  *   thisMonth: { requests, tokens, cost },
  *   limits: { dailyRequests, dailyTokens, dailyCost, monthlyRequests, monthlyTokens, monthlyCost },
- *   stats: UsageStats
+ *   stats: UsageStats,
+ *   provider?: string (if filtered)
  * }
  */
 export const handler = async (
@@ -27,7 +30,8 @@ export const handler = async (
 
   try {
     // Get user ID from authorizer context
-    const requestingUserId = event.requestContext.authorizer?.claims?.sub;
+    const user = getUserFromContext(event);
+    const requestingUserId = user.userId;
     if (!requestingUserId) {
       return {
         statusCode: 401,
@@ -47,6 +51,7 @@ export const handler = async (
     const projectId = queryParams.projectId;
     const startDate = queryParams.startDate;
     const endDate = queryParams.endDate;
+    const provider = queryParams.provider as 'OPENAI' | 'BEDROCK' | 'HUGGINGFACE' | undefined;
 
     // Authorization check: users can only view their own stats unless they're admin
     if (userId !== requestingUserId) {
@@ -83,7 +88,8 @@ export const handler = async (
       userId,
       projectId,
       startOfToday,
-      endOfToday
+      endOfToday,
+      provider
     );
 
     // Get usage statistics for this month
@@ -91,16 +97,17 @@ export const handler = async (
       userId,
       projectId,
       startOfMonth,
-      endOfMonth
+      endOfMonth,
+      provider
     );
 
     // Get overall stats if date range provided
     const overallStats = startDate || endDate
-      ? await costTracker.getUsageStats(userId, projectId, startDate, endDate)
+      ? await costTracker.getUsageStats(userId, projectId, startDate, endDate, provider)
       : monthStats;
 
-    console.log(`[GetUsage] Today: ${todayStats.totalCalls} calls, $${todayStats.estimatedCost.toFixed(2)}`);
-    console.log(`[GetUsage] Month: ${monthStats.totalCalls} calls, $${monthStats.estimatedCost.toFixed(2)}`);
+    console.log(`[GetUsage] Today: ${todayStats.totalCalls} calls, $${todayStats.estimatedCost.toFixed(2)}, provider: ${provider || 'all'}`);
+    console.log(`[GetUsage] Month: ${monthStats.totalCalls} calls, $${monthStats.estimatedCost.toFixed(2)}, provider: ${provider || 'all'}`);
 
     // Get limits from config (these should match the limits in cost-tracker.ts)
     const limits = {
@@ -113,7 +120,7 @@ export const handler = async (
     };
 
     // Build response
-    const response = {
+    const response: any = {
       today: {
         requests: todayStats.totalCalls,
         tokens: todayStats.totalTokens,
@@ -136,6 +143,11 @@ export const handler = async (
         },
       },
     };
+
+    // Add provider filter info if specified
+    if (provider) {
+      response.provider = provider;
+    }
 
     return {
       statusCode: 200,

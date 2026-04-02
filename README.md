@@ -84,19 +84,19 @@ N8N_API_KEY=
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Frontend  │────▶│  API Gateway │────▶│   Lambda    │
-│  (React)    │     │              │     │  Functions  │
-└─────────────┘     └──────────────┘     └─────────────┘
-                                                 │
-                                                 ▼
-                    ┌──────────────────────────────────┐
-                    │         DynamoDB Tables          │
-                    │  • Users  • Projects  • Tests    │
-                    │  • Executions  • Notifications   │
-                    └──────────────────────────────────┘
-                                                 │
-                                                 ▼
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Frontend  │────▶│  API Gateway │────▶│   Lambda     │────▶│   Lambda    │
+│  (React)    │     │  + JWT Auth  │     │  Authorizer  │     │  Functions  │
+└─────────────┘     └──────────────┘     └──────────────┘     └─────────────┘
+                                                                       │
+                                                                       ▼
+                    ┌──────────────────────────────────────────────────────┐
+                    │                  DynamoDB Tables                     │
+                    │  • Users  • Projects  • Tests                        │
+                    │  • Executions  • Notifications                       │
+                    └──────────────────────────────────────────────────────┘
+                                                                       │
+                                                                       ▼
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │ EventBridge │────▶│  SQS Queue   │────▶│Notification │
 │   Events    │     │              │     │  Processor  │
@@ -108,6 +108,58 @@ N8N_API_KEY=
                                           │ Email/SMS   │
                                           └─────────────┘
 ```
+
+## Authentication Architecture
+
+The platform uses an **API Gateway Lambda Authorizer** for centralized JWT authentication. This replaces the previous approach of verifying tokens inside each Lambda function.
+
+### How it works
+
+1. Every request to a protected endpoint includes an `Authorization: Bearer <token>` header.
+2. API Gateway invokes the Lambda Authorizer (`misra-platform-authorizer`) before routing the request.
+3. The authorizer verifies the JWT using `JWTService` (backed by AWS Secrets Manager) and returns an IAM policy.
+4. If the token is valid, API Gateway forwards the request to the backend Lambda with user context attached.
+5. If the token is invalid or missing, API Gateway returns `401 Unauthorized` immediately.
+
+### Benefits
+
+- **Performance**: API Gateway caches authorization results for 5 minutes — repeated requests with the same token skip the authorizer entirely.
+- **No duplication**: JWT verification logic lives in one place, not in 30+ Lambda functions.
+- **Reduced latency**: Eliminates repeated Secrets Manager calls per request.
+
+### Accessing user context in Lambda functions
+
+Backend Lambda functions receive authenticated user information via `event.requestContext.authorizer`. Use the `getUserFromContext` helper:
+
+```typescript
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const user = getUserFromContext(event);
+  // user.userId, user.email, user.organizationId, user.role are all available
+
+  // ... business logic
+};
+```
+
+The `getUserFromContext` function is located at `packages/backend/src/utils/auth-util.ts`.
+
+### Public vs protected routes
+
+| Route | Auth required |
+|-------|--------------|
+| `POST /auth/login` | No |
+| `POST /auth/register` | No |
+| `POST /auth/refresh` | No |
+| All other routes | Yes — Lambda Authorizer |
+
+### Troubleshooting auth issues
+
+- **401 on a valid token**: Check that the token hasn't expired (default TTL is 1 hour). Refresh using `POST /auth/refresh`.
+- **503 / timeout errors**: The Lambda Authorizer has a 5-second timeout. Check CloudWatch Logs for `misra-platform-authorizer` to see if Secrets Manager is slow.
+- **Missing user context in Lambda**: Ensure the route has the authorizer attached in the CDK stack (`misra-platform-stack.ts`). The authorizer is not attached to public routes.
+- **Stale cache**: API Gateway caches auth results for 5 minutes. If you revoke a token, it may still work until the cache expires.
 
 ## Key Components
 

@@ -47,6 +47,33 @@ describe('CostTracker', () => {
       expect(cost).toBeCloseTo(0.00125, 5);
     });
 
+    it('should calculate cost for Claude 3.5 Sonnet (Bedrock)', () => {
+      const tokens: TokenUsage = {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500,
+      };
+
+      const cost = costTracker.calculateCost(tokens, 'anthropic.claude-3-5-sonnet-20241022-v2:0', 'BEDROCK');
+
+      // Claude 3.5 Sonnet: $3/1M input + $15/1M output
+      // 1000 * 0.000003 + 500 * 0.000015 = 0.003 + 0.0075 = 0.0105
+      expect(cost).toBeCloseTo(0.0105, 5);
+    });
+
+    it('should use provider default pricing when model not found', () => {
+      const tokens: TokenUsage = {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500,
+      };
+
+      const cost = costTracker.calculateCost(tokens, 'unknown-bedrock-model', 'BEDROCK');
+
+      // Should default to Claude 3.5 Sonnet pricing for BEDROCK
+      expect(cost).toBeCloseTo(0.0105, 5);
+    });
+
     it('should default to GPT-4 pricing for unknown models', () => {
       const tokens: TokenUsage = {
         promptTokens: 1000,
@@ -88,6 +115,7 @@ describe('CostTracker', () => {
         'generate',
         tokens,
         'gpt-4',
+        'OPENAI',
         1,
         5000
       );
@@ -106,7 +134,7 @@ describe('CostTracker', () => {
       };
 
       await expect(
-        costTracker.recordUsage('user-123', 'project-456', 'generate', tokens, 'gpt-4')
+        costTracker.recordUsage('user-123', 'project-456', 'generate', tokens, 'gpt-4', 'OPENAI')
       ).rejects.toThrow('Failed to record usage');
     });
   });
@@ -304,6 +332,38 @@ describe('CostTracker', () => {
       await expect(
         costTracker.getUsageStats('user-123')
       ).rejects.toThrow('Failed to get usage stats');
+    });
+
+    it('should filter by provider when specified', async () => {
+      const mockItems = [
+        {
+          userId: 'user-123',
+          projectId: 'project-1',
+          timestamp: '2024-01-15T10:00:00Z',
+          tokens: { totalTokens: 1000 },
+          cost: 0.05,
+          metadata: { provider: 'OPENAI' },
+        },
+        {
+          userId: 'user-123',
+          projectId: 'project-1',
+          timestamp: '2024-01-16T10:00:00Z',
+          tokens: { totalTokens: 2000 },
+          cost: 0.02,
+          metadata: { provider: 'BEDROCK' },
+        },
+      ];
+
+      ddbMock.on(QueryCommand).resolves({
+        Items: mockItems,
+      });
+
+      const stats = await costTracker.getUsageStats('user-123', undefined, undefined, undefined, 'BEDROCK');
+
+      // Should only include BEDROCK usage
+      expect(stats.totalCalls).toBe(1);
+      expect(stats.totalTokens).toBe(2000);
+      expect(stats.estimatedCost).toBeCloseTo(0.02, 2);
     });
   });
 });

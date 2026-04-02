@@ -3,14 +3,23 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-d
 import { TokenUsage, AIUsageRecord, UsageStats } from '../../types/ai-test-generation';
 
 /**
+ * AI Provider Types
+ */
+export type AIProvider = 'OPENAI' | 'BEDROCK' | 'HUGGINGFACE';
+
+/**
  * Pricing Configuration
  * 
  * OpenAI pricing as of 2024 (per 1M tokens):
  * - GPT-4: $30 input / $60 output
  * - GPT-3.5-turbo: $0.50 input / $1.50 output
+ * 
+ * Bedrock pricing as of 2024 (per 1M tokens):
+ * - Claude 3.5 Sonnet: $3 input / $15 output
  */
 interface PricingConfig {
   model: string;
+  provider: AIProvider;
   promptTokenRate: number;      // Cost per token for input
   completionTokenRate: number;  // Cost per token for output
 }
@@ -18,13 +27,21 @@ interface PricingConfig {
 const DEFAULT_PRICING: Record<string, PricingConfig> = {
   'gpt-4': {
     model: 'gpt-4',
+    provider: 'OPENAI',
     promptTokenRate: 0.00003,      // $30 / 1M tokens
     completionTokenRate: 0.00006,  // $60 / 1M tokens
   },
   'gpt-3.5-turbo': {
     model: 'gpt-3.5-turbo',
+    provider: 'OPENAI',
     promptTokenRate: 0.0000005,    // $0.50 / 1M tokens
     completionTokenRate: 0.0000015, // $1.50 / 1M tokens
+  },
+  'anthropic.claude-3-5-sonnet-20241022-v2:0': {
+    model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    provider: 'BEDROCK',
+    promptTokenRate: 0.000003,     // $3 / 1M tokens
+    completionTokenRate: 0.000015, // $15 / 1M tokens
   },
 };
 
@@ -71,14 +88,30 @@ export class CostTracker {
   }
 
   /**
-   * Calculate cost based on token usage and model
+   * Calculate cost based on token usage, model, and provider
    * 
    * @param tokens - Token usage breakdown
-   * @param model - OpenAI model used
+   * @param model - AI model used (e.g., 'gpt-4', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
+   * @param provider - AI provider (OPENAI, BEDROCK, HUGGINGFACE)
    * @returns Calculated cost in USD
    */
-  calculateCost(tokens: TokenUsage, model: string): number {
-    const config = this.pricing[model] || this.pricing['gpt-4'];
+  calculateCost(tokens: TokenUsage, model: string, provider?: AIProvider): number {
+    // Try to find exact model match first
+    let config = this.pricing[model];
+    
+    // If not found and provider is specified, use provider default
+    if (!config && provider) {
+      if (provider === 'BEDROCK') {
+        config = this.pricing['anthropic.claude-3-5-sonnet-20241022-v2:0'];
+      } else if (provider === 'OPENAI') {
+        config = this.pricing['gpt-4'];
+      }
+    }
+    
+    // Fallback to GPT-4 pricing if still not found
+    if (!config) {
+      config = this.pricing['gpt-4'];
+    }
     
     const promptCost = tokens.promptTokens * config.promptTokenRate;
     const completionCost = tokens.completionTokens * config.completionTokenRate;
@@ -93,7 +126,8 @@ export class CostTracker {
    * @param projectId - Project ID
    * @param operationType - Type of operation
    * @param tokens - Token usage
-   * @param model - OpenAI model used
+   * @param model - AI model used
+   * @param provider - AI provider (OPENAI, BEDROCK, HUGGINGFACE)
    * @param testCasesGenerated - Number of test cases generated
    * @param duration - Operation duration in milliseconds
    */
@@ -103,10 +137,11 @@ export class CostTracker {
     operationType: 'analyze' | 'generate' | 'batch',
     tokens: TokenUsage,
     model: string,
+    provider: AIProvider,
     testCasesGenerated: number = 0,
     duration: number = 0
   ): Promise<void> {
-    const cost = this.calculateCost(tokens, model);
+    const cost = this.calculateCost(tokens, model, provider);
     const timestamp = Date.now(); // Store as number (milliseconds since epoch)
 
     const record: any = {
@@ -119,6 +154,7 @@ export class CostTracker {
       testCasesGenerated,
       metadata: {
         model,
+        provider,
         duration,
       },
     };
@@ -131,7 +167,7 @@ export class CostTracker {
         })
       );
 
-      console.log(`[Cost Tracker] Recorded usage: ${operationType}, cost: $${cost.toFixed(4)}, tokens: ${tokens.totalTokens}`);
+      console.log(`[Cost Tracker] Recorded usage: ${operationType}, provider: ${provider}, cost: $${cost.toFixed(4)}, tokens: ${tokens.totalTokens}`);
     } catch (error) {
       console.error('[Cost Tracker] Failed to record usage:', error);
       throw new Error(`Failed to record usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -300,13 +336,15 @@ export class CostTracker {
    * @param projectId - Optional project ID filter
    * @param startDate - Optional start date filter (ISO string)
    * @param endDate - Optional end date filter (ISO string)
+   * @param provider - Optional provider filter (OPENAI, BEDROCK, HUGGINGFACE)
    * @returns Usage statistics
    */
   async getUsageStats(
     userId?: string,
     projectId?: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    provider?: AIProvider
   ): Promise<UsageStats> {
     try {
       let items: any[] = [];
@@ -332,6 +370,11 @@ export class CostTracker {
             byDate: new Map(),
           },
         };
+      }
+
+      // Filter by provider if specified
+      if (provider) {
+        items = items.filter(item => item.metadata?.provider === provider);
       }
 
       // Aggregate statistics

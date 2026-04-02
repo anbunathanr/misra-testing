@@ -1,0 +1,38 @@
+"use strict";
+/**
+ * Authentication Utility Functions
+ * Helper functions for extracting user context from API Gateway events
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getUserFromContext = getUserFromContext;
+/**
+ * Extract authenticated user information from API Gateway request context
+ *
+ * The Lambda Authorizer verifies JWT tokens and populates the request context
+ * with user information. This helper function extracts that information for
+ * use in backend Lambda functions.
+ *
+ * @param event - API Gateway proxy event
+ * @returns User context object with userId, email, organizationId, and role
+ *
+ * @example
+ * ```typescript
+ * export const handler = async (event: APIGatewayProxyEvent) => {
+ *   const user = getUserFromContext(event);
+ *   console.log('User ID:', user.userId);
+ *   // Business logic using user context
+ * };
+ * ```
+ */
+function getUserFromContext(event) {
+    // Extract user fields from request context authorizer
+    // API Gateway Lambda Authorizer populates these fields after JWT verification
+    const authorizer = event.requestContext?.authorizer;
+    return {
+        userId: authorizer?.userId || '',
+        email: authorizer?.email || '',
+        organizationId: authorizer?.organizationId || '',
+        role: authorizer?.role || '',
+    };
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiYXV0aC11dGlsLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiYXV0aC11dGlsLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7QUFBQTs7O0dBR0c7O0FBa0NILGdEQVdDO0FBOUJEOzs7Ozs7Ozs7Ozs7Ozs7Ozs7R0FrQkc7QUFDSCxTQUFnQixrQkFBa0IsQ0FBQyxLQUEyQjtJQUM1RCxzREFBc0Q7SUFDdEQsOEVBQThFO0lBQzlFLE1BQU0sVUFBVSxHQUFHLEtBQUssQ0FBQyxjQUFjLEVBQUUsVUFBVSxDQUFDO0lBRXBELE9BQU87UUFDTCxNQUFNLEVBQUUsVUFBVSxFQUFFLE1BQU0sSUFBSSxFQUFFO1FBQ2hDLEtBQUssRUFBRSxVQUFVLEVBQUUsS0FBSyxJQUFJLEVBQUU7UUFDOUIsY0FBYyxFQUFFLFVBQVUsRUFBRSxjQUFjLElBQUksRUFBRTtRQUNoRCxJQUFJLEVBQUcsVUFBVSxFQUFFLElBQXlDLElBQUksRUFBRTtLQUNuRSxDQUFDO0FBQ0osQ0FBQyIsInNvdXJjZXNDb250ZW50IjpbIi8qKlxyXG4gKiBBdXRoZW50aWNhdGlvbiBVdGlsaXR5IEZ1bmN0aW9uc1xyXG4gKiBIZWxwZXIgZnVuY3Rpb25zIGZvciBleHRyYWN0aW5nIHVzZXIgY29udGV4dCBmcm9tIEFQSSBHYXRld2F5IGV2ZW50c1xyXG4gKi9cclxuXHJcbmltcG9ydCB7IEFQSUdhdGV3YXlQcm94eUV2ZW50IH0gZnJvbSAnYXdzLWxhbWJkYSc7XHJcblxyXG4vKipcclxuICogVXNlciBjb250ZXh0IGV4dHJhY3RlZCBmcm9tIEFQSSBHYXRld2F5IHJlcXVlc3QgY29udGV4dFxyXG4gKiBUaGlzIGlzIHBvcHVsYXRlZCBieSB0aGUgTGFtYmRhIEF1dGhvcml6ZXIgYWZ0ZXIgSldUIHZlcmlmaWNhdGlvblxyXG4gKi9cclxuZXhwb3J0IGludGVyZmFjZSBVc2VyQ29udGV4dCB7XHJcbiAgdXNlcklkOiBzdHJpbmc7XHJcbiAgZW1haWw6IHN0cmluZztcclxuICBvcmdhbml6YXRpb25JZDogc3RyaW5nO1xyXG4gIHJvbGU6ICdhZG1pbicgfCAnZGV2ZWxvcGVyJyB8ICd2aWV3ZXInIHwgJyc7XHJcbn1cclxuXHJcbi8qKlxyXG4gKiBFeHRyYWN0IGF1dGhlbnRpY2F0ZWQgdXNlciBpbmZvcm1hdGlvbiBmcm9tIEFQSSBHYXRld2F5IHJlcXVlc3QgY29udGV4dFxyXG4gKiBcclxuICogVGhlIExhbWJkYSBBdXRob3JpemVyIHZlcmlmaWVzIEpXVCB0b2tlbnMgYW5kIHBvcHVsYXRlcyB0aGUgcmVxdWVzdCBjb250ZXh0XHJcbiAqIHdpdGggdXNlciBpbmZvcm1hdGlvbi4gVGhpcyBoZWxwZXIgZnVuY3Rpb24gZXh0cmFjdHMgdGhhdCBpbmZvcm1hdGlvbiBmb3JcclxuICogdXNlIGluIGJhY2tlbmQgTGFtYmRhIGZ1bmN0aW9ucy5cclxuICogXHJcbiAqIEBwYXJhbSBldmVudCAtIEFQSSBHYXRld2F5IHByb3h5IGV2ZW50XHJcbiAqIEByZXR1cm5zIFVzZXIgY29udGV4dCBvYmplY3Qgd2l0aCB1c2VySWQsIGVtYWlsLCBvcmdhbml6YXRpb25JZCwgYW5kIHJvbGVcclxuICogXHJcbiAqIEBleGFtcGxlXHJcbiAqIGBgYHR5cGVzY3JpcHRcclxuICogZXhwb3J0IGNvbnN0IGhhbmRsZXIgPSBhc3luYyAoZXZlbnQ6IEFQSUdhdGV3YXlQcm94eUV2ZW50KSA9PiB7XHJcbiAqICAgY29uc3QgdXNlciA9IGdldFVzZXJGcm9tQ29udGV4dChldmVudCk7XHJcbiAqICAgY29uc29sZS5sb2coJ1VzZXIgSUQ6JywgdXNlci51c2VySWQpO1xyXG4gKiAgIC8vIEJ1c2luZXNzIGxvZ2ljIHVzaW5nIHVzZXIgY29udGV4dFxyXG4gKiB9O1xyXG4gKiBgYGBcclxuICovXHJcbmV4cG9ydCBmdW5jdGlvbiBnZXRVc2VyRnJvbUNvbnRleHQoZXZlbnQ6IEFQSUdhdGV3YXlQcm94eUV2ZW50KTogVXNlckNvbnRleHQge1xyXG4gIC8vIEV4dHJhY3QgdXNlciBmaWVsZHMgZnJvbSByZXF1ZXN0IGNvbnRleHQgYXV0aG9yaXplclxyXG4gIC8vIEFQSSBHYXRld2F5IExhbWJkYSBBdXRob3JpemVyIHBvcHVsYXRlcyB0aGVzZSBmaWVsZHMgYWZ0ZXIgSldUIHZlcmlmaWNhdGlvblxyXG4gIGNvbnN0IGF1dGhvcml6ZXIgPSBldmVudC5yZXF1ZXN0Q29udGV4dD8uYXV0aG9yaXplcjtcclxuXHJcbiAgcmV0dXJuIHtcclxuICAgIHVzZXJJZDogYXV0aG9yaXplcj8udXNlcklkIHx8ICcnLFxyXG4gICAgZW1haWw6IGF1dGhvcml6ZXI/LmVtYWlsIHx8ICcnLFxyXG4gICAgb3JnYW5pemF0aW9uSWQ6IGF1dGhvcml6ZXI/Lm9yZ2FuaXphdGlvbklkIHx8ICcnLFxyXG4gICAgcm9sZTogKGF1dGhvcml6ZXI/LnJvbGUgYXMgJ2FkbWluJyB8ICdkZXZlbG9wZXInIHwgJ3ZpZXdlcicpIHx8ICcnLFxyXG4gIH07XHJcbn1cclxuIl19

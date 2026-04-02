@@ -12,6 +12,8 @@
     "synth": "npm run build && cdk synth"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1020.0",
+    "@aws-sdk/client-cloudwatch": "^3.1021.0",
     "@aws-sdk/client-dynamodb": "^3.400.0",
     "@aws-sdk/client-eventbridge": "^3.992.0",
     "@aws-sdk/client-s3": "^3.400.0",
@@ -30,14 +32,19 @@
     "playwright-core": "^1.40.0",
     "puppeteer": "^21.6.0",
     "uuid": "^9.0.0",
+    "pdfkit": "^0.15.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.1021.0",
+    "@aws-sdk/client-iam": "^3.1021.0",
+    "@aws-sdk/client-lambda": "^3.1021.0",
     "@aws-sdk/lib-dynamodb": "^3.985.0",
     "@types/aws-lambda": "^8.10.0",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^8.5.9",
     "@types/node": "^20.19.37",
+    "@types/pdfkit": "^0.13.9",
     "@types/uuid": "^9.0.0",
     "archiver": "^7.0.1",
     "aws-cdk": "^2.170.0",

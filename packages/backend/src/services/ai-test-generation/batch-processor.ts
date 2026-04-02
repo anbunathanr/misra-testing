@@ -1,6 +1,6 @@
 import { ApplicationAnalyzer } from './application-analyzer';
 import { TestGenerator } from './test-generator';
-import { AIEngine } from './ai-engine';
+import { AIEngineFactory, IAIEngine } from './ai-engine-factory';
 import { BatchResult, FailedGeneration, AnalysisOptions } from '../../types/ai-test-generation';
 import { TestCase } from '../../types/test-case';
 
@@ -27,7 +27,7 @@ const DEFAULT_CONFIG: BatchProcessorConfig = {
 export class BatchProcessor {
   private analyzer: ApplicationAnalyzer;
   private generator: TestGenerator;
-  private aiEngine: AIEngine;
+  private aiEngine: IAIEngine;
   private config: BatchProcessorConfig;
 
   constructor(
@@ -37,7 +37,7 @@ export class BatchProcessor {
   ) {
     this.analyzer = analyzer;
     this.generator = generator;
-    this.aiEngine = new AIEngine();
+    this.aiEngine = AIEngineFactory.create();
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 

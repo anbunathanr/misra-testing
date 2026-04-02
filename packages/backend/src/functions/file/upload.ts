@@ -1,9 +1,15 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { FileUploadService, FileUploadRequest } from '../../services/file/file-upload-service';
-import { JWTService } from '../../services/auth/jwt-service';
 import { FileMetadataService } from '../../services/file-metadata-service';
 import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
 import { AnalysisStatus, FileType } from '../../types/file-metadata';
+import { getUserFromContext } from '../../utils/auth-util';
+
+const ALLOWED_EXTENSIONS = ['.c', '.cpp', '.h', '.hpp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const sqsClient = new SQSClient({});
 
 // Local type definitions
 interface UploadRequestBody {
@@ -20,7 +26,6 @@ interface UploadResponse {
 }
 
 const fileUploadService = new FileUploadService();
-const jwtService = new JWTService();
 const environment = process.env.ENVIRONMENT || 'dev';
 const dbClient = new DynamoDBClientWrapper(environment);
 const fileMetadataService = new FileMetadataService(dbClient);
@@ -29,19 +34,10 @@ export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
-    // Extract and validate JWT token
-    const authHeader = event.headers.Authorization || event.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return errorResponse(401, 'MISSING_TOKEN', 'Authorization token is required');
-    }
-
-    const token = authHeader.substring(7);
-    let tokenPayload;
-    
-    try {
-      tokenPayload = await jwtService.verifyAccessToken(token);
-    } catch (error) {
-      return errorResponse(401, 'INVALID_TOKEN', 'Invalid or expired token');
+    // Extract user from Lambda Authorizer context
+    const user = getUserFromContext(event);
+    if (!user.userId) {
+      return errorResponse(401, 'UNAUTHORIZED', 'User not authenticated');
     }
 
     // Parse request body
@@ -56,13 +52,24 @@ export const handler = async (
       return errorResponse(400, 'INVALID_INPUT', 'fileName, fileSize, and contentType are required');
     }
 
+    // Validate file extension (Requirements 1.1)
+    const ext = uploadRequest.fileName.substring(uploadRequest.fileName.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return errorResponse(400, 'INVALID_FILE_TYPE', `Only ${ALLOWED_EXTENSIONS.join(', ')} files are allowed`);
+    }
+
+    // Validate file size (Requirements 1.2)
+    if (uploadRequest.fileSize > MAX_FILE_SIZE) {
+      return errorResponse(400, 'FILE_TOO_LARGE', `File size must not exceed 10MB (${MAX_FILE_SIZE} bytes)`);
+    }
+
     // Create file upload request
     const fileUploadRequest: FileUploadRequest = {
       fileName: uploadRequest.fileName,
       fileSize: uploadRequest.fileSize,
       contentType: uploadRequest.contentType,
-      organizationId: tokenPayload.organizationId,
-      userId: tokenPayload.userId,
+      organizationId: user.organizationId,
+      userId: user.userId,
     };
 
     // Generate presigned upload URL
@@ -76,10 +83,10 @@ export const handler = async (
         filename: uploadRequest.fileName,
         file_type: uploadRequest.fileName.endsWith('.c') ? FileType.C : FileType.CPP,
         file_size: uploadRequest.fileSize,
-        user_id: tokenPayload.userId, // Use user ID as-is from JWT
+        user_id: user.userId, // Use user ID as-is from context
         upload_timestamp: now,
         analysis_status: AnalysisStatus.PENDING,
-        s3_key: `uploads/${tokenPayload.organizationId}/${tokenPayload.userId}/${Date.now()}-${uploadResponse.fileId}-${uploadRequest.fileName}`,
+        s3_key: `uploads/${user.organizationId}/${user.userId}/${Date.now()}-${uploadResponse.fileId}-${uploadRequest.fileName}`,
         created_at: now,
         updated_at: now
       });
@@ -87,6 +94,28 @@ export const handler = async (
     } catch (metadataError) {
       console.error('Error creating FileMetadata record:', metadataError);
       // Don't fail the upload if metadata creation fails
+    }
+
+    // Trigger MISRA analysis via SQS (Requirement 6.1)
+    const analysisQueueUrl = process.env.ANALYSIS_QUEUE_URL;
+    if (analysisQueueUrl) {
+      const language = (ext === '.c' || ext === '.h') ? 'C' : 'CPP';
+      try {
+        await sqsClient.send(new SendMessageCommand({
+          QueueUrl: analysisQueueUrl,
+          MessageBody: JSON.stringify({
+            fileId: uploadResponse.fileId,
+            userId: user.userId,
+            language,
+          }),
+        }));
+        console.log(`Analysis queued for file ${uploadResponse.fileId}, language: ${language}`);
+      } catch (sqsError) {
+        console.error('Failed to queue analysis job:', sqsError);
+        // Don't fail the upload if SQS send fails
+      }
+    } else {
+      console.warn('ANALYSIS_QUEUE_URL is not set - analysis will not be triggered automatically');
     }
 
     const response: UploadResponse = {

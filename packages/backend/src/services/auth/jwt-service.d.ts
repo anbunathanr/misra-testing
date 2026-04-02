@@ -13,7 +13,6 @@ export interface TokenPair {
 }
 export declare class JWTService {
     private secretsClient;
-    private jwtSecret;
     private readonly ACCESS_TOKEN_EXPIRES_IN;
     private readonly REFRESH_TOKEN_EXPIRES_IN;
     constructor();

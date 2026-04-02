@@ -498,6 +498,22 @@ export class MisraPlatformStack extends cdk.Stack {
       },
     });
 
+    // SQS Queue for MISRA analysis (Requirement 10.5)
+    const analysisQueueDLQ = new sqs.Queue(this, 'AnalysisQueueDLQ', {
+      queueName: 'misra-analysis-dlq',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const analysisQueue = new sqs.Queue(this, 'AnalysisQueue', {
+      queueName: 'misra-analysis-queue',
+      visibilityTimeout: cdk.Duration.minutes(5),
+      receiveMessageWaitTime: cdk.Duration.seconds(20),
+      deadLetterQueue: {
+        queue: analysisQueueDLQ,
+        maxReceiveCount: 3,
+      },
+    });
+
     // SQS Queue for test execution
     const testExecutionDLQ = new sqs.Queue(this, 'TestExecutionDLQ', {
       queueName: 'misra-platform-test-execution-dlq',
@@ -593,8 +609,8 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/file/upload'),
       environment: {
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
         ENVIRONMENT: 'dev',
+        ANALYSIS_QUEUE_URL: analysisQueue.queueUrl,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -621,7 +637,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/file/get-files'),
       environment: {
         ENVIRONMENT: 'dev',
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -635,7 +650,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/projects/create-project'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -648,7 +662,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/projects/get-projects-minimal'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -661,7 +674,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/projects/update-project'),
       environment: {
         PROJECTS_TABLE_NAME: testProjectsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -675,7 +687,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/create-suite'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -688,7 +699,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/get-suites'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -701,7 +711,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/update-suite'),
       environment: {
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -715,7 +724,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/create-test-case'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -728,7 +736,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/get-test-cases'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -741,7 +748,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/update-test-case'),
       environment: {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -752,13 +758,12 @@ export class MisraPlatformStack extends cdk.Stack {
     usersTable.grantReadWriteData(refreshFunction);
     jwtSecret.grantRead(loginFunction);
     jwtSecret.grantRead(refreshFunction);
-    jwtSecret.grantRead(fileUploadFunction);
-    jwtSecret.grantRead(getFilesFunction);
     
     // File upload permissions
     fileStorageBucket.grantReadWrite(fileUploadFunction);
     fileStorageBucket.grantRead(uploadCompleteFunction);
     processingQueue.grantSendMessages(uploadCompleteFunction);
+    analysisQueue.grantSendMessages(fileUploadFunction);
     
     // File metadata permissions
     fileMetadataTable.grantReadWriteData(fileUploadFunction);
@@ -769,25 +774,16 @@ export class MisraPlatformStack extends cdk.Stack {
     testProjectsTable.table.grantReadWriteData(createProjectFunction);
     testProjectsTable.table.grantReadData(getProjectsFunction);
     testProjectsTable.table.grantReadWriteData(updateProjectFunction);
-    jwtSecret.grantRead(createProjectFunction);
-    jwtSecret.grantRead(getProjectsFunction);
-    jwtSecret.grantRead(updateProjectFunction);
 
     // Test suite management permissions
     testSuitesTable.table.grantReadWriteData(createTestSuiteFunction);
     testSuitesTable.table.grantReadData(getTestSuitesFunction);
     testSuitesTable.table.grantReadWriteData(updateTestSuiteFunction);
-    jwtSecret.grantRead(createTestSuiteFunction);
-    jwtSecret.grantRead(getTestSuitesFunction);
-    jwtSecret.grantRead(updateTestSuiteFunction);
 
     // Test case management permissions
     testCasesTable.table.grantReadWriteData(createTestCaseFunction);
     testCasesTable.table.grantReadData(getTestCasesFunction);
     testCasesTable.table.grantReadWriteData(updateTestCaseFunction);
-    jwtSecret.grantRead(createTestCaseFunction);
-    jwtSecret.grantRead(getTestCasesFunction);
-    jwtSecret.grantRead(updateTestCaseFunction);
 
     // AI Test Generation Lambda Functions
     const aiAnalyzeFunction = new lambda.Function(this, 'AIAnalyzeFunction', {
@@ -795,10 +791,20 @@ export class MisraPlatformStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/analyze'),
-      environment: {},
+      environment: {
+        // Task 10.1: Add Bedrock configuration environment variables
+        AI_PROVIDER: process.env.AI_PROVIDER || 'BEDROCK',
+        BEDROCK_REGION: process.env.BEDROCK_REGION || 'us-east-1',
+        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+        BEDROCK_TIMEOUT: process.env.BEDROCK_TIMEOUT || '30000',
+        ENABLE_BEDROCK_MONITORING: process.env.ENABLE_BEDROCK_MONITORING || 'true',
+        // Task 12.1: Add canary deployment traffic percentage
+        BEDROCK_TRAFFIC_PERCENTAGE: process.env.BEDROCK_TRAFFIC_PERCENTAGE || '0',
+      },
       timeout: cdk.Duration.minutes(5), // Browser automation can take time
       memorySize: 2048, // Puppeteer needs more memory
       reservedConcurrentExecutions: 0,
+      tracing: lambda.Tracing.ACTIVE, // Task 8.3: Enable X-Ray tracing
     });
 
     const aiGenerateTestFunction = new lambda.Function(this, 'AIGenerateTestFunction', {
@@ -810,10 +816,19 @@ export class MisraPlatformStack extends cdk.Stack {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        // Task 10.1: Add Bedrock configuration environment variables
+        AI_PROVIDER: process.env.AI_PROVIDER || 'BEDROCK',
+        BEDROCK_REGION: process.env.BEDROCK_REGION || 'us-east-1',
+        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+        BEDROCK_TIMEOUT: process.env.BEDROCK_TIMEOUT || '30000',
+        ENABLE_BEDROCK_MONITORING: process.env.ENABLE_BEDROCK_MONITORING || 'true',
+        // Task 12.1: Add canary deployment traffic percentage
+        BEDROCK_TRAFFIC_PERCENTAGE: process.env.BEDROCK_TRAFFIC_PERCENTAGE || '0',
       },
       timeout: cdk.Duration.minutes(2),
       memorySize: 1024,
       reservedConcurrentExecutions: 0,
+      tracing: lambda.Tracing.ACTIVE, // Task 8.3: Enable X-Ray tracing
     });
 
     const aiBatchGenerateFunction = new lambda.Function(this, 'AIBatchGenerateFunction', {
@@ -825,9 +840,18 @@ export class MisraPlatformStack extends cdk.Stack {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        // Task 10.1: Add Bedrock configuration environment variables
+        AI_PROVIDER: process.env.AI_PROVIDER || 'BEDROCK',
+        BEDROCK_REGION: process.env.BEDROCK_REGION || 'us-east-1',
+        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+        BEDROCK_TIMEOUT: process.env.BEDROCK_TIMEOUT || '30000',
+        ENABLE_BEDROCK_MONITORING: process.env.ENABLE_BEDROCK_MONITORING || 'true',
+        // Task 12.1: Add canary deployment traffic percentage
+        BEDROCK_TRAFFIC_PERCENTAGE: process.env.BEDROCK_TRAFFIC_PERCENTAGE || '0',
       },
       timeout: cdk.Duration.minutes(15), // Batch processing can take longer
       memorySize: 2048,
+      tracing: lambda.Tracing.ACTIVE, // Task 8.3: Enable X-Ray tracing
       reservedConcurrentExecutions: 0,
     });
 
@@ -838,7 +862,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/get-usage'),
       environment: {
         AI_USAGE_TABLE: aiUsageTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
@@ -851,9 +874,257 @@ export class MisraPlatformStack extends cdk.Stack {
     aiUsageTable.table.grantReadData(aiGetUsageStatsFunction);
     testCasesTable.table.grantReadWriteData(aiGenerateTestFunction);
     testCasesTable.table.grantReadWriteData(aiBatchGenerateFunction);
-    jwtSecret.grantRead(aiGenerateTestFunction);
-    jwtSecret.grantRead(aiBatchGenerateFunction);
-    jwtSecret.grantRead(aiGetUsageStatsFunction);
+    // Batch 4 functions use Lambda Authorizer context - no JWT secret needed
+    // aiGenerateTestFunction, aiBatchGenerateFunction, aiGetUsageStatsFunction
+
+    // Add Bedrock permissions to AI Lambda functions (Task 5.1)
+    // Using inference profile for Claude Sonnet 4.6 (cross-region routing)
+    const bedrockPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['bedrock:InvokeModel'],
+      resources: [
+        'arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6',
+      ],
+    });
+
+    aiAnalyzeFunction.addToRolePolicy(bedrockPolicy);
+    aiGenerateTestFunction.addToRolePolicy(bedrockPolicy);
+    aiBatchGenerateFunction.addToRolePolicy(bedrockPolicy);
+
+    // Task 5.2: No BEDROCK_API_KEY environment variable is used
+    // The BedrockRuntimeClient uses AWS SDK default credential provider (IAM roles)
+    
+    // Task 5.3: CloudWatch Logs permissions are automatically added by CDK
+    // CDK grants logs:CreateLogGroup, logs:CreateLogStream, and logs:PutLogEvents
+    // to all Lambda functions by default through the Lambda execution role
+
+    // Task 8.2: Create CloudWatch alarms for Bedrock monitoring
+    // Add CloudWatch PutMetricData permission for Bedrock monitoring
+    const cloudWatchMetricsPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['cloudwatch:PutMetricData'],
+      resources: ['*'],
+    });
+
+    aiAnalyzeFunction.addToRolePolicy(cloudWatchMetricsPolicy);
+    aiGenerateTestFunction.addToRolePolicy(cloudWatchMetricsPolicy);
+    aiBatchGenerateFunction.addToRolePolicy(cloudWatchMetricsPolicy);
+
+    // CloudWatch Alarm: High Error Rate (>10 errors in 5 minutes)
+    const bedrockErrorAlarm = new cloudwatch.Alarm(this, 'BedrockHighErrorRateAlarm', {
+      alarmName: 'AIBTS-Bedrock-HighErrorRate',
+      alarmDescription: 'Alert when Bedrock error rate exceeds 10 errors in 5 minutes',
+      metric: new cloudwatch.Metric({
+        namespace: 'AIBTS/Bedrock',
+        metricName: 'BedrockErrors',
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 10,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // CloudWatch Alarm: High Latency (>30 seconds average)
+    const bedrockLatencyAlarm = new cloudwatch.Alarm(this, 'BedrockHighLatencyAlarm', {
+      alarmName: 'AIBTS-Bedrock-HighLatency',
+      alarmDescription: 'Alert when Bedrock average latency exceeds 30 seconds',
+      metric: new cloudwatch.Metric({
+        namespace: 'AIBTS/Bedrock',
+        metricName: 'BedrockLatency',
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 30000, // 30 seconds in milliseconds
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // CloudWatch Alarm: High Cost (>$100/day)
+    // Note: This alarm checks if cost exceeds $100 in a 24-hour period
+    const bedrockCostAlarm = new cloudwatch.Alarm(this, 'BedrockHighCostAlarm', {
+      alarmName: 'AIBTS-Bedrock-HighCost',
+      alarmDescription: 'Alert when Bedrock cost exceeds $100 per day',
+      metric: new cloudwatch.Metric({
+        namespace: 'AIBTS/Bedrock',
+        metricName: 'BedrockCost',
+        statistic: 'Sum',
+        period: cdk.Duration.hours(24),
+      }),
+      threshold: 100, // $100
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
+    // Output alarm ARNs for SNS topic subscription (optional)
+    new cdk.CfnOutput(this, 'BedrockErrorAlarmArn', {
+      value: bedrockErrorAlarm.alarmArn,
+      description: 'Bedrock High Error Rate Alarm ARN',
+    });
+
+    new cdk.CfnOutput(this, 'BedrockLatencyAlarmArn', {
+      value: bedrockLatencyAlarm.alarmArn,
+      description: 'Bedrock High Latency Alarm ARN',
+    });
+
+    new cdk.CfnOutput(this, 'BedrockCostAlarmArn', {
+      value: bedrockCostAlarm.alarmArn,
+      description: 'Bedrock High Cost Alarm ARN',
+    });
+
+    // Task 12: Create CloudWatch Dashboard for Bedrock vs OpenAI comparison
+    const bedrockDashboard = new cloudwatch.Dashboard(this, 'BedrockMigrationDashboard', {
+      dashboardName: 'AIBTS-Bedrock-Migration',
+    });
+
+    // Add widgets to compare Bedrock vs OpenAI metrics
+    bedrockDashboard.addWidgets(
+      // Row 1: Latency Comparison
+      new cloudwatch.GraphWidget({
+        title: 'AI Provider Latency Comparison',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/Bedrock',
+            metricName: 'BedrockLatency',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            label: 'Bedrock Avg Latency',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/OpenAI',
+            metricName: 'OpenAILatency',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            label: 'OpenAI Avg Latency',
+          }),
+        ],
+        width: 12,
+      }),
+      // Row 1: Error Rate Comparison
+      new cloudwatch.GraphWidget({
+        title: 'AI Provider Error Rate Comparison',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/Bedrock',
+            metricName: 'BedrockErrors',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Bedrock Errors',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/OpenAI',
+            metricName: 'OpenAIErrors',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'OpenAI Errors',
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    bedrockDashboard.addWidgets(
+      // Row 2: Cost Comparison
+      new cloudwatch.GraphWidget({
+        title: 'AI Provider Cost Comparison (24h)',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/Bedrock',
+            metricName: 'BedrockCost',
+            statistic: 'Sum',
+            period: cdk.Duration.hours(24),
+            label: 'Bedrock Cost',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/OpenAI',
+            metricName: 'OpenAICost',
+            statistic: 'Sum',
+            period: cdk.Duration.hours(24),
+            label: 'OpenAI Cost',
+          }),
+        ],
+        width: 12,
+      }),
+      // Row 2: Token Usage Comparison
+      new cloudwatch.GraphWidget({
+        title: 'AI Provider Token Usage',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/Bedrock',
+            metricName: 'BedrockTokens',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Bedrock Tokens',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/OpenAI',
+            metricName: 'OpenAITokens',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'OpenAI Tokens',
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    bedrockDashboard.addWidgets(
+      // Row 3: Request Count
+      new cloudwatch.GraphWidget({
+        title: 'AI Provider Request Count',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/Bedrock',
+            metricName: 'BedrockRequests',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'Bedrock Requests',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AIBTS/OpenAI',
+            metricName: 'OpenAIRequests',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            label: 'OpenAI Requests',
+          }),
+        ],
+        width: 12,
+      }),
+      // Row 3: Traffic Distribution (Canary)
+      new cloudwatch.SingleValueWidget({
+        title: 'Bedrock Traffic Percentage',
+        metrics: [
+          new cloudwatch.MathExpression({
+            expression: '(bedrock / (bedrock + openai)) * 100',
+            usingMetrics: {
+              bedrock: new cloudwatch.Metric({
+                namespace: 'AIBTS/Bedrock',
+                metricName: 'BedrockRequests',
+                statistic: 'Sum',
+                period: cdk.Duration.hours(1),
+              }),
+              openai: new cloudwatch.Metric({
+                namespace: 'AIBTS/OpenAI',
+                metricName: 'OpenAIRequests',
+                statistic: 'Sum',
+                period: cdk.Duration.hours(1),
+              }),
+            },
+            label: 'Bedrock Traffic %',
+          }),
+        ],
+        width: 12,
+      })
+    );
+
+    // Output dashboard URL
+    new cdk.CfnOutput(this, 'BedrockDashboardURL', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${bedrockDashboard.dashboardName}`,
+      description: 'CloudWatch Dashboard for Bedrock Migration Monitoring',
+    });
 
     // Test Execution Lambda Functions
     const testExecutorFunction = new lambda.Function(this, 'TestExecutorFunction', {
@@ -902,7 +1173,6 @@ export class MisraPlatformStack extends cdk.Stack {
         TEST_CASES_TABLE_NAME: testCasesTable.table.tableName,
         TEST_SUITES_TABLE_NAME: testSuitesTable.table.tableName,
         TEST_EXECUTION_QUEUE_URL: testExecutionQueue.queueUrl,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -913,7 +1183,6 @@ export class MisraPlatformStack extends cdk.Stack {
     testCasesTable.table.grantReadData(triggerExecutionFunction);
     testSuitesTable.table.grantReadData(triggerExecutionFunction);
     testExecutionQueue.grantSendMessages(triggerExecutionFunction);
-    jwtSecret.grantRead(triggerExecutionFunction);
 
     // Test Execution Status Lambda
     const getExecutionStatusFunction = new lambda.Function(this, 'GetExecutionStatusFunction', {
@@ -923,7 +1192,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-status'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -931,7 +1199,6 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Grant status function permissions
     testExecutionsTable.table.grantReadData(getExecutionStatusFunction);
-    jwtSecret.grantRead(getExecutionStatusFunction);
 
     // Test Execution Results Lambda
     const getExecutionResultsFunction = new lambda.Function(this, 'GetExecutionResultsFunction', {
@@ -942,7 +1209,6 @@ export class MisraPlatformStack extends cdk.Stack {
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
         SCREENSHOTS_BUCKET_NAME: screenshotsBucket.bucket.bucketName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -951,7 +1217,6 @@ export class MisraPlatformStack extends cdk.Stack {
     // Grant results function permissions
     testExecutionsTable.table.grantReadData(getExecutionResultsFunction);
     screenshotsBucket.bucket.grantRead(getExecutionResultsFunction);
-    jwtSecret.grantRead(getExecutionResultsFunction);
 
     // Test Execution History Lambda
     const getExecutionHistoryFunction = new lambda.Function(this, 'GetExecutionHistoryFunction', {
@@ -961,7 +1226,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-history'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -969,7 +1233,6 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Grant history function permissions
     testExecutionsTable.table.grantReadData(getExecutionHistoryFunction);
-    jwtSecret.grantRead(getExecutionHistoryFunction);
 
     // Test Suite Results Lambda
     const getSuiteResultsFunction = new lambda.Function(this, 'GetSuiteResultsFunction', {
@@ -979,7 +1242,6 @@ export class MisraPlatformStack extends cdk.Stack {
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-suite-results'),
       environment: {
         TEST_EXECUTIONS_TABLE_NAME: testExecutionsTable.table.tableName,
-        JWT_SECRET_NAME: jwtSecret.secretName,
       },
       timeout: cdk.Duration.seconds(30),
       reservedConcurrentExecutions: 0,
@@ -987,7 +1249,6 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Grant suite results function permissions
     testExecutionsTable.table.grantReadData(getSuiteResultsFunction);
-    jwtSecret.grantRead(getSuiteResultsFunction);
 
     // S3 event notification for upload completion
     fileStorageBucket.addEventNotification(
@@ -1141,7 +1402,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Grant AI insights function access to analysis results
     analysisResultsTable.grantReadData(aiInsightsFunction);
-    jwtSecret.grantRead(aiInsightsFunction);
+    // aiInsightsFunction uses Lambda Authorizer context - no JWT secret needed
 
     // AI Feedback Lambda Function
     const aiFeedbackFunction = new lambda.Function(this, 'AIFeedbackFunction', {
@@ -1157,7 +1418,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     // Grant feedback function access to store feedback
-    jwtSecret.grantRead(aiFeedbackFunction);
+    // aiFeedbackFunction uses Lambda Authorizer context - no JWT secret needed
 
     // Report Generation Lambda Function
     const reportFunction = new lambda.Function(this, 'ReportFunction', {
@@ -1245,6 +1506,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('FileUploadIntegration', fileUploadFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1253,6 +1515,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetFilesIntegration', getFilesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add report routes
@@ -1262,6 +1525,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add analysis query routes
@@ -1271,6 +1535,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('QueryResultsIntegration', queryResultsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add user stats routes
@@ -1280,6 +1545,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add AI insights routes
@@ -1289,6 +1555,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add AI feedback routes
@@ -1298,6 +1565,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add project management routes
@@ -1307,6 +1575,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('CreateProjectIntegration', createProjectFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1315,6 +1584,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetProjectsIntegration', getProjectsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1323,6 +1593,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UpdateProjectIntegration', updateProjectFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add test suite management routes
@@ -1332,6 +1603,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('CreateTestSuiteIntegration', createTestSuiteFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1340,6 +1612,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetTestSuitesIntegration', getTestSuitesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1348,6 +1621,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UpdateTestSuiteIntegration', updateTestSuiteFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add test case management routes
@@ -1357,6 +1631,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('CreateTestCaseIntegration', createTestCaseFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1365,6 +1640,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetTestCasesIntegration', getTestCasesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1373,6 +1649,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UpdateTestCaseIntegration', updateTestCaseFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add test execution routes
@@ -1382,6 +1659,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('TriggerExecutionIntegration', triggerExecutionFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1390,6 +1668,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetExecutionStatusIntegration', getExecutionStatusFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1398,6 +1677,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetExecutionResultsIntegration', getExecutionResultsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1406,6 +1686,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetExecutionHistoryIntegration', getExecutionHistoryFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1414,6 +1695,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetSuiteResultsIntegration', getSuiteResultsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add notification preferences routes
@@ -1423,6 +1705,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetPreferencesIntegration', getPreferencesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1431,6 +1714,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UpdatePreferencesIntegration', updatePreferencesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add notification history routes
@@ -1440,6 +1724,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetHistoryIntegration', getHistoryFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1448,6 +1733,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetNotificationIntegration', getNotificationFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add notification template routes (admin only)
@@ -1457,6 +1743,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('CreateTemplateIntegration', createTemplateFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1465,6 +1752,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('UpdateTemplateIntegration', updateTemplateFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1473,6 +1761,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('GetTemplatesIntegration', getTemplatesFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Add AI test generation routes
@@ -1482,6 +1771,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIAnalyzeIntegration', aiAnalyzeFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1490,6 +1780,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIGenerateTestIntegration', aiGenerateTestFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1498,6 +1789,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIBatchGenerateIntegration', aiBatchGenerateFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     api.addRoutes({
@@ -1506,6 +1798,7 @@ export class MisraPlatformStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration('AIGetUsageStatsIntegration', aiGetUsageStatsFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
+      authorizer: authorizer,
     });
 
     // Output important values

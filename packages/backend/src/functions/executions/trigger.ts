@@ -4,14 +4,14 @@
  * Creates execution records and queues test cases for execution
  */
 
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { v4 as uuidv4 } from 'uuid';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
 import { TestCaseService } from '../../services/test-case-service';
 import { TestSuiteService } from '../../services/test-suite-service';
 import { ExecutionMessage } from '../../types/test-execution';
-import { withAuthAndPermission, AuthenticatedEvent } from '../../middleware/auth-middleware';
+import { getUserFromContext } from '../../utils/auth-util';
 
 const sqsClient = new SQSClient({});
 const testCaseService = new TestCaseService();
@@ -31,10 +31,7 @@ interface TriggerExecutionResponse {
   message: string;
 }
 
-export const handler = withAuthAndPermission(
-  'tests',
-  'execute',
-  async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     console.log('Trigger Lambda invoked');
     console.log('Event:', JSON.stringify(event, null, 2));
 
@@ -80,8 +77,9 @@ export const handler = withAuthAndPermission(
         };
       }
 
-      // Get user ID from authenticated event
-      const userId = event.user.userId;
+      // Get user ID from context
+      const user = getUserFromContext(event);
+      const userId = user.userId || 'anonymous';
 
       // Check queue URL
       const queueUrl = process.env.TEST_EXECUTION_QUEUE_URL;
@@ -102,7 +100,7 @@ export const handler = withAuthAndPermission(
         const response = await triggerTestCaseExecution(
           request.testCaseId,
           userId,
-          event.user.organizationId,
+          user.organizationId,
           queueUrl,
           request.environment
         );
@@ -122,7 +120,7 @@ export const handler = withAuthAndPermission(
         const response = await triggerTestSuiteExecution(
           request.testSuiteId,
           userId,
-          event.user.organizationId,
+          user.organizationId,
           queueUrl,
           request.environment
         );
@@ -161,8 +159,7 @@ export const handler = withAuthAndPermission(
         }),
       };
     }
-  }
-);
+};
 
 async function triggerTestCaseExecution(
   testCaseId: string,

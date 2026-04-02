@@ -46,9 +46,7 @@ describe('Trigger Lambda', () => {
       body: null,
       requestContext: {
         authorizer: {
-          claims: {
-            sub: 'user-123',
-          },
+          userId: 'user-123',
         },
       } as any,
     };

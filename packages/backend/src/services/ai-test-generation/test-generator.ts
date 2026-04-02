@@ -1,6 +1,6 @@
 import { TestCase, TestStep } from '../../types/test-case';
 import { TestSpecification, AIGeneratedStep, ApplicationAnalysis } from '../../types/ai-test-generation';
-import { AIEngine } from './ai-engine';
+import { IAIEngine } from './ai-engine-factory';
 import { SelectorGenerator } from './selector-generator';
 import { TestCaseService } from '../test-case-service';
 
@@ -11,12 +11,12 @@ import { TestCaseService } from '../test-case-service';
  * Integrates with AI Engine, Selector Generator, and Test Case Service.
  */
 export class TestGenerator {
-  private aiEngine: AIEngine;
+  private aiEngine: IAIEngine;
   private selectorGenerator: SelectorGenerator;
   private testCaseService: TestCaseService;
 
   constructor(
-    aiEngine: AIEngine,
+    aiEngine: IAIEngine,
     selectorGenerator: SelectorGenerator,
     testCaseService: TestCaseService
   ) {

@@ -1,14 +1,22 @@
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { TokenUsage, UsageStats } from '../../types/ai-test-generation';
 /**
+ * AI Provider Types
+ */
+export type AIProvider = 'OPENAI' | 'BEDROCK' | 'HUGGINGFACE';
+/**
  * Pricing Configuration
  *
  * OpenAI pricing as of 2024 (per 1M tokens):
  * - GPT-4: $30 input / $60 output
  * - GPT-3.5-turbo: $0.50 input / $1.50 output
+ *
+ * Bedrock pricing as of 2024 (per 1M tokens):
+ * - Claude 3.5 Sonnet: $3 input / $15 output
  */
 interface PricingConfig {
     model: string;
+    provider: AIProvider;
     promptTokenRate: number;
     completionTokenRate: number;
 }
@@ -32,13 +40,14 @@ export declare class CostTracker {
     private limits;
     constructor(tableName?: string, pricing?: Record<string, PricingConfig>, limits?: UsageLimits, docClient?: DynamoDBDocumentClient);
     /**
-     * Calculate cost based on token usage and model
+     * Calculate cost based on token usage, model, and provider
      *
      * @param tokens - Token usage breakdown
-     * @param model - OpenAI model used
+     * @param model - AI model used (e.g., 'gpt-4', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
+     * @param provider - AI provider (OPENAI, BEDROCK, HUGGINGFACE)
      * @returns Calculated cost in USD
      */
-    calculateCost(tokens: TokenUsage, model: string): number;
+    calculateCost(tokens: TokenUsage, model: string, provider?: AIProvider): number;
     /**
      * Record API usage
      *
@@ -46,11 +55,12 @@ export declare class CostTracker {
      * @param projectId - Project ID
      * @param operationType - Type of operation
      * @param tokens - Token usage
-     * @param model - OpenAI model used
+     * @param model - AI model used
+     * @param provider - AI provider (OPENAI, BEDROCK, HUGGINGFACE)
      * @param testCasesGenerated - Number of test cases generated
      * @param duration - Operation duration in milliseconds
      */
-    recordUsage(userId: string, projectId: string, operationType: 'analyze' | 'generate' | 'batch', tokens: TokenUsage, model: string, testCasesGenerated?: number, duration?: number): Promise<void>;
+    recordUsage(userId: string, projectId: string, operationType: 'analyze' | 'generate' | 'batch', tokens: TokenUsage, model: string, provider: AIProvider, testCasesGenerated?: number, duration?: number): Promise<void>;
     /**
      * Check if user or project has exceeded usage limits
      *
@@ -91,9 +101,10 @@ export declare class CostTracker {
      * @param projectId - Optional project ID filter
      * @param startDate - Optional start date filter (ISO string)
      * @param endDate - Optional end date filter (ISO string)
+     * @param provider - Optional provider filter (OPENAI, BEDROCK, HUGGINGFACE)
      * @returns Usage statistics
      */
-    getUsageStats(userId?: string, projectId?: string, startDate?: string, endDate?: string): Promise<UsageStats>;
+    getUsageStats(userId?: string, projectId?: string, startDate?: string, endDate?: string, provider?: AIProvider): Promise<UsageStats>;
     /**
      * Query usage records by user
      */
