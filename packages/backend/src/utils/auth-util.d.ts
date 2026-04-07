@@ -14,22 +14,13 @@ export interface UserContext {
     role: 'admin' | 'developer' | 'viewer' | '';
 }
 /**
- * Extract authenticated user information from API Gateway request context
+ * Extract authenticated user information from API Gateway request context.
  *
- * The Lambda Authorizer verifies JWT tokens and populates the request context
- * with user information. This helper function extracts that information for
- * use in backend Lambda functions.
+ * First tries the Lambda Authorizer context (populated when an authorizer is
+ * configured). Falls back to decoding the Bearer JWT directly from the
+ * Authorization header so the function works even without an authorizer.
  *
  * @param event - API Gateway proxy event
  * @returns User context object with userId, email, organizationId, and role
- *
- * @example
- * ```typescript
- * export const handler = async (event: APIGatewayProxyEvent) => {
- *   const user = getUserFromContext(event);
- *   console.log('User ID:', user.userId);
- *   // Business logic using user context
- * };
- * ```
  */
 export declare function getUserFromContext(event: APIGatewayProxyEvent): UserContext;

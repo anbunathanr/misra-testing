@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_CPP_6_5_5 = void 0;
+/**
+ * MISRA C++:2008 Rule 6-5-5
+ * A loop-control-variable other than the loop-counter shall not be modified within condition or expression
+ *
+ * NOTE: This is a stub implementation. Full implementation requires:
+ * - Detailed AST analysis for this specific rule
+ * - Comprehensive test cases
+ * - Integration with the rule engine
+ */
+class Rule_CPP_6_5_5 {
+    id = 'MISRA-CPP-6.5.5';
+    description = 'A loop-control-variable other than the loop-counter shall not be modified within condition or expression';
+    severity = 'required';
+    category = 'Control flow';
+    language = 'CPP';
+    async check(ast, sourceCode) {
+        // Stub implementation - returns no violations
+        // TODO: Implement full rule checking logic
+        return [];
+    }
+}
+exports.Rule_CPP_6_5_5 = Rule_CPP_6_5_5;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS02LTUtNS5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbInJ1bGUtNi01LTUudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7O0FBSUE7Ozs7Ozs7O0dBUUc7QUFDSCxNQUFhLGNBQWM7SUFDekIsRUFBRSxHQUFHLGlCQUFpQixDQUFDO0lBQ3ZCLFdBQVcsR0FBRywwR0FBMEcsQ0FBQztJQUN6SCxRQUFRLEdBQUcsVUFBbUIsQ0FBQztJQUMvQixRQUFRLEdBQUcsY0FBYyxDQUFDO0lBQzFCLFFBQVEsR0FBRyxLQUFjLENBQUM7SUFFMUIsS0FBSyxDQUFDLEtBQUssQ0FBQyxHQUFRLEVBQUUsVUFBa0I7UUFDdEMsOENBQThDO1FBQzlDLDJDQUEyQztRQUMzQyxPQUFPLEVBQUUsQ0FBQztJQUNaLENBQUM7Q0FDRjtBQVpELHdDQVlDIiwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTUlTUkFSdWxlLCBjcmVhdGVWaW9sYXRpb24gfSBmcm9tICcuLi8uLi9ydWxlLWVuZ2luZSc7XG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XG5pbXBvcnQgeyBWaW9sYXRpb24gfSBmcm9tICcuLi8uLi8uLi8uLi90eXBlcy9taXNyYS1hbmFseXNpcyc7XG5cbi8qKlxuICogTUlTUkEgQysrOjIwMDggUnVsZSA2LTUtNVxuICogQSBsb29wLWNvbnRyb2wtdmFyaWFibGUgb3RoZXIgdGhhbiB0aGUgbG9vcC1jb3VudGVyIHNoYWxsIG5vdCBiZSBtb2RpZmllZCB3aXRoaW4gY29uZGl0aW9uIG9yIGV4cHJlc3Npb25cbiAqIFxuICogTk9URTogVGhpcyBpcyBhIHN0dWIgaW1wbGVtZW50YXRpb24uIEZ1bGwgaW1wbGVtZW50YXRpb24gcmVxdWlyZXM6XG4gKiAtIERldGFpbGVkIEFTVCBhbmFseXNpcyBmb3IgdGhpcyBzcGVjaWZpYyBydWxlXG4gKiAtIENvbXByZWhlbnNpdmUgdGVzdCBjYXNlc1xuICogLSBJbnRlZ3JhdGlvbiB3aXRoIHRoZSBydWxlIGVuZ2luZVxuICovXG5leHBvcnQgY2xhc3MgUnVsZV9DUFBfNl81XzUgaW1wbGVtZW50cyBNSVNSQVJ1bGUge1xuICBpZCA9ICdNSVNSQS1DUFAtNi41LjUnO1xuICBkZXNjcmlwdGlvbiA9ICdBIGxvb3AtY29udHJvbC12YXJpYWJsZSBvdGhlciB0aGFuIHRoZSBsb29wLWNvdW50ZXIgc2hhbGwgbm90IGJlIG1vZGlmaWVkIHdpdGhpbiBjb25kaXRpb24gb3IgZXhwcmVzc2lvbic7XG4gIHNldmVyaXR5ID0gJ3JlcXVpcmVkJyBhcyBjb25zdDtcbiAgY2F0ZWdvcnkgPSAnQ29udHJvbCBmbG93JztcbiAgbGFuZ3VhZ2UgPSAnQ1BQJyBhcyBjb25zdDtcblxuICBhc3luYyBjaGVjayhhc3Q6IEFTVCwgc291cmNlQ29kZTogc3RyaW5nKTogUHJvbWlzZTxWaW9sYXRpb25bXT4ge1xuICAgIC8vIFN0dWIgaW1wbGVtZW50YXRpb24gLSByZXR1cm5zIG5vIHZpb2xhdGlvbnNcbiAgICAvLyBUT0RPOiBJbXBsZW1lbnQgZnVsbCBydWxlIGNoZWNraW5nIGxvZ2ljXG4gICAgcmV0dXJuIFtdO1xuICB9XG59XG4iXX0=

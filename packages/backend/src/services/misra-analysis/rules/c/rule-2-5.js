@@ -1,0 +1,48 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_C_2_5 = void 0;
+const rule_engine_1 = require("../../rule-engine");
+/**
+ * MISRA C:2012 Rule 2.5
+ * A project should not contain unused macro declarations.
+ */
+class Rule_C_2_5 {
+    id = 'MISRA-C-2.5';
+    description = 'A project should not contain unused macro declarations';
+    severity = 'advisory';
+    category = 'Unused code';
+    language = 'C';
+    async check(ast, sourceCode) {
+        const violations = [];
+        const lines = ast.lines;
+        const macros = new Map();
+        const usedMacros = new Set();
+        // Find macro definitions
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            const macroMatch = line.match(/^#define\s+(\w+)/);
+            if (macroMatch) {
+                macros.set(macroMatch[1], i);
+            }
+        }
+        // Find macro usage
+        for (const line of lines) {
+            if (line.trim().startsWith('#define'))
+                continue;
+            for (const macroName of macros.keys()) {
+                if (line.includes(macroName)) {
+                    usedMacros.add(macroName);
+                }
+            }
+        }
+        // Report unused macros
+        for (const [macroName, lineNum] of macros) {
+            if (!usedMacros.has(macroName)) {
+                violations.push((0, rule_engine_1.createViolation)(this, lineNum + 1, 0, `Unused macro '${macroName}'`, lines[lineNum]));
+            }
+        }
+        return violations;
+    }
+}
+exports.Rule_C_2_5 = Rule_C_2_5;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS0yLTUuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJydWxlLTItNS50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFBQSxtREFBK0Q7QUFJL0Q7OztHQUdHO0FBQ0gsTUFBYSxVQUFVO0lBQ3JCLEVBQUUsR0FBRyxhQUFhLENBQUM7SUFDbkIsV0FBVyxHQUFHLHdEQUF3RCxDQUFDO0lBQ3ZFLFFBQVEsR0FBRyxVQUFtQixDQUFDO0lBQy9CLFFBQVEsR0FBRyxhQUFhLENBQUM7SUFDekIsUUFBUSxHQUFHLEdBQVksQ0FBQztJQUV4QixLQUFLLENBQUMsS0FBSyxDQUFDLEdBQVEsRUFBRSxVQUFrQjtRQUN0QyxNQUFNLFVBQVUsR0FBZ0IsRUFBRSxDQUFDO1FBQ25DLE1BQU0sS0FBSyxHQUFHLEdBQUcsQ0FBQyxLQUFLLENBQUM7UUFDeEIsTUFBTSxNQUFNLEdBQUcsSUFBSSxHQUFHLEVBQWtCLENBQUM7UUFDekMsTUFBTSxVQUFVLEdBQUcsSUFBSSxHQUFHLEVBQVUsQ0FBQztRQUVyQyx5QkFBeUI7UUFDekIsS0FBSyxJQUFJLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxNQUFNLEVBQUUsQ0FBQyxFQUFFLEVBQUUsQ0FBQztZQUN0QyxNQUFNLElBQUksR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUMsSUFBSSxFQUFFLENBQUM7WUFDN0IsTUFBTSxVQUFVLEdBQUcsSUFBSSxDQUFDLEtBQUssQ0FBQyxrQkFBa0IsQ0FBQyxDQUFDO1lBQ2xELElBQUksVUFBVSxFQUFFLENBQUM7Z0JBQ2YsTUFBTSxDQUFDLEdBQUcsQ0FBQyxVQUFVLENBQUMsQ0FBQyxDQUFDLEVBQUUsQ0FBQyxDQUFDLENBQUM7WUFDL0IsQ0FBQztRQUNILENBQUM7UUFFRCxtQkFBbUI7UUFDbkIsS0FBSyxNQUFNLElBQUksSUFBSSxLQUFLLEVBQUUsQ0FBQztZQUN6QixJQUFJLElBQUksQ0FBQyxJQUFJLEVBQUUsQ0FBQyxVQUFVLENBQUMsU0FBUyxDQUFDO2dCQUFFLFNBQVM7WUFDaEQsS0FBSyxNQUFNLFNBQVMsSUFBSSxNQUFNLENBQUMsSUFBSSxFQUFFLEVBQUUsQ0FBQztnQkFDdEMsSUFBSSxJQUFJLENBQUMsUUFBUSxDQUFDLFNBQVMsQ0FBQyxFQUFFLENBQUM7b0JBQzdCLFVBQVUsQ0FBQyxHQUFHLENBQUMsU0FBUyxDQUFDLENBQUM7Z0JBQzVCLENBQUM7WUFDSCxDQUFDO1FBQ0gsQ0FBQztRQUVELHVCQUF1QjtRQUN2QixLQUFLLE1BQU0sQ0FBQyxTQUFTLEVBQUUsT0FBTyxDQUFDLElBQUksTUFBTSxFQUFFLENBQUM7WUFDMUMsSUFBSSxDQUFDLFVBQVUsQ0FBQyxHQUFHLENBQUMsU0FBUyxDQUFDLEVBQUUsQ0FBQztnQkFDL0IsVUFBVSxDQUFDLElBQUksQ0FDYixJQUFBLDZCQUFlLEVBQ2IsSUFBSSxFQUNKLE9BQU8sR0FBRyxDQUFDLEVBQ1gsQ0FBQyxFQUNELGlCQUFpQixTQUFTLEdBQUcsRUFDN0IsS0FBSyxDQUFDLE9BQU8sQ0FBQyxDQUNmLENBQ0YsQ0FBQztZQUNKLENBQUM7UUFDSCxDQUFDO1FBRUQsT0FBTyxVQUFVLENBQUM7SUFDcEIsQ0FBQztDQUNGO0FBakRELGdDQWlEQyIsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IE1JU1JBUnVsZSwgY3JlYXRlVmlvbGF0aW9uIH0gZnJvbSAnLi4vLi4vcnVsZS1lbmdpbmUnO1xyXG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XHJcbmltcG9ydCB7IFZpb2xhdGlvbiB9IGZyb20gJy4uLy4uLy4uLy4uL3R5cGVzL21pc3JhLWFuYWx5c2lzJztcclxuXHJcbi8qKlxyXG4gKiBNSVNSQSBDOjIwMTIgUnVsZSAyLjVcclxuICogQSBwcm9qZWN0IHNob3VsZCBub3QgY29udGFpbiB1bnVzZWQgbWFjcm8gZGVjbGFyYXRpb25zLlxyXG4gKi9cclxuZXhwb3J0IGNsYXNzIFJ1bGVfQ18yXzUgaW1wbGVtZW50cyBNSVNSQVJ1bGUge1xyXG4gIGlkID0gJ01JU1JBLUMtMi41JztcclxuICBkZXNjcmlwdGlvbiA9ICdBIHByb2plY3Qgc2hvdWxkIG5vdCBjb250YWluIHVudXNlZCBtYWNybyBkZWNsYXJhdGlvbnMnO1xyXG4gIHNldmVyaXR5ID0gJ2Fkdmlzb3J5JyBhcyBjb25zdDtcclxuICBjYXRlZ29yeSA9ICdVbnVzZWQgY29kZSc7XHJcbiAgbGFuZ3VhZ2UgPSAnQycgYXMgY29uc3Q7XHJcblxyXG4gIGFzeW5jIGNoZWNrKGFzdDogQVNULCBzb3VyY2VDb2RlOiBzdHJpbmcpOiBQcm9taXNlPFZpb2xhdGlvbltdPiB7XHJcbiAgICBjb25zdCB2aW9sYXRpb25zOiBWaW9sYXRpb25bXSA9IFtdO1xyXG4gICAgY29uc3QgbGluZXMgPSBhc3QubGluZXM7XHJcbiAgICBjb25zdCBtYWNyb3MgPSBuZXcgTWFwPHN0cmluZywgbnVtYmVyPigpO1xyXG4gICAgY29uc3QgdXNlZE1hY3JvcyA9IG5ldyBTZXQ8c3RyaW5nPigpO1xyXG5cclxuICAgIC8vIEZpbmQgbWFjcm8gZGVmaW5pdGlvbnNcclxuICAgIGZvciAobGV0IGkgPSAwOyBpIDwgbGluZXMubGVuZ3RoOyBpKyspIHtcclxuICAgICAgY29uc3QgbGluZSA9IGxpbmVzW2ldLnRyaW0oKTtcclxuICAgICAgY29uc3QgbWFjcm9NYXRjaCA9IGxpbmUubWF0Y2goL14jZGVmaW5lXFxzKyhcXHcrKS8pO1xyXG4gICAgICBpZiAobWFjcm9NYXRjaCkge1xyXG4gICAgICAgIG1hY3Jvcy5zZXQobWFjcm9NYXRjaFsxXSwgaSk7XHJcbiAgICAgIH1cclxuICAgIH1cclxuXHJcbiAgICAvLyBGaW5kIG1hY3JvIHVzYWdlXHJcbiAgICBmb3IgKGNvbnN0IGxpbmUgb2YgbGluZXMpIHtcclxuICAgICAgaWYgKGxpbmUudHJpbSgpLnN0YXJ0c1dpdGgoJyNkZWZpbmUnKSkgY29udGludWU7XHJcbiAgICAgIGZvciAoY29uc3QgbWFjcm9OYW1lIG9mIG1hY3Jvcy5rZXlzKCkpIHtcclxuICAgICAgICBpZiAobGluZS5pbmNsdWRlcyhtYWNyb05hbWUpKSB7XHJcbiAgICAgICAgICB1c2VkTWFjcm9zLmFkZChtYWNyb05hbWUpO1xyXG4gICAgICAgIH1cclxuICAgICAgfVxyXG4gICAgfVxyXG5cclxuICAgIC8vIFJlcG9ydCB1bnVzZWQgbWFjcm9zXHJcbiAgICBmb3IgKGNvbnN0IFttYWNyb05hbWUsIGxpbmVOdW1dIG9mIG1hY3Jvcykge1xyXG4gICAgICBpZiAoIXVzZWRNYWNyb3MuaGFzKG1hY3JvTmFtZSkpIHtcclxuICAgICAgICB2aW9sYXRpb25zLnB1c2goXHJcbiAgICAgICAgICBjcmVhdGVWaW9sYXRpb24oXHJcbiAgICAgICAgICAgIHRoaXMsXHJcbiAgICAgICAgICAgIGxpbmVOdW0gKyAxLFxyXG4gICAgICAgICAgICAwLFxyXG4gICAgICAgICAgICBgVW51c2VkIG1hY3JvICcke21hY3JvTmFtZX0nYCxcclxuICAgICAgICAgICAgbGluZXNbbGluZU51bV1cclxuICAgICAgICAgIClcclxuICAgICAgICApO1xyXG4gICAgICB9XHJcbiAgICB9XHJcblxyXG4gICAgcmV0dXJuIHZpb2xhdGlvbnM7XHJcbiAgfVxyXG59XHJcbiJdfQ==

@@ -1,0 +1,59 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_C_20_9 = void 0;
+const rule_engine_1 = require("../../rule-engine");
+/**
+ * MISRA C:2012 Rule 20.9
+ * All macros used in #if or #elif preprocessing directives shall be defined
+ * before use.
+ * Detects macros used in #if/#elif that are not defined before that point.
+ */
+class Rule_C_20_9 {
+    id = 'MISRA-C-20.9';
+    description = 'All macros used in #if or #elif preprocessing directives shall be defined before use';
+    severity = 'required';
+    category = 'Preprocessing';
+    language = 'C';
+    async check(ast, sourceCode) {
+        const violations = [];
+        const lines = ast.lines;
+        const definedMacros = new Set();
+        const ifRegex = /^\s*#\s*(?:if|elif)\s+(.+)/;
+        const defineRegex = /^\s*#\s*define\s+(\w+)/;
+        const identRegex = /\b([A-Z_][A-Z0-9_]{2,})\b/g; // Macro-like identifiers (all caps)
+        // Built-in macros that are always defined
+        const builtins = new Set([
+            '__LINE__', '__FILE__', '__DATE__', '__TIME__', '__STDC__',
+            '__STDC_VERSION__', '__cplusplus', 'NULL', 'EOF', 'TRUE', 'FALSE',
+            'NDEBUG', 'INT_MAX', 'INT_MIN', 'UINT_MAX',
+        ]);
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Track #define
+            const defineMatch = line.match(defineRegex);
+            if (defineMatch) {
+                definedMacros.add(defineMatch[1]);
+                continue;
+            }
+            // Check #if/#elif
+            const ifMatch = line.match(ifRegex);
+            if (ifMatch) {
+                const expr = ifMatch[1];
+                // Skip defined() operator — that's the proper way to check
+                if (expr.includes('defined('))
+                    continue;
+                let m;
+                identRegex.lastIndex = 0;
+                while ((m = identRegex.exec(expr)) !== null) {
+                    const macroName = m[1];
+                    if (!definedMacros.has(macroName) && !builtins.has(macroName)) {
+                        violations.push((0, rule_engine_1.createViolation)(this, i + 1, 0, `Macro '${macroName}' used in #if/#elif before being defined`, line.trim()));
+                    }
+                }
+            }
+        }
+        return violations;
+    }
+}
+exports.Rule_C_20_9 = Rule_C_20_9;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS0yMC05LmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsicnVsZS0yMC05LnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7OztBQUFBLG1EQUErRDtBQUkvRDs7Ozs7R0FLRztBQUNILE1BQWEsV0FBVztJQUN0QixFQUFFLEdBQUcsY0FBYyxDQUFDO0lBQ3BCLFdBQVcsR0FBRyxzRkFBc0YsQ0FBQztJQUNyRyxRQUFRLEdBQUcsVUFBbUIsQ0FBQztJQUMvQixRQUFRLEdBQUcsZUFBZSxDQUFDO0lBQzNCLFFBQVEsR0FBRyxHQUFZLENBQUM7SUFFeEIsS0FBSyxDQUFDLEtBQUssQ0FBQyxHQUFRLEVBQUUsVUFBa0I7UUFDdEMsTUFBTSxVQUFVLEdBQWdCLEVBQUUsQ0FBQztRQUNuQyxNQUFNLEtBQUssR0FBRyxHQUFHLENBQUMsS0FBSyxDQUFDO1FBRXhCLE1BQU0sYUFBYSxHQUFHLElBQUksR0FBRyxFQUFVLENBQUM7UUFDeEMsTUFBTSxPQUFPLEdBQUcsNEJBQTRCLENBQUM7UUFDN0MsTUFBTSxXQUFXLEdBQUcsd0JBQXdCLENBQUM7UUFDN0MsTUFBTSxVQUFVLEdBQUcsNEJBQTRCLENBQUMsQ0FBQyxvQ0FBb0M7UUFFckYsMENBQTBDO1FBQzFDLE1BQU0sUUFBUSxHQUFHLElBQUksR0FBRyxDQUFDO1lBQ3ZCLFVBQVUsRUFBRSxVQUFVLEVBQUUsVUFBVSxFQUFFLFVBQVUsRUFBRSxVQUFVO1lBQzFELGtCQUFrQixFQUFFLGFBQWEsRUFBRSxNQUFNLEVBQUUsS0FBSyxFQUFFLE1BQU0sRUFBRSxPQUFPO1lBQ2pFLFFBQVEsRUFBRSxTQUFTLEVBQUUsU0FBUyxFQUFFLFVBQVU7U0FDM0MsQ0FBQyxDQUFDO1FBRUgsS0FBSyxJQUFJLENBQUMsR0FBRyxDQUFDLEVBQUUsQ0FBQyxHQUFHLEtBQUssQ0FBQyxNQUFNLEVBQUUsQ0FBQyxFQUFFLEVBQUUsQ0FBQztZQUN0QyxNQUFNLElBQUksR0FBRyxLQUFLLENBQUMsQ0FBQyxDQUFDLENBQUM7WUFFdEIsZ0JBQWdCO1lBQ2hCLE1BQU0sV0FBVyxHQUFHLElBQUksQ0FBQyxLQUFLLENBQUMsV0FBVyxDQUFDLENBQUM7WUFDNUMsSUFBSSxXQUFXLEVBQUUsQ0FBQztnQkFDaEIsYUFBYSxDQUFDLEdBQUcsQ0FBQyxXQUFXLENBQUMsQ0FBQyxDQUFDLENBQUMsQ0FBQztnQkFDbEMsU0FBUztZQUNYLENBQUM7WUFFRCxrQkFBa0I7WUFDbEIsTUFBTSxPQUFPLEdBQUcsSUFBSSxDQUFDLEtBQUssQ0FBQyxPQUFPLENBQUMsQ0FBQztZQUNwQyxJQUFJLE9BQU8sRUFBRSxDQUFDO2dCQUNaLE1BQU0sSUFBSSxHQUFHLE9BQU8sQ0FBQyxDQUFDLENBQUMsQ0FBQztnQkFDeEIsMkRBQTJEO2dCQUMzRCxJQUFJLElBQUksQ0FBQyxRQUFRLENBQUMsVUFBVSxDQUFDO29CQUFFLFNBQVM7Z0JBRXhDLElBQUksQ0FBeUIsQ0FBQztnQkFDOUIsVUFBVSxDQUFDLFNBQVMsR0FBRyxDQUFDLENBQUM7Z0JBQ3pCLE9BQU8sQ0FBQyxDQUFDLEdBQUcsVUFBVSxDQUFDLElBQUksQ0FBQyxJQUFJLENBQUMsQ0FBQyxLQUFLLElBQUksRUFBRSxDQUFDO29CQUM1QyxNQUFNLFNBQVMsR0FBRyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUM7b0JBQ3ZCLElBQUksQ0FBQyxhQUFhLENBQUMsR0FBRyxDQUFDLFNBQVMsQ0FBQyxJQUFJLENBQUMsUUFBUSxDQUFDLEdBQUcsQ0FBQyxTQUFTLENBQUMsRUFBRSxDQUFDO3dCQUM5RCxVQUFVLENBQUMsSUFBSSxDQUNiLElBQUEsNkJBQWUsRUFDYixJQUFJLEVBQ0osQ0FBQyxHQUFHLENBQUMsRUFDTCxDQUFDLEVBQ0QsVUFBVSxTQUFTLDBDQUEwQyxFQUM3RCxJQUFJLENBQUMsSUFBSSxFQUFFLENBQ1osQ0FDRixDQUFDO29CQUNKLENBQUM7Z0JBQ0gsQ0FBQztZQUNILENBQUM7UUFDSCxDQUFDO1FBRUQsT0FBTyxVQUFVLENBQUM7SUFDcEIsQ0FBQztDQUNGO0FBN0RELGtDQTZEQyIsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IE1JU1JBUnVsZSwgY3JlYXRlVmlvbGF0aW9uIH0gZnJvbSAnLi4vLi4vcnVsZS1lbmdpbmUnO1xyXG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XHJcbmltcG9ydCB7IFZpb2xhdGlvbiB9IGZyb20gJy4uLy4uLy4uLy4uL3R5cGVzL21pc3JhLWFuYWx5c2lzJztcclxuXHJcbi8qKlxyXG4gKiBNSVNSQSBDOjIwMTIgUnVsZSAyMC45XHJcbiAqIEFsbCBtYWNyb3MgdXNlZCBpbiAjaWYgb3IgI2VsaWYgcHJlcHJvY2Vzc2luZyBkaXJlY3RpdmVzIHNoYWxsIGJlIGRlZmluZWRcclxuICogYmVmb3JlIHVzZS5cclxuICogRGV0ZWN0cyBtYWNyb3MgdXNlZCBpbiAjaWYvI2VsaWYgdGhhdCBhcmUgbm90IGRlZmluZWQgYmVmb3JlIHRoYXQgcG9pbnQuXHJcbiAqL1xyXG5leHBvcnQgY2xhc3MgUnVsZV9DXzIwXzkgaW1wbGVtZW50cyBNSVNSQVJ1bGUge1xyXG4gIGlkID0gJ01JU1JBLUMtMjAuOSc7XHJcbiAgZGVzY3JpcHRpb24gPSAnQWxsIG1hY3JvcyB1c2VkIGluICNpZiBvciAjZWxpZiBwcmVwcm9jZXNzaW5nIGRpcmVjdGl2ZXMgc2hhbGwgYmUgZGVmaW5lZCBiZWZvcmUgdXNlJztcclxuICBzZXZlcml0eSA9ICdyZXF1aXJlZCcgYXMgY29uc3Q7XHJcbiAgY2F0ZWdvcnkgPSAnUHJlcHJvY2Vzc2luZyc7XHJcbiAgbGFuZ3VhZ2UgPSAnQycgYXMgY29uc3Q7XHJcblxyXG4gIGFzeW5jIGNoZWNrKGFzdDogQVNULCBzb3VyY2VDb2RlOiBzdHJpbmcpOiBQcm9taXNlPFZpb2xhdGlvbltdPiB7XHJcbiAgICBjb25zdCB2aW9sYXRpb25zOiBWaW9sYXRpb25bXSA9IFtdO1xyXG4gICAgY29uc3QgbGluZXMgPSBhc3QubGluZXM7XHJcblxyXG4gICAgY29uc3QgZGVmaW5lZE1hY3JvcyA9IG5ldyBTZXQ8c3RyaW5nPigpO1xyXG4gICAgY29uc3QgaWZSZWdleCA9IC9eXFxzKiNcXHMqKD86aWZ8ZWxpZilcXHMrKC4rKS87XHJcbiAgICBjb25zdCBkZWZpbmVSZWdleCA9IC9eXFxzKiNcXHMqZGVmaW5lXFxzKyhcXHcrKS87XHJcbiAgICBjb25zdCBpZGVudFJlZ2V4ID0gL1xcYihbQS1aX11bQS1aMC05X117Mix9KVxcYi9nOyAvLyBNYWNyby1saWtlIGlkZW50aWZpZXJzIChhbGwgY2FwcylcclxuXHJcbiAgICAvLyBCdWlsdC1pbiBtYWNyb3MgdGhhdCBhcmUgYWx3YXlzIGRlZmluZWRcclxuICAgIGNvbnN0IGJ1aWx0aW5zID0gbmV3IFNldChbXHJcbiAgICAgICdfX0xJTkVfXycsICdfX0ZJTEVfXycsICdfX0RBVEVfXycsICdfX1RJTUVfXycsICdfX1NURENfXycsXHJcbiAgICAgICdfX1NURENfVkVSU0lPTl9fJywgJ19fY3BsdXNwbHVzJywgJ05VTEwnLCAnRU9GJywgJ1RSVUUnLCAnRkFMU0UnLFxyXG4gICAgICAnTkRFQlVHJywgJ0lOVF9NQVgnLCAnSU5UX01JTicsICdVSU5UX01BWCcsXHJcbiAgICBdKTtcclxuXHJcbiAgICBmb3IgKGxldCBpID0gMDsgaSA8IGxpbmVzLmxlbmd0aDsgaSsrKSB7XHJcbiAgICAgIGNvbnN0IGxpbmUgPSBsaW5lc1tpXTtcclxuXHJcbiAgICAgIC8vIFRyYWNrICNkZWZpbmVcclxuICAgICAgY29uc3QgZGVmaW5lTWF0Y2ggPSBsaW5lLm1hdGNoKGRlZmluZVJlZ2V4KTtcclxuICAgICAgaWYgKGRlZmluZU1hdGNoKSB7XHJcbiAgICAgICAgZGVmaW5lZE1hY3Jvcy5hZGQoZGVmaW5lTWF0Y2hbMV0pO1xyXG4gICAgICAgIGNvbnRpbnVlO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAvLyBDaGVjayAjaWYvI2VsaWZcclxuICAgICAgY29uc3QgaWZNYXRjaCA9IGxpbmUubWF0Y2goaWZSZWdleCk7XHJcbiAgICAgIGlmIChpZk1hdGNoKSB7XHJcbiAgICAgICAgY29uc3QgZXhwciA9IGlmTWF0Y2hbMV07XHJcbiAgICAgICAgLy8gU2tpcCBkZWZpbmVkKCkgb3BlcmF0b3Ig4oCUIHRoYXQncyB0aGUgcHJvcGVyIHdheSB0byBjaGVja1xyXG4gICAgICAgIGlmIChleHByLmluY2x1ZGVzKCdkZWZpbmVkKCcpKSBjb250aW51ZTtcclxuXHJcbiAgICAgICAgbGV0IG06IFJlZ0V4cEV4ZWNBcnJheSB8IG51bGw7XHJcbiAgICAgICAgaWRlbnRSZWdleC5sYXN0SW5kZXggPSAwO1xyXG4gICAgICAgIHdoaWxlICgobSA9IGlkZW50UmVnZXguZXhlYyhleHByKSkgIT09IG51bGwpIHtcclxuICAgICAgICAgIGNvbnN0IG1hY3JvTmFtZSA9IG1bMV07XHJcbiAgICAgICAgICBpZiAoIWRlZmluZWRNYWNyb3MuaGFzKG1hY3JvTmFtZSkgJiYgIWJ1aWx0aW5zLmhhcyhtYWNyb05hbWUpKSB7XHJcbiAgICAgICAgICAgIHZpb2xhdGlvbnMucHVzaChcclxuICAgICAgICAgICAgICBjcmVhdGVWaW9sYXRpb24oXHJcbiAgICAgICAgICAgICAgICB0aGlzLFxyXG4gICAgICAgICAgICAgICAgaSArIDEsXHJcbiAgICAgICAgICAgICAgICAwLFxyXG4gICAgICAgICAgICAgICAgYE1hY3JvICcke21hY3JvTmFtZX0nIHVzZWQgaW4gI2lmLyNlbGlmIGJlZm9yZSBiZWluZyBkZWZpbmVkYCxcclxuICAgICAgICAgICAgICAgIGxpbmUudHJpbSgpXHJcbiAgICAgICAgICAgICAgKVxyXG4gICAgICAgICAgICApO1xyXG4gICAgICAgICAgfVxyXG4gICAgICAgIH1cclxuICAgICAgfVxyXG4gICAgfVxyXG5cclxuICAgIHJldHVybiB2aW9sYXRpb25zO1xyXG4gIH1cclxufVxyXG4iXX0=

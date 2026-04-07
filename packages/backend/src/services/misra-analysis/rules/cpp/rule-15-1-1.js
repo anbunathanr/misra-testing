@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_CPP_15_1_1 = void 0;
+/**
+ * MISRA C++:2008 Rule 15-1-1
+ * The assignment-expression of a throw statement shall not itself cause an exception to be thrown
+ *
+ * NOTE: This is a stub implementation. Full implementation requires:
+ * - Detailed AST analysis for this specific rule
+ * - Comprehensive test cases
+ * - Integration with the rule engine
+ */
+class Rule_CPP_15_1_1 {
+    id = 'MISRA-CPP-15.1.1';
+    description = 'The assignment-expression of a throw statement shall not itself cause an exception to be thrown';
+    severity = 'required';
+    category = 'Exceptions';
+    language = 'CPP';
+    async check(ast, sourceCode) {
+        // Stub implementation - returns no violations
+        // TODO: Implement full rule checking logic
+        return [];
+    }
+}
+exports.Rule_CPP_15_1_1 = Rule_CPP_15_1_1;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS0xNS0xLTEuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJydWxlLTE1LTEtMS50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFJQTs7Ozs7Ozs7R0FRRztBQUNILE1BQWEsZUFBZTtJQUMxQixFQUFFLEdBQUcsa0JBQWtCLENBQUM7SUFDeEIsV0FBVyxHQUFHLGlHQUFpRyxDQUFDO0lBQ2hILFFBQVEsR0FBRyxVQUFtQixDQUFDO0lBQy9CLFFBQVEsR0FBRyxZQUFZLENBQUM7SUFDeEIsUUFBUSxHQUFHLEtBQWMsQ0FBQztJQUUxQixLQUFLLENBQUMsS0FBSyxDQUFDLEdBQVEsRUFBRSxVQUFrQjtRQUN0Qyw4Q0FBOEM7UUFDOUMsMkNBQTJDO1FBQzNDLE9BQU8sRUFBRSxDQUFDO0lBQ1osQ0FBQztDQUNGO0FBWkQsMENBWUMiLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBNSVNSQVJ1bGUsIGNyZWF0ZVZpb2xhdGlvbiB9IGZyb20gJy4uLy4uL3J1bGUtZW5naW5lJztcbmltcG9ydCB7IEFTVCB9IGZyb20gJy4uLy4uL2NvZGUtcGFyc2VyJztcbmltcG9ydCB7IFZpb2xhdGlvbiB9IGZyb20gJy4uLy4uLy4uLy4uL3R5cGVzL21pc3JhLWFuYWx5c2lzJztcblxuLyoqXG4gKiBNSVNSQSBDKys6MjAwOCBSdWxlIDE1LTEtMVxuICogVGhlIGFzc2lnbm1lbnQtZXhwcmVzc2lvbiBvZiBhIHRocm93IHN0YXRlbWVudCBzaGFsbCBub3QgaXRzZWxmIGNhdXNlIGFuIGV4Y2VwdGlvbiB0byBiZSB0aHJvd25cbiAqIFxuICogTk9URTogVGhpcyBpcyBhIHN0dWIgaW1wbGVtZW50YXRpb24uIEZ1bGwgaW1wbGVtZW50YXRpb24gcmVxdWlyZXM6XG4gKiAtIERldGFpbGVkIEFTVCBhbmFseXNpcyBmb3IgdGhpcyBzcGVjaWZpYyBydWxlXG4gKiAtIENvbXByZWhlbnNpdmUgdGVzdCBjYXNlc1xuICogLSBJbnRlZ3JhdGlvbiB3aXRoIHRoZSBydWxlIGVuZ2luZVxuICovXG5leHBvcnQgY2xhc3MgUnVsZV9DUFBfMTVfMV8xIGltcGxlbWVudHMgTUlTUkFSdWxlIHtcbiAgaWQgPSAnTUlTUkEtQ1BQLTE1LjEuMSc7XG4gIGRlc2NyaXB0aW9uID0gJ1RoZSBhc3NpZ25tZW50LWV4cHJlc3Npb24gb2YgYSB0aHJvdyBzdGF0ZW1lbnQgc2hhbGwgbm90IGl0c2VsZiBjYXVzZSBhbiBleGNlcHRpb24gdG8gYmUgdGhyb3duJztcbiAgc2V2ZXJpdHkgPSAncmVxdWlyZWQnIGFzIGNvbnN0O1xuICBjYXRlZ29yeSA9ICdFeGNlcHRpb25zJztcbiAgbGFuZ3VhZ2UgPSAnQ1BQJyBhcyBjb25zdDtcblxuICBhc3luYyBjaGVjayhhc3Q6IEFTVCwgc291cmNlQ29kZTogc3RyaW5nKTogUHJvbWlzZTxWaW9sYXRpb25bXT4ge1xuICAgIC8vIFN0dWIgaW1wbGVtZW50YXRpb24gLSByZXR1cm5zIG5vIHZpb2xhdGlvbnNcbiAgICAvLyBUT0RPOiBJbXBsZW1lbnQgZnVsbCBydWxlIGNoZWNraW5nIGxvZ2ljXG4gICAgcmV0dXJuIFtdO1xuICB9XG59XG4iXX0=

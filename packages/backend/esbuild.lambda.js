@@ -58,7 +58,7 @@ functionDirs.forEach(dir => {
       platform: 'node',
       target: 'node20',
       outfile: path.join(outputDir, 'index.js'),
-      external: ['aws-sdk', 'aws-lambda'],
+      external: ['aws-sdk', 'aws-lambda', '@aws-sdk/*'],
       minify: true,
       sourcemap: false,
       logLevel: 'silent',

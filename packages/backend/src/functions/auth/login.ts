@@ -1,4 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import {
+  CognitoIdentityProviderClient,
+  InitiateAuthCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
 import { JWTService } from '../../services/auth/jwt-service';
 import { UserService } from '../../services/user/user-service';
 
@@ -17,50 +21,72 @@ interface LoginResponse {
 
 const jwtService = new JWTService();
 const userService = new UserService();
+const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
-    // ✅ Parse request body
     if (!event.body) {
       return errorResponse(400, 'MISSING_BODY', 'Request body is required');
     }
 
     const loginRequest: LoginRequest = JSON.parse(event.body);
 
-    // ✅ Validate input
     if (!loginRequest.email || !loginRequest.password) {
       return errorResponse(400, 'INVALID_INPUT', 'Email and password are required');
     }
 
-    // ✅ Mock authentication (bypass n8n)
-    // For demo purposes, accept any email with password "123456"
-    if (loginRequest.password !== "123456") {
-      return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    const clientId = process.env.COGNITO_CLIENT_ID;
+    if (!clientId) {
+      return errorResponse(500, 'CONFIG_ERROR', 'Cognito client not configured');
     }
 
-    // Create mock user object
-    const mockUser = {
-      email: loginRequest.email,
-      organizationId: "test-org",
-      role: "developer" as const
-    };
+    // Authenticate against Cognito
+    let cognitoSub: string;
+    try {
+      const authResult = await cognitoClient.send(new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: {
+          USERNAME: loginRequest.email,
+          PASSWORD: loginRequest.password,
+        },
+      }));
 
-    // ✅ Get or create user in DynamoDB
+      if (!authResult.AuthenticationResult?.IdToken) {
+        return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      }
+
+      // Decode Cognito ID token to get sub
+      const parts = authResult.AuthenticationResult.IdToken.split('.');
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      cognitoSub = payload.sub;
+    } catch (cognitoError: any) {
+      console.error('Cognito auth error:', cognitoError.name, cognitoError.message);
+      if (
+        cognitoError.name === 'NotAuthorizedException' ||
+        cognitoError.name === 'UserNotFoundException'
+      ) {
+        return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      }
+      if (cognitoError.name === 'UserNotConfirmedException') {
+        return errorResponse(401, 'USER_NOT_CONFIRMED', 'User is not confirmed. Please verify your email.');
+      }
+      return errorResponse(500, 'AUTH_ERROR', 'Authentication service error');
+    }
+
+    // Get or create user in DynamoDB
     let user = await userService.getUserByEmail(loginRequest.email);
 
     if (!user) {
       user = await userService.createUser({
-        email: mockUser.email,
-        organizationId: mockUser.organizationId,
-        role: mockUser.role,
+        email: loginRequest.email,
+        organizationId: cognitoSub, // use Cognito sub as org ID for new users
+        role: 'developer',
         preferences: {
           theme: 'light',
-          notifications: {
-            email: true,
-            webhook: false,
-          },
+          notifications: { email: true, webhook: false },
           defaultMisraRuleSet: 'MISRA_C_2012',
         },
       });
@@ -68,7 +94,7 @@ export const handler = async (
       await userService.updateLastLogin(user.userId);
     }
 
-    // ✅ Generate JWT tokens
+    // Generate platform JWT tokens
     const tokenPair = await jwtService.generateTokenPair({
       userId: user.userId,
       email: user.email,
@@ -95,7 +121,6 @@ export const handler = async (
 
   } catch (error) {
     console.error('Login error:', error);
-
     return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
   }
 };

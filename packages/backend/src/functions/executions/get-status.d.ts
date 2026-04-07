@@ -2,7 +2,7 @@
  * Get Execution Status Lambda
  * Returns current status and progress information for a test execution
  */
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 export interface ExecutionStatusResponse {
     executionId: string;
     status: string;
@@ -12,4 +12,4 @@ export interface ExecutionStatusResponse {
     startTime: string;
     duration?: number;
 }
-export declare const handler: (event: import("aws-lambda").APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>;
+export declare const handler: (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>;

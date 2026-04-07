@@ -11,5 +11,5 @@
  * - endDate (optional)
  * - limit (optional, default 50)
  */
-import { APIGatewayProxyResult } from 'aws-lambda';
-export declare const handler: (event: import("aws-lambda").APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>;
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+export declare const handler: (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>;

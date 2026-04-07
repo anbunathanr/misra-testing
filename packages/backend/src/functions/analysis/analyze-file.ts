@@ -1,252 +1,271 @@
-import { Handler } from 'aws-lambda';
-import { AnalysisResultsService } from '../../services/analysis-results-service';
-import { FileMetadataService } from '../../services/file-metadata-service';
-import { NotificationService } from '../../services/notification-service';
-import { ErrorHandlerService, ErrorSeverity } from '../../services/error-handler-service';
-import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
-import { AnalysisStatus } from '../../types/file-metadata';
-import { MisraRuleSet } from '../../types/misra-rules';
+import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DynamoDBClient, PutItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { marshall } from '@aws-sdk/util-dynamodb';
+import { MISRAAnalysisEngine } from '../../services/misra-analysis/analysis-engine';
+import { Language } from '../../types/misra-analysis';
+import { CostTracker } from '../../services/misra-analysis/cost-tracker';
 
 const bucketName = process.env.FILE_STORAGE_BUCKET_NAME || '';
 const region = process.env.AWS_REGION || 'us-east-1';
-const environment = process.env.ENVIRONMENT || 'dev';
+const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'misra-platform-file-metadata-dev';
+const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'misra-platform-analysis-results';
 
-const notificationService = new NotificationService(region);
-const dbClient = new DynamoDBClientWrapper(environment);
-const metadataService = new FileMetadataService(dbClient);
-const resultsService = new AnalysisResultsService(dbClient);
+const s3Client = new S3Client({ region });
+const dynamoClient = new DynamoDBClient({ region });
+const analysisEngine = new MISRAAnalysisEngine();
+const costTracker = new CostTracker(dynamoClient);
 
-interface AnalysisEvent {
+interface AnalysisMessage {
   fileId: string;
   fileName: string;
   s3Key: string;
-  fileType: string;
-  ruleSet?: string;
+  language: Language;
   userId: string;
   organizationId?: string;
-  userEmail?: string;
-}
-
-interface S3EventRecord {
-  s3: {
-    bucket: {
-      name: string;
-    };
-    object: {
-      key: string;
-      size?: number;
-      sequencer?: string;
-    };
-  };
-}
-
-interface S3Event {
-  Records: S3EventRecord[];
-}
-
-/**
- * Extract file information from S3 event record
- */
-function extractFileInfoFromS3Event(record: S3EventRecord): {
-  s3Key: string;
-  fileName: string;
-} {
-  const s3Key = record.s3.object.key;
-  const fileName = s3Key.split('/').pop() || 'unknown-file';
-  
-  return { s3Key, fileName };
-}
-
-/**
- * Determine file type from file extension
- */
-function determineFileType(fileName: string): string {
-  if (fileName.endsWith('.c')) {
-    return 'C';
-  } else if (fileName.endsWith('.cpp') || fileName.endsWith('.cc') || fileName.endsWith('.cxx')) {
-    return 'CPP';
-  } else if (fileName.endsWith('.h') || fileName.endsWith('.hpp')) {
-    return 'HEADER';
-  }
-  return 'UNKNOWN';
 }
 
 /**
  * Lambda handler for MISRA file analysis
- * Can be triggered by S3 event notifications or direct invocation
+ * Processes SQS messages containing analysis requests
+ * 
+ * Requirements: 6.2, 6.3, 6.4, 6.5
  */
-export const handler: Handler = async (event) => {
-  console.log('Analysis event received:', JSON.stringify(event, null, 2));
+export const handler = async (event: SQSEvent, context: Context): Promise<void> => {
+  console.log('Analysis Lambda invoked');
+  console.log(`Processing ${event.Records.length} message(s)`);
+  console.log(`Remaining time: ${context.getRemainingTimeInMillis()}ms`);
 
-  let fileId: string;
-  let fileName: string;
-  let s3Key: string;
-  let fileType: string;
-  let userId: string;
-  let organizationId: string | undefined;
-  let userEmail: string | undefined;
-
-  // Check if this is an S3 event or direct invocation
-  if ('Records' in event && Array.isArray((event as S3Event).Records)) {
-    // S3 event notification
-    const s3Event = event as S3Event;
-    const record = s3Event.Records[0]; // Process first record only
-    
-    const { s3Key: extractedS3Key, fileName: extractedFileName } = extractFileInfoFromS3Event(record);
-    s3Key = extractedS3Key;
-    fileName = extractedFileName;
-    fileType = determineFileType(fileName);
-    
-    // Extract file ID from S3 key (format: uploads/orgId/userId/timestamp-fileId-filename)
-    const keyParts = s3Key.split('/');
-    if (keyParts.length >= 4) {
-      const filePart = keyParts[keyParts.length - 1];
-      const fileParts = filePart.split('-');
-      if (fileParts.length >= 2) {
-        fileId = fileParts[fileParts.length - 2]; // fileId is second to last
-      } else {
-        fileId = `auto-${Date.now()}`;
-      }
-    } else {
-      fileId = `auto-${Date.now()}`;
-    }
-    
-    // Extract user info from S3 key
-    if (keyParts.length >= 3) {
-      userId = keyParts[keyParts.length - 2]; // userId is second to last
-    } else {
-      userId = 'unknown';
-    }
-    
-    organizationId = keyParts[keyParts.length - 3] || undefined; // orgId is third to last
-  } else {
-    // Direct invocation with AnalysisEvent format
-    const analysisEvent = event as AnalysisEvent;
-    fileId = analysisEvent.fileId;
-    fileName = analysisEvent.fileName;
-    s3Key = analysisEvent.s3Key;
-    fileType = analysisEvent.fileType;
-    userId = analysisEvent.userId;
-    organizationId = analysisEvent.organizationId;
-    userEmail = analysisEvent.userEmail;
+  // Process each SQS message
+  for (const record of event.Records) {
+    await processAnalysisMessage(record, context);
   }
 
-  if (!userId) {
-    const error = new Error('userId is required for analysis');
-    ErrorHandlerService.handleError(error, { fileId, operation: 'analyze-file' }, ErrorSeverity.HIGH);
-    return {
-      statusCode: 400,
-      status: 'FAILED',
-      error: 'userId is required for analysis'
-    };
+  console.log('All messages processed successfully');
+};
+
+/**
+ * Process a single analysis message from SQS
+ */
+async function processAnalysisMessage(
+  record: SQSRecord,
+  context: Context
+): Promise<void> {
+  let message: AnalysisMessage;
+  
+  try {
+    // Parse SQS message
+    message = JSON.parse(record.body) as AnalysisMessage;
+    console.log(`Processing analysis for file: ${message.fileId}`);
+    console.log(`File name: ${message.fileName}`);
+    console.log(`Language: ${message.language}`);
+  } catch (error) {
+    console.error('Failed to parse SQS message:', error);
+    console.error('Message body:', record.body);
+    throw new Error('Invalid SQS message format');
   }
+
+  const { fileId, s3Key, language, userId, organizationId } = message;
+  const startTime = Date.now();
+  let fileSize = 0;
 
   try {
-    // Update status to IN_PROGRESS (use seconds, not milliseconds)
-    await metadataService.updateFileMetadata(fileId, {
-      analysis_status: AnalysisStatus.IN_PROGRESS,
-      updated_at: Math.floor(Date.now() / 1000)
-    });
+    // Update file metadata status to IN_PROGRESS (Requirement 6.2)
+    console.log(`Updating file ${fileId} status to IN_PROGRESS`);
+    await updateFileMetadataStatus(fileId, 'in_progress');
 
-    console.log(`Starting MISRA analysis for file ${fileId}: ${fileName}`);
+    // Check remaining time before starting analysis
+    const remainingTime = context.getRemainingTimeInMillis();
+    console.log(`Remaining Lambda time: ${remainingTime}ms`);
 
-    // TODO: Implement actual MISRA analysis when the service is available
-    // For now, simulate a successful analysis
-    const result = {
-      fileId,
-      fileName,
-      ruleSet: MisraRuleSet.C_2004,
-      violations: [],
-      violationsCount: 0,
-      rulesChecked: ['MISRA-C-2004 Rule 10.1', 'MISRA-C-2004 Rule 11.3'],
-      analysisTimestamp: Math.floor(Date.now() / 1000),
-      success: true
-    };
-
-    // Store analysis results in DynamoDB
-      const storedResult = await resultsService.storeAnalysisResult(
-        result,
-        userId,
-        organizationId
-      );
-
-      // Update metadata with results (use seconds, not milliseconds)
-      await metadataService.updateFileMetadata(fileId, {
-        analysis_status: AnalysisStatus.COMPLETED,
-        analysis_results: {
-          violations_count: result.violationsCount,
-          rules_checked: result.rulesChecked,
-          completion_timestamp: result.analysisTimestamp
-        },
-        updated_at: Math.floor(Date.now() / 1000)
-      });
-
-      console.log(`Analysis completed for ${fileId}: ${result.violationsCount} violations found`);
-      console.log(`Results stored with ID: ${storedResult.analysisId}`);
-
-      // Send success notification
-      try {
-        await notificationService.notifyAnalysisComplete(
-          userId,
-          fileId,
-          fileName,
-          result.violationsCount,
-          userEmail
-        );
-      } catch (notifError) {
-        // Log notification error but don't fail the analysis
-        ErrorHandlerService.handleError(notifError as Error, { userId, fileId, operation: 'send-notification' }, ErrorSeverity.LOW);
-      }
-
-      return {
-        statusCode: 200,
-        status: 'COMPLETED',
-        fileId,
-        analysisId: storedResult.analysisId,
-        results: {
-          violations_count: result.violationsCount,
-          rules_checked: result.rulesChecked,
-          completion_timestamp: result.analysisTimestamp
-        },
-        violations: result.violations
-      };
-    } catch (error) {
-    console.error('Error during analysis:', error);
-
-    const errorLog = ErrorHandlerService.handleError(error as Error, { userId, fileId, fileName, operation: 'analyze-file' }, ErrorSeverity.CRITICAL);
-
-    // Update status to FAILED (use seconds, not milliseconds)
-    try {
-      await metadataService.updateFileMetadata(fileId, {
-        analysis_status: AnalysisStatus.FAILED,
-        analysis_results: {
-          violations_count: 0,
-          rules_checked: [],
-          completion_timestamp: Math.floor(Date.now() / 1000),
-          error_message: error instanceof Error ? error.message : 'Unknown error'
-        },
-        updated_at: Math.floor(Date.now() / 1000)
-      });
-
-      // Send failure notification
-      await notificationService.notifyAnalysisFailure(
-        userId,
-        fileId,
-        fileName,
-        error instanceof Error ? error.message : 'Unknown error',
-        userEmail
-      );
-    } catch (updateError) {
-      console.error('Failed to update metadata or send notifications:', updateError);
+    // Reserve 30 seconds for cleanup and result saving
+    const timeoutBuffer = 30000;
+    if (remainingTime < timeoutBuffer + 60000) {
+      throw new Error(`Insufficient time remaining: ${remainingTime}ms`);
     }
 
-    return {
-      statusCode: 500,
-      status: 'FAILED',
+    // Download file from S3 (Requirement 6.3)
+    console.log(`Downloading file from S3: ${s3Key}`);
+    const fileContent = await downloadFileFromS3(s3Key);
+    fileSize = fileContent.length;
+    console.log(`File downloaded successfully, size: ${fileSize} bytes`);
+
+    // Invoke MISRA Analysis Engine (Requirement 6.4)
+    console.log(`Starting MISRA analysis for ${language} file`);
+    const analysisResult = await analysisEngine.analyzeFile(
+      fileContent,
+      language,
       fileId,
-      analysisId: fileId,
-      errorId: errorLog.errorId,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
+      userId
+    );
+
+    const duration = Date.now() - startTime;
+    console.log(`Analysis completed in ${duration}ms`);
+    console.log(`Found ${analysisResult.violations.length} violations`);
+    console.log(`Compliance: ${analysisResult.summary.compliancePercentage.toFixed(2)}%`);
+
+    // Store results in DynamoDB (Requirement 6.5)
+    console.log(`Storing analysis results in DynamoDB`);
+    await storeAnalysisResults(analysisResult, organizationId);
+
+    // Track analysis costs (Requirement 14.1)
+    console.log(`Tracking analysis costs`);
+    const costs = costTracker.calculateCosts(duration, fileSize, 2);
+    await costTracker.recordCost(
+      userId,
+      organizationId || 'default',
+      analysisResult.analysisId,
+      fileId,
+      costs,
+      {
+        fileSize,
+        duration,
+      }
+    );
+    console.log(`Cost tracking completed: $${costs.totalCost.toFixed(6)}`);
+
+    // Update file metadata status to COMPLETED
+    console.log(`Updating file ${fileId} status to COMPLETED`);
+    await updateFileMetadataStatus(fileId, 'completed', {
+      violations_count: analysisResult.violations.length,
+      compliance_percentage: analysisResult.summary.compliancePercentage,
+      analysis_duration: duration,
+    });
+
+    console.log(`Analysis completed successfully for file ${fileId}`);
+  } catch (error) {
+    console.error(`Error during analysis for file ${fileId}:`, error);
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Update file metadata status to FAILED (Requirement 11.1, 11.2, 11.3, 11.4)
+    try {
+      await updateFileMetadataStatus(fileId, 'failed', {
+        error_message: errorMessage,
+        error_timestamp: Date.now(),
+      });
+    } catch (updateError) {
+      console.error('Failed to update file metadata status:', updateError);
+    }
+
+    // Re-throw to trigger SQS retry/DLQ
+    throw error;
   }
-};
+}
+
+/**
+ * Download file content from S3
+ */
+async function downloadFileFromS3(s3Key: string): Promise<string> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: s3Key,
+    });
+
+    const response = await s3Client.send(command);
+    
+    if (!response.Body) {
+      throw new Error('Empty response body from S3');
+    }
+
+    // Convert stream to string
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+    
+    const buffer = Buffer.concat(chunks);
+    return buffer.toString('utf-8');
+  } catch (error) {
+    console.error('Error downloading file from S3:', error);
+    throw new Error(`Failed to download file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Store analysis results in DynamoDB
+ */
+async function storeAnalysisResults(
+  result: any,
+  organizationId?: string
+): Promise<void> {
+  try {
+    const item = {
+      analysisId: result.analysisId,
+      fileId: result.fileId,
+      userId: result.userId,
+      organizationId: organizationId || 'default',
+      language: result.language,
+      violations: result.violations,
+      summary: result.summary,
+      status: result.status,
+      createdAt: result.createdAt,
+      timestamp: Date.now(),
+    };
+
+    const command = new PutItemCommand({
+      TableName: analysisResultsTable,
+      Item: marshall(item),
+    });
+
+    await dynamoClient.send(command);
+    console.log(`Analysis results stored with ID: ${result.analysisId}`);
+  } catch (error) {
+    console.error('Error storing analysis results:', error);
+    throw new Error(`Failed to store analysis results: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Update file metadata status in DynamoDB
+ */
+async function updateFileMetadataStatus(
+  fileId: string,
+  status: string,
+  additionalData?: Record<string, any>
+): Promise<void> {
+  try {
+    const updateExpression = ['SET analysis_status = :status', 'updated_at = :updatedAt'];
+    const expressionAttributeValues: Record<string, any> = {
+      ':status': { S: status },
+      ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+    };
+
+    if (additionalData) {
+      if (additionalData.violations_count !== undefined) {
+        updateExpression.push('violations_count = :violationsCount');
+        expressionAttributeValues[':violationsCount'] = { N: additionalData.violations_count.toString() };
+      }
+      if (additionalData.compliance_percentage !== undefined) {
+        updateExpression.push('compliance_percentage = :compliancePercentage');
+        expressionAttributeValues[':compliancePercentage'] = { N: additionalData.compliance_percentage.toString() };
+      }
+      if (additionalData.analysis_duration !== undefined) {
+        updateExpression.push('analysis_duration = :analysisDuration');
+        expressionAttributeValues[':analysisDuration'] = { N: additionalData.analysis_duration.toString() };
+      }
+      if (additionalData.error_message) {
+        updateExpression.push('error_message = :errorMessage');
+        expressionAttributeValues[':errorMessage'] = { S: additionalData.error_message };
+      }
+      if (additionalData.error_timestamp) {
+        updateExpression.push('error_timestamp = :errorTimestamp');
+        expressionAttributeValues[':errorTimestamp'] = { N: additionalData.error_timestamp.toString() };
+      }
+    }
+
+    const command = new UpdateItemCommand({
+      TableName: fileMetadataTable,
+      Key: marshall({ file_id: fileId }),
+      UpdateExpression: updateExpression.join(', '),
+      ExpressionAttributeValues: expressionAttributeValues,
+    });
+
+    await dynamoClient.send(command);
+    console.log(`File metadata updated for ${fileId}: status=${status}`);
+  } catch (error) {
+    console.error('Error updating file metadata:', error);
+    throw new Error(`Failed to update file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

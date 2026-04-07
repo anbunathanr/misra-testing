@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_CPP_7_3_1 = void 0;
+/**
+ * MISRA C++:2008 Rule 7-3-1
+ * The global namespace shall only contain main, namespace declarations and extern "C" declarations
+ *
+ * NOTE: This is a stub implementation. Full implementation requires:
+ * - Detailed AST analysis for this specific rule
+ * - Comprehensive test cases
+ * - Integration with the rule engine
+ */
+class Rule_CPP_7_3_1 {
+    id = 'MISRA-CPP-7.3.1';
+    description = 'The global namespace shall only contain main, namespace declarations and extern "C" declarations';
+    severity = 'required';
+    category = 'Declarations';
+    language = 'CPP';
+    async check(ast, sourceCode) {
+        // Stub implementation - returns no violations
+        // TODO: Implement full rule checking logic
+        return [];
+    }
+}
+exports.Rule_CPP_7_3_1 = Rule_CPP_7_3_1;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS03LTMtMS5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbInJ1bGUtNy0zLTEudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7O0FBSUE7Ozs7Ozs7O0dBUUc7QUFDSCxNQUFhLGNBQWM7SUFDekIsRUFBRSxHQUFHLGlCQUFpQixDQUFDO0lBQ3ZCLFdBQVcsR0FBRyxrR0FBa0csQ0FBQztJQUNqSCxRQUFRLEdBQUcsVUFBbUIsQ0FBQztJQUMvQixRQUFRLEdBQUcsY0FBYyxDQUFDO0lBQzFCLFFBQVEsR0FBRyxLQUFjLENBQUM7SUFFMUIsS0FBSyxDQUFDLEtBQUssQ0FBQyxHQUFRLEVBQUUsVUFBa0I7UUFDdEMsOENBQThDO1FBQzlDLDJDQUEyQztRQUMzQyxPQUFPLEVBQUUsQ0FBQztJQUNaLENBQUM7Q0FDRjtBQVpELHdDQVlDIiwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTUlTUkFSdWxlLCBjcmVhdGVWaW9sYXRpb24gfSBmcm9tICcuLi8uLi9ydWxlLWVuZ2luZSc7XG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XG5pbXBvcnQgeyBWaW9sYXRpb24gfSBmcm9tICcuLi8uLi8uLi8uLi90eXBlcy9taXNyYS1hbmFseXNpcyc7XG5cbi8qKlxuICogTUlTUkEgQysrOjIwMDggUnVsZSA3LTMtMVxuICogVGhlIGdsb2JhbCBuYW1lc3BhY2Ugc2hhbGwgb25seSBjb250YWluIG1haW4sIG5hbWVzcGFjZSBkZWNsYXJhdGlvbnMgYW5kIGV4dGVybiBcIkNcIiBkZWNsYXJhdGlvbnNcbiAqIFxuICogTk9URTogVGhpcyBpcyBhIHN0dWIgaW1wbGVtZW50YXRpb24uIEZ1bGwgaW1wbGVtZW50YXRpb24gcmVxdWlyZXM6XG4gKiAtIERldGFpbGVkIEFTVCBhbmFseXNpcyBmb3IgdGhpcyBzcGVjaWZpYyBydWxlXG4gKiAtIENvbXByZWhlbnNpdmUgdGVzdCBjYXNlc1xuICogLSBJbnRlZ3JhdGlvbiB3aXRoIHRoZSBydWxlIGVuZ2luZVxuICovXG5leHBvcnQgY2xhc3MgUnVsZV9DUFBfN18zXzEgaW1wbGVtZW50cyBNSVNSQVJ1bGUge1xuICBpZCA9ICdNSVNSQS1DUFAtNy4zLjEnO1xuICBkZXNjcmlwdGlvbiA9ICdUaGUgZ2xvYmFsIG5hbWVzcGFjZSBzaGFsbCBvbmx5IGNvbnRhaW4gbWFpbiwgbmFtZXNwYWNlIGRlY2xhcmF0aW9ucyBhbmQgZXh0ZXJuIFwiQ1wiIGRlY2xhcmF0aW9ucyc7XG4gIHNldmVyaXR5ID0gJ3JlcXVpcmVkJyBhcyBjb25zdDtcbiAgY2F0ZWdvcnkgPSAnRGVjbGFyYXRpb25zJztcbiAgbGFuZ3VhZ2UgPSAnQ1BQJyBhcyBjb25zdDtcblxuICBhc3luYyBjaGVjayhhc3Q6IEFTVCwgc291cmNlQ29kZTogc3RyaW5nKTogUHJvbWlzZTxWaW9sYXRpb25bXT4ge1xuICAgIC8vIFN0dWIgaW1wbGVtZW50YXRpb24gLSByZXR1cm5zIG5vIHZpb2xhdGlvbnNcbiAgICAvLyBUT0RPOiBJbXBsZW1lbnQgZnVsbCBydWxlIGNoZWNraW5nIGxvZ2ljXG4gICAgcmV0dXJuIFtdO1xuICB9XG59XG4iXX0=

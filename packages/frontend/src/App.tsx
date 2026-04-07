@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage.tsx';
 import DashboardPage from './pages/DashboardPage.tsx';
 import FilesPage from './pages/FilesPage.tsx';
 import AnalysisPage from './pages/AnalysisPage.tsx';
+import MISRAAnalysisPage from './pages/MISRAAnalysisPage.tsx';
 import InsightsPage from './pages/InsightsPage.tsx';
 import ProfilePage from './pages/ProfilePage.tsx';
 import { ProjectsPage } from './pages/ProjectsPage.tsx';
@@ -35,6 +36,7 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
+          <Route path="misra-analysis" element={<MISRAAnalysisPage />} />
           <Route path="insights" element={<InsightsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="projects" element={<ProjectsPage />} />

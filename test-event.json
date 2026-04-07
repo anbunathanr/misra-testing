@@ -1,0 +1,1 @@
+{"httpMethod":"POST","headers":{"Authorization":"Bearer eytest"},"requestContext":{"authorizer":null},"body":"{\"fileName\":\"test.c\",\"fileSize\":1024,\"contentType\":\"text/plain\"}"}

@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_CPP_8_3_1 = void 0;
+/**
+ * MISRA C++:2008 Rule 8-3-1
+ * Parameters in an overriding virtual function shall either use the same default arguments as the function they override, or else shall not specify any default arguments
+ *
+ * NOTE: This is a stub implementation. Full implementation requires:
+ * - Detailed AST analysis for this specific rule
+ * - Comprehensive test cases
+ * - Integration with the rule engine
+ */
+class Rule_CPP_8_3_1 {
+    id = 'MISRA-CPP-8.3.1';
+    description = 'Parameters in an overriding virtual function shall either use the same default arguments as the function they override, or else shall not specify any default arguments';
+    severity = 'required';
+    category = 'Classes';
+    language = 'CPP';
+    async check(ast, sourceCode) {
+        // Stub implementation - returns no violations
+        // TODO: Implement full rule checking logic
+        return [];
+    }
+}
+exports.Rule_CPP_8_3_1 = Rule_CPP_8_3_1;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS04LTMtMS5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbInJ1bGUtOC0zLTEudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7O0FBSUE7Ozs7Ozs7O0dBUUc7QUFDSCxNQUFhLGNBQWM7SUFDekIsRUFBRSxHQUFHLGlCQUFpQixDQUFDO0lBQ3ZCLFdBQVcsR0FBRyx5S0FBeUssQ0FBQztJQUN4TCxRQUFRLEdBQUcsVUFBbUIsQ0FBQztJQUMvQixRQUFRLEdBQUcsU0FBUyxDQUFDO0lBQ3JCLFFBQVEsR0FBRyxLQUFjLENBQUM7SUFFMUIsS0FBSyxDQUFDLEtBQUssQ0FBQyxHQUFRLEVBQUUsVUFBa0I7UUFDdEMsOENBQThDO1FBQzlDLDJDQUEyQztRQUMzQyxPQUFPLEVBQUUsQ0FBQztJQUNaLENBQUM7Q0FDRjtBQVpELHdDQVlDIiwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTUlTUkFSdWxlLCBjcmVhdGVWaW9sYXRpb24gfSBmcm9tICcuLi8uLi9ydWxlLWVuZ2luZSc7XG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XG5pbXBvcnQgeyBWaW9sYXRpb24gfSBmcm9tICcuLi8uLi8uLi8uLi90eXBlcy9taXNyYS1hbmFseXNpcyc7XG5cbi8qKlxuICogTUlTUkEgQysrOjIwMDggUnVsZSA4LTMtMVxuICogUGFyYW1ldGVycyBpbiBhbiBvdmVycmlkaW5nIHZpcnR1YWwgZnVuY3Rpb24gc2hhbGwgZWl0aGVyIHVzZSB0aGUgc2FtZSBkZWZhdWx0IGFyZ3VtZW50cyBhcyB0aGUgZnVuY3Rpb24gdGhleSBvdmVycmlkZSwgb3IgZWxzZSBzaGFsbCBub3Qgc3BlY2lmeSBhbnkgZGVmYXVsdCBhcmd1bWVudHNcbiAqIFxuICogTk9URTogVGhpcyBpcyBhIHN0dWIgaW1wbGVtZW50YXRpb24uIEZ1bGwgaW1wbGVtZW50YXRpb24gcmVxdWlyZXM6XG4gKiAtIERldGFpbGVkIEFTVCBhbmFseXNpcyBmb3IgdGhpcyBzcGVjaWZpYyBydWxlXG4gKiAtIENvbXByZWhlbnNpdmUgdGVzdCBjYXNlc1xuICogLSBJbnRlZ3JhdGlvbiB3aXRoIHRoZSBydWxlIGVuZ2luZVxuICovXG5leHBvcnQgY2xhc3MgUnVsZV9DUFBfOF8zXzEgaW1wbGVtZW50cyBNSVNSQVJ1bGUge1xuICBpZCA9ICdNSVNSQS1DUFAtOC4zLjEnO1xuICBkZXNjcmlwdGlvbiA9ICdQYXJhbWV0ZXJzIGluIGFuIG92ZXJyaWRpbmcgdmlydHVhbCBmdW5jdGlvbiBzaGFsbCBlaXRoZXIgdXNlIHRoZSBzYW1lIGRlZmF1bHQgYXJndW1lbnRzIGFzIHRoZSBmdW5jdGlvbiB0aGV5IG92ZXJyaWRlLCBvciBlbHNlIHNoYWxsIG5vdCBzcGVjaWZ5IGFueSBkZWZhdWx0IGFyZ3VtZW50cyc7XG4gIHNldmVyaXR5ID0gJ3JlcXVpcmVkJyBhcyBjb25zdDtcbiAgY2F0ZWdvcnkgPSAnQ2xhc3Nlcyc7XG4gIGxhbmd1YWdlID0gJ0NQUCcgYXMgY29uc3Q7XG5cbiAgYXN5bmMgY2hlY2soYXN0OiBBU1QsIHNvdXJjZUNvZGU6IHN0cmluZyk6IFByb21pc2U8VmlvbGF0aW9uW10+IHtcbiAgICAvLyBTdHViIGltcGxlbWVudGF0aW9uIC0gcmV0dXJucyBubyB2aW9sYXRpb25zXG4gICAgLy8gVE9ETzogSW1wbGVtZW50IGZ1bGwgcnVsZSBjaGVja2luZyBsb2dpY1xuICAgIHJldHVybiBbXTtcbiAgfVxufVxuIl19

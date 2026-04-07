@@ -739,3 +739,364 @@ describe('Rule metadata', () => {
     }
   });
 });
+
+// ─── New rules imports ────────────────────────────────────────────────────────
+
+import { Rule_C_12_1 } from '../rules/c/rule-12-1';
+import { Rule_C_13_1 } from '../rules/c/rule-13-1';
+import { Rule_C_13_3 } from '../rules/c/rule-13-3';
+import { Rule_C_13_4 } from '../rules/c/rule-13-4';
+import { Rule_C_14_1 } from '../rules/c/rule-14-1';
+import { Rule_C_14_2 } from '../rules/c/rule-14-2';
+import { Rule_C_15_1 } from '../rules/c/rule-15-1';
+import { Rule_C_15_2 } from '../rules/c/rule-15-2';
+import { Rule_C_15_3 } from '../rules/c/rule-15-3';
+import { Rule_C_15_4 } from '../rules/c/rule-15-4';
+
+// ─── Rule 12.1: Operator precedence ──────────────────────────────────────────
+
+describe('Rule 12.1 – Operator precedence should be explicit', () => {
+  const rule = new Rule_C_12_1();
+
+  it('detects mixed arithmetic without parentheses', async () => {
+    const src = `int foo(int a, int b, int c) {
+    return a + b * c;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-12.1');
+  });
+
+  it('detects mixed bitwise without parentheses', async () => {
+    const src = `int foo(int a, int b, int c) {
+    return a | b & c;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('passes for simple arithmetic', async () => {
+    const src = `int foo(int a, int b) {
+    return a + b;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 13.1: Side effects in initializer lists ────────────────────────────
+
+describe('Rule 13.1 – Initializer lists shall not contain persistent side effects', () => {
+  const rule = new Rule_C_13_1();
+
+  it('detects comma operator with side effect in initializer', async () => {
+    const src = `void foo(int a, int b) {
+    int x = (a++, b);
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-13.1');
+  });
+
+  it('passes for normal initializer', async () => {
+    const src = `void foo(int a) {
+    int x = a;
+    int y = a + 1;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 13.3: Increment/decrement in expressions ───────────────────────────
+
+describe('Rule 13.3 – Increment/decrement should not be used in larger expressions', () => {
+  const rule = new Rule_C_13_3();
+
+  it('detects post-increment in assignment expression', async () => {
+    const src = `void foo(int a, int b) {
+    int x = a + b++;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-13.3');
+  });
+
+  it('passes for standalone increment statement', async () => {
+    const src = `void foo(int i) {
+    i++;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 13.4: Assignment in expressions ────────────────────────────────────
+
+describe('Rule 13.4 – Assignment operator result shall not be used', () => {
+  const rule = new Rule_C_13_4();
+
+  it('detects assignment in if condition', async () => {
+    const src = `void foo(int x, int y) {
+    if (x = y) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-13.4');
+  });
+
+  it('detects assignment in while condition', async () => {
+    const src = `void foo(int x, int y) {
+    while (x = y) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('passes for comparison in if condition', async () => {
+    const src = `void foo(int x, int y) {
+    if (x == y) { }
+    if (x != y) { }
+    if (x >= y) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 14.1: Float loop counter ───────────────────────────────────────────
+
+describe('Rule 14.1 – Loop counter shall not have floating-point type', () => {
+  const rule = new Rule_C_14_1();
+
+  it('detects float loop counter', async () => {
+    const src = `void foo(void) {
+    for (float f = 0.0f; f < 10.0f; f += 1.0f) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-14.1');
+  });
+
+  it('detects double loop counter', async () => {
+    const src = `void foo(void) {
+    for (double d = 0.0; d < 1.0; d += 0.1) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('passes for integer loop counter', async () => {
+    const src = `void foo(void) {
+    for (int i = 0; i < 10; i++) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 14.2: For loop structure ───────────────────────────────────────────
+
+describe('Rule 14.2 – For loop shall be well-formed', () => {
+  const rule = new Rule_C_14_2();
+
+  it('detects infinite for loop (empty clauses)', async () => {
+    const src = `void foo(void) {
+    for (;;) { break; }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-14.2');
+  });
+
+  it('detects for loop with missing init clause', async () => {
+    const src = `void foo(int i) {
+    for (; i < 10; i++) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('passes for well-formed for loop', async () => {
+    const src = `void foo(void) {
+    for (int i = 0; i < 10; i++) { }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 15.1: No goto ───────────────────────────────────────────────────────
+
+describe('Rule 15.1 – The goto statement shall not be used', () => {
+  const rule = new Rule_C_15_1();
+
+  it('detects goto statement', async () => {
+    const src = `void foo(void) {
+    goto end;
+    end:
+    return;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-15.1');
+  });
+
+  it('passes for code without goto', async () => {
+    const src = `int foo(int x) {
+    if (x > 0) {
+        return 1;
+    }
+    return 0;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 15.2: goto label scope (backward jump) ─────────────────────────────
+
+describe('Rule 15.2 – goto shall jump to a label declared later in the same function', () => {
+  const rule = new Rule_C_15_2();
+
+  it('detects backward goto jump', async () => {
+    const src = `void foo(void) {
+    start:
+    int x = 0;
+    goto start;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-15.2');
+  });
+
+  it('passes for forward goto jump', async () => {
+    const src = `void foo(void) {
+    goto end;
+    int x = 0;
+    end:
+    return;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 15.3: goto target scope ────────────────────────────────────────────
+
+describe('Rule 15.3 – goto label shall be in the same or enclosing block', () => {
+  const rule = new Rule_C_15_3();
+
+  it('detects goto jumping to label in deeper scope', async () => {
+    const src = `void foo(void) {
+    goto inner;
+    {
+        inner:
+        int x = 0;
+    }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-15.3');
+  });
+
+  it('passes for goto to label in same scope', async () => {
+    const src = `void foo(void) {
+    goto end;
+    end:
+    return;
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── Rule 15.4: Single break per loop ────────────────────────────────────────
+
+describe('Rule 15.4 – No more than one break per iteration statement', () => {
+  const rule = new Rule_C_15_4();
+
+  it('detects multiple break statements in a loop', async () => {
+    const src = `void foo(int x) {
+    for (int i = 0; i < 10; i++) {
+        if (x > 5) {
+            break;
+        }
+        if (x < 0) {
+            break;
+        }
+    }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v.length).toBeGreaterThan(0);
+    expect(v[0].ruleId).toBe('MISRA-C-15.4');
+  });
+
+  it('passes for single break in loop', async () => {
+    const src = `void foo(int x) {
+    for (int i = 0; i < 10; i++) {
+        if (x > 5) {
+            break;
+        }
+    }
+}`;
+    const ast = await parse(src);
+    const v = await rule.check(ast, ast.source);
+    expect(v).toHaveLength(0);
+  });
+});
+
+// ─── New rules metadata checks ────────────────────────────────────────────────
+
+describe('New rules metadata (12.1, 13.1, 13.3, 13.4, 14.1, 14.2, 15.1, 15.2, 15.3, 15.4)', () => {
+  const newRules = [
+    new Rule_C_12_1(), new Rule_C_13_1(), new Rule_C_13_3(), new Rule_C_13_4(),
+    new Rule_C_14_1(), new Rule_C_14_2(), new Rule_C_15_1(), new Rule_C_15_2(),
+    new Rule_C_15_3(), new Rule_C_15_4(),
+  ];
+
+  it('all new rules have required metadata fields', () => {
+    for (const rule of newRules) {
+      expect(rule.id).toMatch(/^MISRA-C-/);
+      expect(rule.description).toBeTruthy();
+      expect(['mandatory', 'required', 'advisory']).toContain(rule.severity);
+      expect(rule.category).toBeTruthy();
+      expect(rule.language).toBe('C');
+    }
+  });
+
+  it('all new rule IDs are unique', () => {
+    const ids = newRules.map(r => r.id);
+    const unique = new Set(ids);
+    expect(unique.size).toBe(ids.length);
+  });
+
+  it('all new rules implement the check() method', () => {
+    for (const rule of newRules) {
+      expect(typeof rule.check).toBe('function');
+    }
+  });
+});

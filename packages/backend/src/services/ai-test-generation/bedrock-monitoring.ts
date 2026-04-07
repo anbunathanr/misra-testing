@@ -6,7 +6,7 @@
  * **Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7**
  */
 
-import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
+import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
 
 // ============================================================================
 // Types
@@ -71,7 +71,7 @@ export class BedrockMonitoring {
         {
           MetricName: 'BedrockLatency',
           Value: data.latency,
-          Unit: 'Milliseconds',
+          Unit: 'Milliseconds' as StandardUnit,
           Timestamp: timestamp,
           Dimensions: [
             { Name: 'Operation', Value: data.operation },
@@ -82,7 +82,7 @@ export class BedrockMonitoring {
         {
           MetricName: 'BedrockTokens',
           Value: data.tokens,
-          Unit: 'Count',
+          Unit: 'Count' as StandardUnit,
           Timestamp: timestamp,
           Dimensions: [
             { Name: 'Operation', Value: data.operation },
@@ -92,7 +92,7 @@ export class BedrockMonitoring {
         {
           MetricName: 'BedrockCost',
           Value: data.cost,
-          Unit: 'None', // Cost in dollars
+          Unit: 'None' as StandardUnit, // Cost in dollars
           Timestamp: timestamp,
           Dimensions: [
             { Name: 'Operation', Value: data.operation },
@@ -105,7 +105,7 @@ export class BedrockMonitoring {
         metricData.push({
           MetricName: 'BedrockErrors',
           Value: 1,
-          Unit: 'Count',
+          Unit: 'Count' as StandardUnit,
           Timestamp: timestamp,
           Dimensions: [
             { Name: 'Operation', Value: data.operation },

@@ -55,3 +55,4 @@ playwright/.cache/
 
 # Incorrectly placed files (Windows path length issue prevents deletion)
 .git/packages/
+.vercel

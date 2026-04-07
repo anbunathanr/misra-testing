@@ -15,6 +15,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import WorkIcon from '@mui/icons-material/Work'
 import LogoutIcon from '@mui/icons-material/Logout'
+import CodeIcon from '@mui/icons-material/Code'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { logoutUser } from '../store/slices/authSlice.ts'
@@ -31,6 +32,7 @@ const menuItems = [
   { text: 'Projects', icon: <WorkIcon />, path: '/projects' },
   { text: 'Files', icon: <FolderIcon />, path: '/files' },
   { text: 'Analysis', icon: <AssessmentIcon />, path: '/analysis' },
+  { text: 'MISRA Analysis', icon: <CodeIcon />, path: '/misra-analysis' },
   { text: 'Insights', icon: <LightbulbIcon />, path: '/insights' }
 ]
 

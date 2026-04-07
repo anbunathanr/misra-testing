@@ -22,6 +22,8 @@ export interface IAIEngine {
  *
  * Creates AI engine instances based on the AI_PROVIDER environment variable.
  * Defaults to BEDROCK if not specified.
+ *
+ * Supports canary deployment with BEDROCK_TRAFFIC_PERCENTAGE for gradual rollout.
  */
 export declare class AIEngineFactory {
     /**
@@ -32,6 +34,17 @@ export declare class AIEngineFactory {
      * @throws Error if provider is unknown
      */
     static create(provider?: AIProvider): IAIEngine;
+    /**
+     * Select provider with canary deployment support
+     *
+     * Implements traffic percentage routing for gradual Bedrock rollout.
+     * When BEDROCK_TRAFFIC_PERCENTAGE is set, routes that percentage of traffic to Bedrock
+     * regardless of the AI_PROVIDER setting.
+     *
+     * @param provider - Optional provider override
+     * @returns Selected provider based on canary logic
+     */
+    private static selectProviderWithCanary;
     /**
      * Get the currently configured provider
      *

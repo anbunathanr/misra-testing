@@ -28,8 +28,6 @@ export class JWTService {
   constructor() {
     this.secretsClient = new SecretsManagerClient({
       region: process.env.AWS_REGION || 'us-east-1',
-      requestTimeout: 3000, // 3 second timeout for Secrets Manager calls
-      connectionTimeout: 3000, // 3 second connection timeout
     });
   }
 
@@ -77,7 +75,7 @@ export class JWTService {
         if (response.SecretString) {
           const secretData = JSON.parse(response.SecretString);
           cachedJwtSecret = secretData.secret || secretData;
-          return cachedJwtSecret;
+          return cachedJwtSecret as string;
         } else {
           throw new Error('No secret value found in response');
         }
@@ -85,14 +83,15 @@ export class JWTService {
         console.error('Failed to retrieve JWT secret from Secrets Manager:', error);
         
         // Check for specific AWS errors
-        if (error.name === 'AccessDeniedException') {
+        const err = error as any;
+        if (err.name === 'AccessDeniedException') {
           throw new Error('Access denied to Secrets Manager. Check IAM permissions.');
-        } else if (error.name === 'ResourceNotFoundException') {
+        } else if (err.name === 'ResourceNotFoundException') {
           throw new Error(`Secret not found: ${process.env.JWT_SECRET_NAME || 'misra-platform-jwt-secret'}`);
-        } else if (error.message.includes('timeout')) {
+        } else if (err.message && err.message.includes('timeout')) {
           throw new Error('Secrets Manager call timed out. Check network connectivity and IAM permissions.');
         } else {
-          throw new Error(`Unable to retrieve JWT secret: ${error.message}`);
+          throw new Error(`Unable to retrieve JWT secret: ${err.message}`);
         }
       } finally {
         secretFetchInProgress = null;
@@ -166,7 +165,7 @@ export class JWTService {
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         throw new Error('Refresh token expired');
-      } else if (error.message === 'Invalid refresh token') {
+      } else if (error instanceof Error && error.message === 'Invalid refresh token') {
         // Re-throw our custom error for non-refresh tokens
         throw error;
       } else {

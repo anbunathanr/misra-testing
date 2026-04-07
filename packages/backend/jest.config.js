@@ -15,16 +15,17 @@ module.exports = {
     '/node_modules/',
     '/cdk.out/',
     '/dist/',
+    'performance.test.ts',
   ],
   modulePathIgnorePatterns: [
     '<rootDir>/cdk.out/',
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
-  },
-  globals: {
-    'ts-jest': {
+    '^.+\\.ts$': ['ts-jest', {
       isolatedModules: true,
-    },
+    }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@aws-sdk)/)',
+  ],
 };

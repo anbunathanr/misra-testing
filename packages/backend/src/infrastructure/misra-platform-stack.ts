@@ -29,6 +29,7 @@ import { NotificationPreferencesTable } from './notification-preferences-table';
 import { NotificationTemplatesTable } from './notification-templates-table';
 import { NotificationHistoryTable } from './notification-history-table';
 import { AIUsageTable } from './ai-usage-table';
+import { AnalysisCacheTable } from './analysis-cache-table';
 
 export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -292,6 +293,11 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // AI Usage Table for AI Test Generation - Using existing AIUsage table
     const aiUsageTable = new AIUsageTable(this, 'AIUsageTable');
+
+    // Analysis Cache Table for MISRA analysis caching (Requirement 10.7)
+    const analysisCacheTable = new AnalysisCacheTable(this, 'AnalysisCacheTable', {
+      environment: 'dev'
+    });
 
     // SNS Topics for Notification Delivery
     const emailNotificationTopic = new sns.Topic(this, 'EmailNotificationTopic', {
@@ -1264,12 +1270,14 @@ export class MisraPlatformStack extends cdk.Stack {
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/analyze-file'),
       environment: {
-        ANALYSES_TABLE_NAME: analysesTable.tableName,
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
-        ENVIRONMENT: 'dev', // Fixed: was this.stackName
+        FILE_METADATA_TABLE: fileMetadataTable.table.tableName,
+        ANALYSIS_RESULTS_TABLE: analysisResultsTable.tableName,
+        ANALYSIS_CACHE_TABLE: analysisCacheTable.table.tableName,
+        AWS_REGION: this.region,
       },
-      timeout: cdk.Duration.minutes(5),
-      memorySize: 512,
+      timeout: cdk.Duration.minutes(5), // Requirement 10.6: Set timeout to 5 minutes
+      memorySize: 2048, // Requirement 10.4: Set memory to 2GB for AST parsing
       reservedConcurrentExecutions: 0,
     });
 
@@ -1352,9 +1360,19 @@ export class MisraPlatformStack extends cdk.Stack {
     // Grant permissions for analysis and notification functions
     analysesTable.grantReadWriteData(analysisFunction);
     analysisResultsTable.grantReadWriteData(analysisFunction);
-    fileStorageBucket.grantRead(analysisFunction);
-    fileMetadataTable.grantReadWriteData(analysisFunction);
+    fileStorageBucket.grantRead(analysisFunction); // Requirement 10.4: Grant S3 read permissions
+    fileMetadataTable.grantReadWriteData(analysisFunction); // Requirement 10.4: Grant DynamoDB read/write permissions
+    analysisCacheTable.table.grantReadWriteData(analysisFunction); // Requirement 10.7: Grant cache table permissions
     usersTable.grantReadData(notificationFunction);
+
+    // Requirement 10.4: Connect analysis Lambda to SQS queue
+    analysisFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(analysisQueue, {
+        batchSize: 1, // Process one analysis at a time
+        maxBatchingWindow: cdk.Duration.seconds(0), // No batching delay
+        reportBatchItemFailures: true, // Enable partial batch responses
+      })
+    );
 
     // Query Results Lambda Function
     const queryResultsFunction = new lambda.Function(this, 'QueryResultsFunction', {

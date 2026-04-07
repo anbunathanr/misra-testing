@@ -1,0 +1,33 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Rule_CPP_4_10_1 = void 0;
+const rule_engine_1 = require("../../rule-engine");
+/**
+ * MISRA C++:2008 Rule 4-10-1
+ * NULL shall not be used as an integer value.
+ */
+class Rule_CPP_4_10_1 {
+    id = 'MISRA-CPP-4.10.1';
+    description = 'NULL shall not be used as an integer value';
+    severity = 'required';
+    category = 'Expressions';
+    language = 'CPP';
+    async check(ast, sourceCode) {
+        const violations = [];
+        const lines = ast.lines;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith('//') || line.startsWith('#') || !line)
+                continue;
+            // NULL used in arithmetic or comparison with integers
+            if (/\bNULL\b/.test(line)) {
+                if (/NULL\s*[+\-*\/%]|[+\-*\/%]\s*NULL/.test(line) || /\bint\b.*NULL|NULL.*\bint\b/.test(line)) {
+                    violations.push((0, rule_engine_1.createViolation)(this, i + 1, 0, 'NULL used as an integer value', line));
+                }
+            }
+        }
+        return violations;
+    }
+}
+exports.Rule_CPP_4_10_1 = Rule_CPP_4_10_1;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicnVsZS00LTEwLTEuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJydWxlLTQtMTAtMS50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFBQSxtREFBK0Q7QUFJL0Q7OztHQUdHO0FBQ0gsTUFBYSxlQUFlO0lBQzFCLEVBQUUsR0FBRyxrQkFBa0IsQ0FBQztJQUN4QixXQUFXLEdBQUcsNENBQTRDLENBQUM7SUFDM0QsUUFBUSxHQUFHLFVBQW1CLENBQUM7SUFDL0IsUUFBUSxHQUFHLGFBQWEsQ0FBQztJQUN6QixRQUFRLEdBQUcsS0FBYyxDQUFDO0lBRTFCLEtBQUssQ0FBQyxLQUFLLENBQUMsR0FBUSxFQUFFLFVBQWtCO1FBQ3RDLE1BQU0sVUFBVSxHQUFnQixFQUFFLENBQUM7UUFDbkMsTUFBTSxLQUFLLEdBQUcsR0FBRyxDQUFDLEtBQUssQ0FBQztRQUV4QixLQUFLLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsS0FBSyxDQUFDLE1BQU0sRUFBRSxDQUFDLEVBQUUsRUFBRSxDQUFDO1lBQ3RDLE1BQU0sSUFBSSxHQUFHLEtBQUssQ0FBQyxDQUFDLENBQUMsQ0FBQyxJQUFJLEVBQUUsQ0FBQztZQUM3QixJQUFJLElBQUksQ0FBQyxVQUFVLENBQUMsSUFBSSxDQUFDLElBQUksSUFBSSxDQUFDLFVBQVUsQ0FBQyxHQUFHLENBQUMsSUFBSSxDQUFDLElBQUk7Z0JBQUUsU0FBUztZQUVyRSxzREFBc0Q7WUFDdEQsSUFBSSxVQUFVLENBQUMsSUFBSSxDQUFDLElBQUksQ0FBQyxFQUFFLENBQUM7Z0JBQzFCLElBQUksbUNBQW1DLENBQUMsSUFBSSxDQUFDLElBQUksQ0FBQyxJQUFJLDZCQUE2QixDQUFDLElBQUksQ0FBQyxJQUFJLENBQUMsRUFBRSxDQUFDO29CQUMvRixVQUFVLENBQUMsSUFBSSxDQUNiLElBQUEsNkJBQWUsRUFDYixJQUFJLEVBQ0osQ0FBQyxHQUFHLENBQUMsRUFDTCxDQUFDLEVBQ0QsK0JBQStCLEVBQy9CLElBQUksQ0FDTCxDQUNGLENBQUM7Z0JBQ0osQ0FBQztZQUNILENBQUM7UUFDSCxDQUFDO1FBRUQsT0FBTyxVQUFVLENBQUM7SUFDcEIsQ0FBQztDQUNGO0FBakNELDBDQWlDQyIsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IE1JU1JBUnVsZSwgY3JlYXRlVmlvbGF0aW9uIH0gZnJvbSAnLi4vLi4vcnVsZS1lbmdpbmUnO1xyXG5pbXBvcnQgeyBBU1QgfSBmcm9tICcuLi8uLi9jb2RlLXBhcnNlcic7XHJcbmltcG9ydCB7IFZpb2xhdGlvbiB9IGZyb20gJy4uLy4uLy4uLy4uL3R5cGVzL21pc3JhLWFuYWx5c2lzJztcclxuXHJcbi8qKlxyXG4gKiBNSVNSQSBDKys6MjAwOCBSdWxlIDQtMTAtMVxyXG4gKiBOVUxMIHNoYWxsIG5vdCBiZSB1c2VkIGFzIGFuIGludGVnZXIgdmFsdWUuXHJcbiAqL1xyXG5leHBvcnQgY2xhc3MgUnVsZV9DUFBfNF8xMF8xIGltcGxlbWVudHMgTUlTUkFSdWxlIHtcclxuICBpZCA9ICdNSVNSQS1DUFAtNC4xMC4xJztcclxuICBkZXNjcmlwdGlvbiA9ICdOVUxMIHNoYWxsIG5vdCBiZSB1c2VkIGFzIGFuIGludGVnZXIgdmFsdWUnO1xyXG4gIHNldmVyaXR5ID0gJ3JlcXVpcmVkJyBhcyBjb25zdDtcclxuICBjYXRlZ29yeSA9ICdFeHByZXNzaW9ucyc7XHJcbiAgbGFuZ3VhZ2UgPSAnQ1BQJyBhcyBjb25zdDtcclxuXHJcbiAgYXN5bmMgY2hlY2soYXN0OiBBU1QsIHNvdXJjZUNvZGU6IHN0cmluZyk6IFByb21pc2U8VmlvbGF0aW9uW10+IHtcclxuICAgIGNvbnN0IHZpb2xhdGlvbnM6IFZpb2xhdGlvbltdID0gW107XHJcbiAgICBjb25zdCBsaW5lcyA9IGFzdC5saW5lcztcclxuXHJcbiAgICBmb3IgKGxldCBpID0gMDsgaSA8IGxpbmVzLmxlbmd0aDsgaSsrKSB7XHJcbiAgICAgIGNvbnN0IGxpbmUgPSBsaW5lc1tpXS50cmltKCk7XHJcbiAgICAgIGlmIChsaW5lLnN0YXJ0c1dpdGgoJy8vJykgfHwgbGluZS5zdGFydHNXaXRoKCcjJykgfHwgIWxpbmUpIGNvbnRpbnVlO1xyXG5cclxuICAgICAgLy8gTlVMTCB1c2VkIGluIGFyaXRobWV0aWMgb3IgY29tcGFyaXNvbiB3aXRoIGludGVnZXJzXHJcbiAgICAgIGlmICgvXFxiTlVMTFxcYi8udGVzdChsaW5lKSkge1xyXG4gICAgICAgIGlmICgvTlVMTFxccypbK1xcLSpcXC8lXXxbK1xcLSpcXC8lXVxccypOVUxMLy50ZXN0KGxpbmUpIHx8IC9cXGJpbnRcXGIuKk5VTEx8TlVMTC4qXFxiaW50XFxiLy50ZXN0KGxpbmUpKSB7XHJcbiAgICAgICAgICB2aW9sYXRpb25zLnB1c2goXHJcbiAgICAgICAgICAgIGNyZWF0ZVZpb2xhdGlvbihcclxuICAgICAgICAgICAgICB0aGlzLFxyXG4gICAgICAgICAgICAgIGkgKyAxLFxyXG4gICAgICAgICAgICAgIDAsXHJcbiAgICAgICAgICAgICAgJ05VTEwgdXNlZCBhcyBhbiBpbnRlZ2VyIHZhbHVlJyxcclxuICAgICAgICAgICAgICBsaW5lXHJcbiAgICAgICAgICAgIClcclxuICAgICAgICAgICk7XHJcbiAgICAgICAgfVxyXG4gICAgICB9XHJcbiAgICB9XHJcblxyXG4gICAgcmV0dXJuIHZpb2xhdGlvbnM7XHJcbiAgfVxyXG59XHJcbiJdfQ==

@@ -65,37 +65,7 @@ export const filesApi = api.injectEndpoints({
       }
     }),
     getFiles: builder.query<FileMetadata[], void>({
-      queryFn: async () => {
-        // Mock data for demo
-        return {
-          data: [
-            {
-              file_id: 'file-001',
-              user_id: 'user-123',
-              filename: 'app.js',
-              file_type: 'javascript',
-              file_size: 2048,
-              upload_timestamp: Math.floor(Date.now() / 1000) - 3600,
-              analysis_status: 'completed',
-              s3_key: 's3://bucket/app.js',
-              created_at: Math.floor(Date.now() / 1000) - 3600,
-              updated_at: Math.floor(Date.now() / 1000),
-            },
-            {
-              file_id: 'file-002',
-              user_id: 'user-123',
-              filename: 'utils.ts',
-              file_type: 'typescript',
-              file_size: 1024,
-              upload_timestamp: Math.floor(Date.now() / 1000) - 7200,
-              analysis_status: 'completed',
-              s3_key: 's3://bucket/utils.ts',
-              created_at: Math.floor(Date.now() / 1000) - 7200,
-              updated_at: Math.floor(Date.now() / 1000),
-            },
-          ],
-        };
-      },
+      query: () => '/files',
       providesTags: ['File']
     })
   })

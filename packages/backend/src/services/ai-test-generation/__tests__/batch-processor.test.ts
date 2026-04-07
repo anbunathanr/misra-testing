@@ -1,17 +1,20 @@
 import { BatchProcessor } from '../batch-processor';
 import { ApplicationAnalyzer } from '../application-analyzer';
 import { TestGenerator } from '../test-generator';
+import { AIEngineFactory } from '../ai-engine-factory';
 import { ApplicationAnalysis, BatchResult } from '../../../types/ai-test-generation';
 import { TestCase } from '../../../types/test-case';
 
 // Mock dependencies
 jest.mock('../application-analyzer');
 jest.mock('../test-generator');
+jest.mock('../ai-engine-factory');
 
 describe('BatchProcessor', () => {
   let batchProcessor: BatchProcessor;
   let mockAnalyzer: jest.Mocked<ApplicationAnalyzer>;
   let mockGenerator: jest.Mocked<TestGenerator>;
+  let mockAIEngine: any;
 
   const mockAnalysis: ApplicationAnalysis = {
     url: 'https://example.com',
@@ -41,16 +44,50 @@ describe('BatchProcessor', () => {
     updatedAt: Date.now(),
   };
 
+  const mockTestSpecification = {
+    testName: 'Test Login',
+    description: 'Test user login functionality',
+    steps: [
+      {
+        action: 'navigate',
+        description: 'Navigate to login page',
+      },
+      {
+        action: 'type',
+        description: 'Enter username',
+        elementDescription: 'username input',
+        value: 'testuser',
+      },
+      {
+        action: 'click',
+        description: 'Click login button',
+        elementDescription: 'login button',
+      },
+    ],
+    tags: ['login'],
+  };
+
   beforeEach(() => {
     // jest.mock() already replaces the constructors, so we can instantiate directly
     mockAnalyzer = new (ApplicationAnalyzer as any)() as jest.Mocked<ApplicationAnalyzer>;
     mockGenerator = new (TestGenerator as any)() as jest.Mocked<TestGenerator>;
+
+    // Mock AI Engine
+    mockAIEngine = {
+      generateTestSpecification: jest.fn().mockResolvedValue(mockTestSpecification),
+    };
+
+    // Mock AIEngineFactory.create()
+    (AIEngineFactory.create as jest.Mock) = jest.fn().mockReturnValue(mockAIEngine);
 
     // Create batch processor with mocks
     batchProcessor = new BatchProcessor(mockAnalyzer, mockGenerator);
 
     // Reset mocks
     jest.clearAllMocks();
+    
+    // Re-setup the AI engine mock after clearing
+    (AIEngineFactory.create as jest.Mock).mockReturnValue(mockAIEngine);
   });
 
   describe('generateBatch', () => {
@@ -62,6 +99,7 @@ describe('BatchProcessor', () => {
       ];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockResolvedValue(mockTestCase);
 
       const result = await batchProcessor.generateBatch(
@@ -75,6 +113,9 @@ describe('BatchProcessor', () => {
       // Verify analysis was called once
       expect(mockAnalyzer.analyze).toHaveBeenCalledTimes(1);
       expect(mockAnalyzer.analyze).toHaveBeenCalledWith('https://example.com', undefined);
+
+      // Verify AI engine was called for each scenario
+      expect(mockAIEngine.generateTestSpecification).toHaveBeenCalledTimes(3);
 
       // Verify generator was called for each scenario
       expect(mockGenerator.generate).toHaveBeenCalledTimes(3);
@@ -97,6 +138,7 @@ describe('BatchProcessor', () => {
       ];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       
       // First generation succeeds, second fails, third succeeds
       mockGenerator.generate
@@ -190,6 +232,7 @@ describe('BatchProcessor', () => {
       ];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockResolvedValue(mockTestCase);
 
       // Create batch processor with concurrency limit of 2
@@ -221,6 +264,7 @@ describe('BatchProcessor', () => {
       };
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockResolvedValue(mockTestCase);
 
       await batchProcessor.generateBatch(
@@ -239,6 +283,7 @@ describe('BatchProcessor', () => {
       const scenarios = ['Test scenario'];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockRejectedValue(new Error('Detailed error message'));
 
       const result = await batchProcessor.generateBatch(
@@ -258,6 +303,7 @@ describe('BatchProcessor', () => {
       const scenarios = ['Test scenario'];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockRejectedValue('String error');
 
       const result = await batchProcessor.generateBatch(
@@ -280,6 +326,7 @@ describe('BatchProcessor', () => {
       ];
 
       mockAnalyzer.analyze.mockResolvedValue(mockAnalysis);
+      mockAIEngine.generateTestSpecification.mockResolvedValue(mockTestSpecification);
       mockGenerator.generate.mockResolvedValue(mockTestCase);
 
       const result = await batchProcessor.generateBatch(
@@ -292,6 +339,9 @@ describe('BatchProcessor', () => {
 
       // Analysis should be called only once
       expect(mockAnalyzer.analyze).toHaveBeenCalledTimes(1);
+
+      // AI engine should be called for each scenario
+      expect(mockAIEngine.generateTestSpecification).toHaveBeenCalledTimes(3);
 
       // Generator should be called for each scenario
       expect(mockGenerator.generate).toHaveBeenCalledTimes(3);

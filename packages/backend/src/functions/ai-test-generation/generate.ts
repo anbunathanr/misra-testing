@@ -147,6 +147,7 @@ export const handler = async (
       'generate',
       tokensUsed,
       'gpt-4',
+      'OPENAI',
       1,
       0
     );

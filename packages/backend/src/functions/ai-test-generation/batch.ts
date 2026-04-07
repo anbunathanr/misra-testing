@@ -160,6 +160,7 @@ export const handler = async (
       'batch',
       tokensUsed,
       'gpt-4',
+      'OPENAI',
       results.summary.succeeded,
       0
     );

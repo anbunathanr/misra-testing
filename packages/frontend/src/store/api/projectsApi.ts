@@ -29,43 +29,7 @@ export interface UpdateProjectInput {
 export const projectsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getProjects: builder.query<TestProject[], void>({
-      queryFn: async () => {
-        // Mock data for demo
-        return {
-          data: [
-            {
-              projectId: 'proj-001',
-              userId: 'user-123',
-              name: 'E-Commerce Platform',
-              description: 'Test automation for e-commerce website',
-              targetUrl: 'https://example-ecommerce.com',
-              environment: 'dev',
-              createdAt: Math.floor(Date.now() / 1000) - 86400,
-              updatedAt: Math.floor(Date.now() / 1000),
-            },
-            {
-              projectId: 'proj-002',
-              userId: 'user-123',
-              name: 'Social Media App',
-              description: 'Test automation for social platform',
-              targetUrl: 'https://example-social.com',
-              environment: 'staging',
-              createdAt: Math.floor(Date.now() / 1000) - 172800,
-              updatedAt: Math.floor(Date.now() / 1000),
-            },
-            {
-              projectId: 'proj-003',
-              userId: 'user-123',
-              name: 'Banking Portal',
-              description: 'Test automation for banking application',
-              targetUrl: 'https://example-banking.com',
-              environment: 'production',
-              createdAt: Math.floor(Date.now() / 1000) - 259200,
-              updatedAt: Math.floor(Date.now() / 1000),
-            },
-          ],
-        };
-      },
+      query: () => '/projects',
       providesTags: ['Projects'],
     }),
     getProject: builder.query<TestProject, string>({

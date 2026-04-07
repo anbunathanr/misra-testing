@@ -1,15 +1,73 @@
 import { RuleEngine } from '../../rule-engine';
 import { Rule_C_1_1 } from './rule-1-1';
 import { Rule_C_2_1 } from './rule-2-1';
+import { Rule_C_2_2 } from './rule-2-2';
+import { Rule_C_2_3 } from './rule-2-3';
+import { Rule_C_2_4 } from './rule-2-4';
+import { Rule_C_2_5 } from './rule-2-5';
+import { Rule_C_2_6 } from './rule-2-6';
+import { Rule_C_2_7 } from './rule-2-7';
+import { Rule_C_3_1 } from './rule-3-1';
+import { Rule_C_3_2 } from './rule-3-2';
+import { Rule_C_4_1 } from './rule-4-1';
+import { Rule_C_4_2 } from './rule-4-2';
+import { Rule_C_5_1 } from './rule-5-1';
+import { Rule_C_5_2 } from './rule-5-2';
+import { Rule_C_5_3 } from './rule-5-3';
+import { Rule_C_5_4 } from './rule-5-4';
+import { Rule_C_5_5 } from './rule-5-5';
+import { Rule_C_6_1 } from './rule-6-1';
+import { Rule_C_6_2 } from './rule-6-2';
+import { Rule_C_7_1 } from './rule-7-1';
+import { Rule_C_7_2 } from './rule-7-2';
+import { Rule_C_7_3 } from './rule-7-3';
+import { Rule_C_7_4 } from './rule-7-4';
 import { Rule_C_8_1 } from './rule-8-1';
 import { Rule_C_8_2 } from './rule-8-2';
+import { Rule_C_8_3 } from './rule-8-3';
 import { Rule_C_8_4 } from './rule-8-4';
+import { Rule_C_8_5 } from './rule-8-5';
+import { Rule_C_8_6 } from './rule-8-6';
+import { Rule_C_8_7 } from './rule-8-7';
+import { Rule_C_8_8 } from './rule-8-8';
+import { Rule_C_8_9 } from './rule-8-9';
+import { Rule_C_8_10 } from './rule-8-10';
+import { Rule_C_8_11 } from './rule-8-11';
+import { Rule_C_8_12 } from './rule-8-12';
+import { Rule_C_8_13 } from './rule-8-13';
+import { Rule_C_8_14 } from './rule-8-14';
 import { Rule_C_9_1 } from './rule-9-1';
+import { Rule_C_9_2 } from './rule-9-2';
+import { Rule_C_9_3 } from './rule-9-3';
+import { Rule_C_9_4 } from './rule-9-4';
+import { Rule_C_9_5 } from './rule-9-5';
 import { Rule_C_10_1 } from './rule-10-1';
+import { Rule_C_10_2 } from './rule-10-2';
 import { Rule_C_10_3 } from './rule-10-3';
+import { Rule_C_10_4 } from './rule-10-4';
+import { Rule_C_10_5 } from './rule-10-5';
+import { Rule_C_10_6 } from './rule-10-6';
+import { Rule_C_10_7 } from './rule-10-7';
+import { Rule_C_10_8 } from './rule-10-8';
 import { Rule_C_11_1 } from './rule-11-1';
+import { Rule_C_11_2 } from './rule-11-2';
 import { Rule_C_11_3 } from './rule-11-3';
+import { Rule_C_11_4 } from './rule-11-4';
+import { Rule_C_11_5 } from './rule-11-5';
+import { Rule_C_11_6 } from './rule-11-6';
+import { Rule_C_11_7 } from './rule-11-7';
+import { Rule_C_11_8 } from './rule-11-8';
+import { Rule_C_12_1 } from './rule-12-1';
+import { Rule_C_13_1 } from './rule-13-1';
+import { Rule_C_13_3 } from './rule-13-3';
+import { Rule_C_13_4 } from './rule-13-4';
+import { Rule_C_14_1 } from './rule-14-1';
+import { Rule_C_14_2 } from './rule-14-2';
 import { Rule_C_14_4 } from './rule-14-4';
+import { Rule_C_15_1 } from './rule-15-1';
+import { Rule_C_15_2 } from './rule-15-2';
+import { Rule_C_15_3 } from './rule-15-3';
+import { Rule_C_15_4 } from './rule-15-4';
 import { Rule_C_15_5 } from './rule-15-5';
 import { Rule_C_16_3 } from './rule-16-3';
 import { Rule_C_17_7 } from './rule-17-7';
@@ -19,19 +77,152 @@ import { Rule_C_21_3 } from './rule-21-3';
 import { Rule_C_21_6 } from './rule-21-6';
 import { Rule_C_22_1 } from './rule-22-1';
 import { Rule_C_22_2 } from './rule-22-2';
+import { Rule_C_12_2 } from './rule-12-2';
+import { Rule_C_12_3 } from './rule-12-3';
+import { Rule_C_12_4 } from './rule-12-4';
+import { Rule_C_13_2 } from './rule-13-2';
+import { Rule_C_13_5 } from './rule-13-5';
+import { Rule_C_13_6 } from './rule-13-6';
+import { Rule_C_14_3 } from './rule-14-3';
+import { Rule_C_16_1 } from './rule-16-1';
+import { Rule_C_16_2 } from './rule-16-2';
+import { Rule_C_16_4 } from './rule-16-4';
+import { Rule_C_16_5 } from './rule-16-5';
+import { Rule_C_16_6 } from './rule-16-6';
+import { Rule_C_16_7 } from './rule-16-7';
+import { Rule_C_17_1 } from './rule-17-1';
+import { Rule_C_17_2 } from './rule-17-2';
+import { Rule_C_17_3 } from './rule-17-3';
+import {
+  Rule_C_12_5,
+  Rule_C_13_7,
+  Rule_C_15_6,
+  Rule_C_15_7,
+  Rule_C_17_4,
+  Rule_C_17_5,
+  Rule_C_17_6,
+  Rule_C_17_8,
+  Rule_C_18_1,
+  Rule_C_18_2,
+  Rule_C_18_3,
+  Rule_C_18_4,
+  Rule_C_18_5,
+  Rule_C_18_6,
+  Rule_C_18_7,
+  Rule_C_18_8,
+  Rule_C_19_1,
+  Rule_C_19_2,
+  Rule_C_20_1,
+  Rule_C_20_2,
+  Rule_C_20_3,
+  Rule_C_20_5,
+  Rule_C_20_6,
+  Rule_C_20_7,
+  Rule_C_20_8,
+  Rule_C_20_10,
+  Rule_C_20_11,
+  Rule_C_20_12,
+  Rule_C_20_13,
+  Rule_C_20_14,
+  Rule_C_21_1,
+  Rule_C_21_2,
+  Rule_C_21_4,
+  Rule_C_21_5,
+  Rule_C_21_7,
+  Rule_C_21_8,
+  Rule_C_21_9,
+  Rule_C_21_10,
+  Rule_C_21_11,
+  Rule_C_21_12,
+  Rule_C_21_13,
+  Rule_C_21_14,
+  Rule_C_21_15,
+  Rule_C_21_16,
+  Rule_C_21_17,
+  Rule_C_21_18,
+  Rule_C_21_19,
+  Rule_C_21_20,
+  Rule_C_21_21,
+  Rule_C_22_3,
+  Rule_C_22_4,
+  Rule_C_22_5,
+  Rule_C_22_6,
+  Rule_C_22_7,
+  Rule_C_22_8,
+  Rule_C_22_9,
+  Rule_C_22_10,
+} from './rule-stubs';
 
 export {
   Rule_C_1_1,
   Rule_C_2_1,
+  Rule_C_2_2,
+  Rule_C_2_3,
+  Rule_C_2_4,
+  Rule_C_2_5,
+  Rule_C_2_6,
+  Rule_C_2_7,
+  Rule_C_3_1,
+  Rule_C_3_2,
+  Rule_C_4_1,
+  Rule_C_4_2,
+  Rule_C_5_1,
+  Rule_C_5_2,
+  Rule_C_5_3,
+  Rule_C_5_4,
+  Rule_C_5_5,
+  Rule_C_6_1,
+  Rule_C_6_2,
+  Rule_C_7_1,
+  Rule_C_7_2,
+  Rule_C_7_3,
+  Rule_C_7_4,
   Rule_C_8_1,
   Rule_C_8_2,
+  Rule_C_8_3,
   Rule_C_8_4,
+  Rule_C_8_5,
+  Rule_C_8_6,
+  Rule_C_8_7,
+  Rule_C_8_8,
+  Rule_C_8_9,
+  Rule_C_8_10,
+  Rule_C_8_11,
+  Rule_C_8_12,
+  Rule_C_8_13,
+  Rule_C_8_14,
   Rule_C_9_1,
+  Rule_C_9_2,
+  Rule_C_9_3,
+  Rule_C_9_4,
+  Rule_C_9_5,
   Rule_C_10_1,
+  Rule_C_10_2,
   Rule_C_10_3,
+  Rule_C_10_4,
+  Rule_C_10_5,
+  Rule_C_10_6,
+  Rule_C_10_7,
+  Rule_C_10_8,
   Rule_C_11_1,
+  Rule_C_11_2,
   Rule_C_11_3,
+  Rule_C_11_4,
+  Rule_C_11_5,
+  Rule_C_11_6,
+  Rule_C_11_7,
+  Rule_C_11_8,
+  Rule_C_12_1,
+  Rule_C_13_1,
+  Rule_C_13_3,
+  Rule_C_13_4,
+  Rule_C_14_1,
+  Rule_C_14_2,
   Rule_C_14_4,
+  Rule_C_15_1,
+  Rule_C_15_2,
+  Rule_C_15_3,
+  Rule_C_15_4,
   Rule_C_15_5,
   Rule_C_16_3,
   Rule_C_17_7,
@@ -41,20 +232,151 @@ export {
   Rule_C_21_6,
   Rule_C_22_1,
   Rule_C_22_2,
+  Rule_C_12_2,
+  Rule_C_12_3,
+  Rule_C_12_4,
+  Rule_C_13_2,
+  Rule_C_13_5,
+  Rule_C_13_6,
+  Rule_C_14_3,
+  Rule_C_16_1,
+  Rule_C_16_2,
+  Rule_C_16_4,
+  Rule_C_16_5,
+  Rule_C_16_6,
+  Rule_C_16_7,
+  Rule_C_17_1,
+  Rule_C_17_2,
+  Rule_C_17_3,
+  Rule_C_12_5,
+  Rule_C_13_7,
+  Rule_C_15_6,
+  Rule_C_15_7,
+  Rule_C_17_4,
+  Rule_C_17_5,
+  Rule_C_17_6,
+  Rule_C_17_8,
+  Rule_C_18_1,
+  Rule_C_18_2,
+  Rule_C_18_3,
+  Rule_C_18_4,
+  Rule_C_18_5,
+  Rule_C_18_6,
+  Rule_C_18_7,
+  Rule_C_18_8,
+  Rule_C_19_1,
+  Rule_C_19_2,
+  Rule_C_20_1,
+  Rule_C_20_2,
+  Rule_C_20_3,
+  Rule_C_20_5,
+  Rule_C_20_6,
+  Rule_C_20_7,
+  Rule_C_20_8,
+  Rule_C_20_10,
+  Rule_C_20_11,
+  Rule_C_20_12,
+  Rule_C_20_13,
+  Rule_C_20_14,
+  Rule_C_21_1,
+  Rule_C_21_2,
+  Rule_C_21_4,
+  Rule_C_21_5,
+  Rule_C_21_7,
+  Rule_C_21_8,
+  Rule_C_21_9,
+  Rule_C_21_10,
+  Rule_C_21_11,
+  Rule_C_21_12,
+  Rule_C_21_13,
+  Rule_C_21_14,
+  Rule_C_21_15,
+  Rule_C_21_16,
+  Rule_C_21_17,
+  Rule_C_21_18,
+  Rule_C_21_19,
+  Rule_C_21_20,
+  Rule_C_21_21,
+  Rule_C_22_3,
+  Rule_C_22_4,
+  Rule_C_22_5,
+  Rule_C_22_6,
+  Rule_C_22_7,
+  Rule_C_22_8,
+  Rule_C_22_9,
+  Rule_C_22_10,
 };
 
 export const ALL_MISRA_C_RULES = [
   new Rule_C_1_1(),
   new Rule_C_2_1(),
+  new Rule_C_2_2(),
+  new Rule_C_2_3(),
+  new Rule_C_2_4(),
+  new Rule_C_2_5(),
+  new Rule_C_2_6(),
+  new Rule_C_2_7(),
+  new Rule_C_3_1(),
+  new Rule_C_3_2(),
+  new Rule_C_4_1(),
+  new Rule_C_4_2(),
+  new Rule_C_5_1(),
+  new Rule_C_5_2(),
+  new Rule_C_5_3(),
+  new Rule_C_5_4(),
+  new Rule_C_5_5(),
+  new Rule_C_6_1(),
+  new Rule_C_6_2(),
+  new Rule_C_7_1(),
+  new Rule_C_7_2(),
+  new Rule_C_7_3(),
+  new Rule_C_7_4(),
   new Rule_C_8_1(),
   new Rule_C_8_2(),
+  new Rule_C_8_3(),
   new Rule_C_8_4(),
+  new Rule_C_8_5(),
+  new Rule_C_8_6(),
+  new Rule_C_8_7(),
+  new Rule_C_8_8(),
+  new Rule_C_8_9(),
+  new Rule_C_8_10(),
+  new Rule_C_8_11(),
+  new Rule_C_8_12(),
+  new Rule_C_8_13(),
+  new Rule_C_8_14(),
   new Rule_C_9_1(),
+  new Rule_C_9_2(),
+  new Rule_C_9_3(),
+  new Rule_C_9_4(),
+  new Rule_C_9_5(),
   new Rule_C_10_1(),
+  new Rule_C_10_2(),
   new Rule_C_10_3(),
+  new Rule_C_10_4(),
+  new Rule_C_10_5(),
+  new Rule_C_10_6(),
+  new Rule_C_10_7(),
+  new Rule_C_10_8(),
   new Rule_C_11_1(),
+  new Rule_C_11_2(),
   new Rule_C_11_3(),
+  new Rule_C_11_4(),
+  new Rule_C_11_5(),
+  new Rule_C_11_6(),
+  new Rule_C_11_7(),
+  new Rule_C_11_8(),
+  new Rule_C_12_1(),
+  new Rule_C_13_1(),
+  new Rule_C_13_3(),
+  new Rule_C_13_4(),
+  new Rule_C_14_1(),
+  new Rule_C_14_2(),
   new Rule_C_14_4(),
+  new Rule_C_15_1(),
+  new Rule_C_15_2(),
+  new Rule_C_15_3(),
+  new Rule_C_15_4(),
   new Rule_C_15_5(),
   new Rule_C_16_3(),
   new Rule_C_17_7(),
@@ -64,6 +386,79 @@ export const ALL_MISRA_C_RULES = [
   new Rule_C_21_6(),
   new Rule_C_22_1(),
   new Rule_C_22_2(),
+  new Rule_C_12_2(),
+  new Rule_C_12_3(),
+  new Rule_C_12_4(),
+  new Rule_C_13_2(),
+  new Rule_C_13_5(),
+  new Rule_C_13_6(),
+  new Rule_C_14_3(),
+  new Rule_C_16_1(),
+  new Rule_C_16_2(),
+  new Rule_C_16_4(),
+  new Rule_C_16_5(),
+  new Rule_C_16_6(),
+  new Rule_C_16_7(),
+  new Rule_C_17_1(),
+  new Rule_C_17_2(),
+  new Rule_C_17_3(),
+  new Rule_C_12_5(),
+  new Rule_C_13_7(),
+  new Rule_C_15_6(),
+  new Rule_C_15_7(),
+  new Rule_C_17_4(),
+  new Rule_C_17_5(),
+  new Rule_C_17_6(),
+  new Rule_C_17_8(),
+  new Rule_C_18_1(),
+  new Rule_C_18_2(),
+  new Rule_C_18_3(),
+  new Rule_C_18_4(),
+  new Rule_C_18_5(),
+  new Rule_C_18_6(),
+  new Rule_C_18_7(),
+  new Rule_C_18_8(),
+  new Rule_C_19_1(),
+  new Rule_C_19_2(),
+  new Rule_C_20_1(),
+  new Rule_C_20_2(),
+  new Rule_C_20_3(),
+  new Rule_C_20_5(),
+  new Rule_C_20_6(),
+  new Rule_C_20_7(),
+  new Rule_C_20_8(),
+  new Rule_C_20_10(),
+  new Rule_C_20_11(),
+  new Rule_C_20_12(),
+  new Rule_C_20_13(),
+  new Rule_C_20_14(),
+  new Rule_C_21_1(),
+  new Rule_C_21_2(),
+  new Rule_C_21_4(),
+  new Rule_C_21_5(),
+  new Rule_C_21_7(),
+  new Rule_C_21_8(),
+  new Rule_C_21_9(),
+  new Rule_C_21_10(),
+  new Rule_C_21_11(),
+  new Rule_C_21_12(),
+  new Rule_C_21_13(),
+  new Rule_C_21_14(),
+  new Rule_C_21_15(),
+  new Rule_C_21_16(),
+  new Rule_C_21_17(),
+  new Rule_C_21_18(),
+  new Rule_C_21_19(),
+  new Rule_C_21_20(),
+  new Rule_C_21_21(),
+  new Rule_C_22_3(),
+  new Rule_C_22_4(),
+  new Rule_C_22_5(),
+  new Rule_C_22_6(),
+  new Rule_C_22_7(),
+  new Rule_C_22_8(),
+  new Rule_C_22_9(),
+  new Rule_C_22_10(),
 ];
 
 /**
