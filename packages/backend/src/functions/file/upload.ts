@@ -75,38 +75,43 @@ export const handler = async (
     // Generate presigned upload URL
     const uploadResponse = await fileUploadService.generatePresignedUploadUrl(fileUploadRequest);
 
+    // Build the s3Key once so it's consistent between metadata and SQS message
+    const s3Key = uploadResponse.s3Key;
+    const language = (ext === '.c' || ext === '.h') ? 'C' : 'CPP';
+
     // Create FileMetadata record
     try {
-      const now = Math.floor(Date.now() / 1000); // Convert to seconds
+      const now = Math.floor(Date.now() / 1000);
       await fileMetadataService.createFileMetadata({
         file_id: uploadResponse.fileId,
         filename: uploadRequest.fileName,
         file_type: uploadRequest.fileName.endsWith('.c') ? FileType.C : FileType.CPP,
         file_size: uploadRequest.fileSize,
-        user_id: user.userId, // Use user ID as-is from context
+        user_id: user.userId,
         upload_timestamp: now,
         analysis_status: AnalysisStatus.PENDING,
-        s3_key: `uploads/${user.organizationId}/${user.userId}/${Date.now()}-${uploadResponse.fileId}-${uploadRequest.fileName}`,
+        s3_key: s3Key,
         created_at: now,
         updated_at: now
       });
       console.log(`FileMetadata record created for file ${uploadResponse.fileId}`);
     } catch (metadataError) {
       console.error('Error creating FileMetadata record:', metadataError);
-      // Don't fail the upload if metadata creation fails
     }
 
     // Trigger MISRA analysis via SQS (Requirement 6.1)
     const analysisQueueUrl = process.env.ANALYSIS_QUEUE_URL;
     if (analysisQueueUrl) {
-      const language = (ext === '.c' || ext === '.h') ? 'C' : 'CPP';
       try {
         await sqsClient.send(new SendMessageCommand({
           QueueUrl: analysisQueueUrl,
           MessageBody: JSON.stringify({
             fileId: uploadResponse.fileId,
-            userId: user.userId,
+            fileName: uploadRequest.fileName,
+            s3Key,
             language,
+            userId: user.userId,
+            organizationId: user.organizationId || 'default-org',
           }),
         }));
         console.log(`Analysis queued for file ${uploadResponse.fileId}, language: ${language}`);

@@ -30,6 +30,12 @@ export const projectsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getProjects: builder.query<TestProject[], void>({
       query: () => '/projects',
+      transformResponse: (response: any): TestProject[] => {
+        // Backend returns { projects: [] } or an array directly
+        if (Array.isArray(response)) return response
+        if (response?.projects && Array.isArray(response.projects)) return response.projects
+        return []
+      },
       providesTags: ['Projects'],
     }),
     getProject: builder.query<TestProject, string>({

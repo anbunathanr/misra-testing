@@ -22,7 +22,7 @@ const initialState: AuthState = {
   user: null,
   token: null,
   isAuthenticated: false,
-  loading: false,
+  loading: true,  // start true so ProtectedRoute waits for checkAuth
   error: null,
 };
 
@@ -163,7 +163,11 @@ const authSlice = createSlice({
     });
 
     // Check auth
+    builder.addCase(checkAuth.pending, (state) => {
+      state.loading = true;
+    });
     builder.addCase(checkAuth.fulfilled, (state, action) => {
+      state.loading = false;
       state.user = {
         id: action.payload.user.sub,
         userId: action.payload.user.sub,
@@ -174,6 +178,7 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
     });
     builder.addCase(checkAuth.rejected, (state) => {
+      state.loading = false;
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;

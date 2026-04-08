@@ -53,14 +53,60 @@ interface MISRAAnalysisListItem {
 export const misraAnalysisApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getMISRAAnalysisResults: builder.query<MISRAAnalysisResult, string>({
-      query: (fileId) => `/analysis/results/${fileId}`,
+      // Route /analysis/results/{fileId} doesn't exist — use /analysis/query?fileId=...
+      query: (fileId) => ({ url: '/analysis/query', params: { fileId } }),
+      transformResponse: (response: any, _meta, fileId): MISRAAnalysisResult => {
+        const results = Array.isArray(response) ? response : (response?.results ?? [])
+        const item = results[0]
+        if (!item) {
+          return {
+            analysisId: '', fileId, userId: '', organizationId: '', fileName: '',
+            language: 'C', standard: 'MISRA-C:2012', status: 'PENDING',
+            violations: [], summary: { totalViolations: 0, criticalCount: 0, majorCount: 0, minorCount: 0, compliancePercentage: 100 },
+            rulesChecked: 0, created_at: Date.now()
+          }
+        }
+        return {
+          analysisId: item.analysisId ?? '',
+          fileId: item.fileId ?? fileId,
+          userId: item.userId ?? '',
+          organizationId: item.organizationId ?? '',
+          fileName: item.fileName ?? '',
+          language: item.language ?? 'C',
+          standard: item.ruleSet ?? 'MISRA-C:2012',
+          status: item.success === false ? 'FAILED' : 'COMPLETED',
+          violations: item.violations ?? [],
+          summary: {
+            totalViolations: item.violationsCount ?? item.violations?.length ?? 0,
+            criticalCount: 0, majorCount: 0, minorCount: 0,
+            compliancePercentage: 100
+          },
+          rulesChecked: item.rulesChecked ?? 0,
+          created_at: item.timestamp ?? Date.now()
+        }
+      },
       providesTags: (_result, _error, fileId) => [{ type: 'MISRAAnalysis', id: fileId }]
     }),
     
     listMISRAAnalyses: builder.query<MISRAAnalysisListItem[], { userId: string; limit?: number }>({
-      queryFn: async () => {
-        // Returns empty until user uploads files and analyses complete
-        return { data: [] }
+      query: ({ userId, limit = 50 }) => ({
+        url: '/analysis/query',
+        params: { userId, limit }
+      }),
+      transformResponse: (response: any): MISRAAnalysisListItem[] => {
+        const results = Array.isArray(response) ? response : (response?.results ?? [])
+        return results.map((item: any) => ({
+          analysisId: item.analysisId ?? '',
+          fileId: item.fileId ?? '',
+          fileName: item.fileName ?? '',
+          language: item.language ?? 'C',
+          standard: item.ruleSet ?? item.standard ?? 'MISRA-C:2012',
+          status: item.success === false ? 'FAILED' : 'COMPLETED',
+          totalViolations: item.violationsCount ?? item.violations?.length ?? 0,
+          compliancePercentage: item.compliancePercentage ?? 100,
+          completionTimestamp: item.timestamp,
+          created_at: item.timestamp ? Math.floor(item.timestamp / 1000) : Math.floor(Date.now() / 1000),
+        }))
       },
       providesTags: ['MISRAAnalysis']
     }),

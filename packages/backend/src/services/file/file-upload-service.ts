@@ -13,6 +13,7 @@ export interface FileUploadRequest {
 
 export interface FileUploadResponse {
   fileId: string;
+  s3Key: string;
   uploadUrl: string;
   downloadUrl: string;
   expiresIn: number;
@@ -93,6 +94,7 @@ export class FileUploadService {
 
       return {
         fileId,
+        s3Key,
         uploadUrl,
         downloadUrl,
         expiresIn: 3600,

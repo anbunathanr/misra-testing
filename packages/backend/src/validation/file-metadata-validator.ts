@@ -210,8 +210,8 @@ export class FileMetadataValidator implements IFileMetadataValidator {
       return false
     }
 
-    // Allow alphanumeric characters and hyphens, 3-32 characters
-    const userIdRegex = /^[a-zA-Z0-9-]{3,32}$/
+    // Allow alphanumeric + hyphens up to 128 chars (covers Cognito sub UUIDs and custom IDs)
+    const userIdRegex = /^[a-zA-Z0-9-_@.]{3,128}$/
     return userIdRegex.test(userId)
   }
 
