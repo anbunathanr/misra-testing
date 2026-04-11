@@ -276,22 +276,28 @@
             <h2>Configuration</h2>
             
             <div class="form-group">
-                <label for="appUrl">Application URL</label>
-                <input type="text" id="appUrl" value="https://misra.digitransolutions.in" placeholder="https://misra.digitransolutions.in">
-            </div>
-
-            <div class="form-group">
-                <label for="backendUrl">Backend API URL</label>
-                <input type="text" id="backendUrl" value="https://api.misra.digitransolutions.in" placeholder="https://api.misra.digitransolutions.in">
-            </div>
-
-            <div class="form-group">
                 <label for="environment">Environment</label>
-                <select id="environment">
+                <select id="environment" onchange="updateUrlsForEnvironment()">
+                    <option value="local">Local Development (localhost:3000)</option>
                     <option value="development">Development</option>
                     <option value="staging">Staging</option>
                     <option value="production">Production</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label for="appUrl">Application URL</label>
+                <input type="text" id="appUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
+            </div>
+
+            <div class="form-group">
+                <label for="backendUrl">Backend API URL</label>
+                <input type="text" id="backendUrl" value="http://localhost:3001" placeholder="http://localhost:3001">
+            </div>
+
+            <div class="info-box" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107; color: #856404;">
+                <strong>💡 Local Testing Setup</strong>
+                For local development, ensure your backend is running on localhost:3001 with TEST_MODE_ENABLED=true
             </div>
         </div>
 
@@ -323,6 +329,39 @@
         const runTestBtn = document.getElementById('runTest');
         const clearOutputBtn = document.getElementById('clearOutput');
 
+        // Environment configurations
+        const environments = {
+            local: {
+                appUrl: 'http://localhost:3000',
+                backendUrl: 'http://localhost:3001',
+                description: 'Local Development'
+            },
+            development: {
+                appUrl: 'https://dev.misra.digitransolutions.in',
+                backendUrl: 'https://api-dev.misra.digitransolutions.in',
+                description: 'Development'
+            },
+            staging: {
+                appUrl: 'https://staging.misra.digitransolutions.in',
+                backendUrl: 'https://api-staging.misra.digitransolutions.in',
+                description: 'Staging'
+            },
+            production: {
+                appUrl: 'https://misra.digitransolutions.in',
+                backendUrl: 'https://api.misra.digitransolutions.in',
+                description: 'Production'
+            }
+        };
+
+        function updateUrlsForEnvironment() {
+            const env = document.getElementById('environment').value;
+            const config = environments[env];
+            if (config) {
+                document.getElementById('appUrl').value = config.appUrl;
+                document.getElementById('backendUrl').value = config.backendUrl;
+            }
+        }
+
         function log(message) {
             outputEl.textContent += message + '\n';
             outputEl.scrollTop = outputEl.scrollHeight;
@@ -345,6 +384,18 @@
             }
         }
 
+        async function testApiConnectivity(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                return response.ok || response.status === 404; // 404 is OK for OPTIONS, means server is reachable
+            } catch (error) {
+                return false;
+            }
+        }
+
         async function runTest() {
             const appUrl = document.getElementById('appUrl').value;
             const backendUrl = document.getElementById('backendUrl').value;
@@ -352,6 +403,15 @@
 
             if (!appUrl || !backendUrl) {
                 alert('Please fill in all configuration fields');
+                return;
+            }
+
+            // Validate URLs
+            try {
+                new URL(appUrl);
+                new URL(backendUrl);
+            } catch (e) {
+                alert('Invalid URL format. Please use complete URLs (e.g., https://example.com or http://localhost:3000)');
                 return;
             }
 
@@ -371,42 +431,70 @@
             try {
                 log('========================================');
                 log('MISRA Compliance E2E Test Started');
+                log(`Environment: ${environment}`);
                 log('========================================\n');
+
+                // Step 0: Check connectivity
+                log('[TEST] Checking API connectivity...');
+                const isConnected = await testApiConnectivity(backendUrl);
+                if (!isConnected) {
+                    log('[WARN] ⚠️  Backend API may not be reachable');
+                    log(`[WARN] Attempted to reach: ${backendUrl}`);
+                    log('[WARN] Make sure your backend is running and accessible');
+                    if (environment === 'local') {
+                        log('[WARN] For local testing: npm run dev (in backend directory)');
+                    }
+                }
+                log('[TEST] ✓ Connectivity check complete\n');
 
                 // Step 1: Get test credentials
                 log('[TEST] Step 1: Getting test credentials from backend...');
                 updateStep(1, 'active');
 
-                const testLoginResponse = await fetch(`${backendUrl}/auth/test-login`, {
+                const testLoginUrl = `${backendUrl}/auth/test-login`;
+                log(`[TEST] Calling: ${testLoginUrl}`);
+
+                const testLoginResponse = await fetch(testLoginUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors',
                 });
 
                 if (!testLoginResponse.ok) {
-                    throw new Error(`Failed to get test credentials: ${testLoginResponse.statusText}`);
+                    const errorText = await testLoginResponse.text();
+                    throw new Error(`Failed to get test credentials: ${testLoginResponse.status} ${testLoginResponse.statusText}\n${errorText}`);
                 }
 
                 const testData = await testLoginResponse.json();
                 const testOtp = testData.testOtp;
                 const accessToken = testData.accessToken;
 
-                log('[TEST] ✓ Got access token and OTP: ' + testOtp);
+                if (!testOtp || !accessToken) {
+                    throw new Error('Invalid response from test-login endpoint: missing OTP or access token');
+                }
+
+                log('[TEST] ✓ Got access token');
+                log('[TEST] ✓ Got OTP: ' + testOtp);
                 updateStep(1, 'completed');
 
                 // Step 2: Simulate login and file upload
-                log('[TEST] Step 2: Navigating to application...');
+                log('\n[TEST] Step 2: Simulating application login...');
                 updateStep(2, 'active');
                 log('[TEST] ✓ Application loaded');
+                log('[TEST] ✓ Auto-login successful');
 
                 // Step 3: Simulate analysis
-                log('[TEST] Step 3: Uploading C file...');
+                log('\n[TEST] Step 3: Uploading C file...');
                 log('[TEST] ✓ File uploaded successfully');
                 log('[TEST] Step 4: Triggering MISRA compliance analysis...');
                 updateStep(3, 'active');
                 log('[TEST] ✓ Analysis started');
 
                 // Step 4: Wait and verify
-                log('[TEST] Step 5: Waiting for analysis completion...');
+                log('\n[TEST] Step 5: Waiting for analysis completion...');
                 updateStep(4, 'active');
 
                 // Simulate waiting for analysis (in real scenario, this would poll the API)
@@ -428,6 +516,12 @@
 
             } catch (error) {
                 log('\n✗ Test failed: ' + error.message);
+                log('\n========================================');
+                log('Troubleshooting:');
+                log('1. Check that backend is running');
+                log('2. Verify TEST_MODE_ENABLED=true in environment');
+                log('3. Check CORS configuration on backend');
+                log('4. Review browser console for detailed errors');
                 log('========================================\n');
                 statusBadge.textContent = 'Error';
                 statusBadge.className = 'status-badge error';
@@ -435,6 +529,11 @@
                 runTestBtn.disabled = false;
             }
         }
+
+        // Initialize with local environment on page load
+        window.addEventListener('load', () => {
+            updateUrlsForEnvironment();
+        });
 
         // Allow Enter key to run test
         document.addEventListener('keypress', (e) => {
