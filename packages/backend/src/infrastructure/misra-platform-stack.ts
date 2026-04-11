@@ -1274,7 +1274,6 @@ export class MisraPlatformStack extends cdk.Stack {
         FILE_METADATA_TABLE: fileMetadataTable.table.tableName,
         ANALYSIS_RESULTS_TABLE: analysisResultsTable.tableName,
         ANALYSIS_CACHE_TABLE: analysisCacheTable.table.tableName,
-        AWS_REGION: this.region,
       },
       timeout: cdk.Duration.minutes(5), // Requirement 10.6: Set timeout to 5 minutes
       memorySize: 2048, // Requirement 10.4: Set memory to 2GB for AST parsing

@@ -33,17 +33,29 @@ console.log(`Building ${functionDirs.length} Lambda functions...\n`);
 const buildPromises = [];
 
 functionDirs.forEach(dir => {
+  console.log(`Processing function directory: ${dir}`);
   const functionPath = path.join(FUNCTIONS_DIR, dir);
   const files = fs.readdirSync(functionPath);
   
   // Find handler files (*.ts files that export handler)
   const handlers = files.filter(f => f.endsWith('.ts') && !f.includes('.test') && !f.includes('.spec'));
   
+  if (handlers.length > 0) {
+    console.log(`  Found ${handlers.length} handler file(s): ${handlers.join(', ')}`);
+  }
+  
   handlers.forEach(handler => {
     const handlerName = handler.replace('.ts', '');
     const outputDir = path.join(DIST_DIR, dir, handlerName);
     const zipDir = path.join(ZIP_DIR, dir, handlerName);
     const entryPoint = path.join(functionPath, handler);
+    
+    console.log(`  Output directory: ${outputDir}`);
+    
+    // Special logging for upload.ts
+    if (handler === 'upload.ts') {
+      console.log(`  ✓ upload.ts is included in the build process`);
+    }
     
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });

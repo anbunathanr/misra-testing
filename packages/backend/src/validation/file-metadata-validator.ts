@@ -45,7 +45,7 @@ export class FileMetadataValidator implements IFileMetadataValidator {
     if (metadata.user_id !== undefined && !this.validateUserId(metadata.user_id)) {
       errors.push({
         field: 'user_id',
-        message: 'user_id must be a valid user identifier',
+        message: 'user_id must be 3-128 characters and contain only alphanumeric, hyphen, underscore, @, or dot characters',
         code: ErrorCodes.VALIDATION_ERROR
       })
     }

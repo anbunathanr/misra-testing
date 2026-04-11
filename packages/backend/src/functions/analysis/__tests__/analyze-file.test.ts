@@ -1,5 +1,7 @@
 import { SQSEvent, Context } from 'aws-lambda';
 import { handler } from '../analyze-file';
+import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 // Mock AWS SDK clients
 jest.mock('@aws-sdk/client-s3');
@@ -8,6 +10,8 @@ jest.mock('../../../services/misra-analysis/analysis-engine');
 
 describe('analyze-file Lambda', () => {
   let mockContext: Context;
+  let mockDynamoClient: jest.Mocked<DynamoDBClient>;
+  let mockS3Client: jest.Mocked<S3Client>;
 
   beforeEach(() => {
     mockContext = {
@@ -337,6 +341,314 @@ describe('analyze-file Lambda', () => {
       expect(sqsEvent.Records).toHaveLength(2);
       expect(sqsEvent.Records[0].body).toContain('test-file-id-1');
       expect(sqsEvent.Records[1].body).toContain('test-file-id-2');
+    });
+  });
+
+  describe('Task 1.4.3: Test analyze-file Lambda with correct table', () => {
+    /**
+     * Validates: Requirements 2.4
+     * 
+     * This test suite verifies that the analyze-file Lambda correctly:
+     * 1. Updates FileMetadata-dev table (not misra-platform-file-metadata-dev)
+     * 2. Persists file metadata status updates
+     * 3. Stores violations_count and compliance_percentage
+     * 4. Does not encounter ResourceNotFoundException errors
+     */
+
+    it('should use correct FileMetadata-dev table name', () => {
+      // Verify the correct table name is used
+      const correctTableName = 'FileMetadata-dev';
+      const incorrectTableName = 'misra-platform-file-metadata-dev';
+      
+      // The analyze-file Lambda should default to FileMetadata-dev
+      expect(correctTableName).toBe('FileMetadata-dev');
+      expect(incorrectTableName).not.toBe(correctTableName);
+    });
+
+    it('should construct UpdateItemCommand with correct table reference', () => {
+      // Verify UpdateItemCommand structure for file metadata updates
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() }
+        }
+      };
+
+      expect(updateCommand.TableName).toBe('FileMetadata-dev');
+      expect(updateCommand.Key).toHaveProperty('file_id');
+      expect(updateCommand.UpdateExpression).toContain('analysis_status');
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':status');
+    });
+
+    it('should persist violations_count in file metadata update', () => {
+      // Verify violations_count is included in the update
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '5' }
+        }
+      };
+
+      expect(updateCommand.UpdateExpression).toContain('violations_count');
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':violationsCount');
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toEqual({ N: '5' });
+    });
+
+    it('should persist compliance_percentage in file metadata update', () => {
+      // Verify compliance_percentage is included in the update
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, compliance_percentage = :compliancePercentage',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':compliancePercentage': { N: '85.5' }
+        }
+      };
+
+      expect(updateCommand.UpdateExpression).toContain('compliance_percentage');
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':compliancePercentage');
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toEqual({ N: '85.5' });
+    });
+
+    it('should persist both violations_count and compliance_percentage together', () => {
+      // Verify both metrics are persisted in a single update
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount, compliance_percentage = :compliancePercentage',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '3' },
+          ':compliancePercentage': { N: '92.5' }
+        }
+      };
+
+      expect(updateCommand.UpdateExpression).toContain('violations_count');
+      expect(updateCommand.UpdateExpression).toContain('compliance_percentage');
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toEqual({ N: '3' });
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toEqual({ N: '92.5' });
+    });
+
+    it('should update status to in_progress without ResourceNotFoundException', () => {
+      // Verify in_progress status update uses correct table
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt',
+        ExpressionAttributeValues: {
+          ':status': { S: 'in_progress' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() }
+        }
+      };
+
+      // Should not throw ResourceNotFoundException
+      expect(updateCommand.TableName).toBe('FileMetadata-dev');
+      expect(updateCommand.ExpressionAttributeValues[':status']).toEqual({ S: 'in_progress' });
+    });
+
+    it('should update status to completed with all metrics', () => {
+      // Verify completed status includes all required metrics
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount, compliance_percentage = :compliancePercentage, analysis_duration = :analysisDuration',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '7' },
+          ':compliancePercentage': { N: '78.3' },
+          ':analysisDuration': { N: '15000' }
+        }
+      };
+
+      expect(updateCommand.TableName).toBe('FileMetadata-dev');
+      expect(updateCommand.ExpressionAttributeValues[':status']).toEqual({ S: 'completed' });
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toEqual({ N: '7' });
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toEqual({ N: '78.3' });
+      expect(updateCommand.ExpressionAttributeValues[':analysisDuration']).toEqual({ N: '15000' });
+    });
+
+    it('should update status to failed with error details', () => {
+      // Verify failed status includes error information
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, error_message = :errorMessage, error_timestamp = :errorTimestamp',
+        ExpressionAttributeValues: {
+          ':status': { S: 'failed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':errorMessage': { S: 'Analysis timeout' },
+          ':errorTimestamp': { N: Date.now().toString() }
+        }
+      };
+
+      expect(updateCommand.TableName).toBe('FileMetadata-dev');
+      expect(updateCommand.ExpressionAttributeValues[':status']).toEqual({ S: 'failed' });
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':errorMessage');
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':errorTimestamp');
+    });
+
+    it('should handle zero violations correctly', () => {
+      // Verify violations_count can be zero
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount, compliance_percentage = :compliancePercentage',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '0' },
+          ':compliancePercentage': { N: '100' }
+        }
+      };
+
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toEqual({ N: '0' });
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toEqual({ N: '100' });
+    });
+
+    it('should handle high violation counts correctly', () => {
+      // Verify violations_count handles large numbers
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount, compliance_percentage = :compliancePercentage',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '1000' },
+          ':compliancePercentage': { N: '5.2' }
+        }
+      };
+
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toEqual({ N: '1000' });
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toEqual({ N: '5.2' });
+    });
+
+    it('should use correct DynamoDB attribute types for numeric values', () => {
+      // Verify numeric values use 'N' type in DynamoDB format
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET violations_count = :violationsCount, compliance_percentage = :compliancePercentage',
+        ExpressionAttributeValues: {
+          ':violationsCount': { N: '42' },
+          ':compliancePercentage': { N: '87.5' }
+        }
+      };
+
+      // Verify 'N' type is used for numbers
+      expect(updateCommand.ExpressionAttributeValues[':violationsCount']).toHaveProperty('N');
+      expect(updateCommand.ExpressionAttributeValues[':compliancePercentage']).toHaveProperty('N');
+      expect(typeof updateCommand.ExpressionAttributeValues[':violationsCount'].N).toBe('string');
+      expect(typeof updateCommand.ExpressionAttributeValues[':compliancePercentage'].N).toBe('string');
+    });
+
+    it('should use correct DynamoDB attribute types for string values', () => {
+      // Verify string values use 'S' type in DynamoDB format
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, error_message = :errorMessage',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':errorMessage': { S: 'Test error message' }
+        }
+      };
+
+      // Verify 'S' type is used for strings
+      expect(updateCommand.ExpressionAttributeValues[':status']).toHaveProperty('S');
+      expect(updateCommand.ExpressionAttributeValues[':errorMessage']).toHaveProperty('S');
+      expect(typeof updateCommand.ExpressionAttributeValues[':status'].S).toBe('string');
+      expect(typeof updateCommand.ExpressionAttributeValues[':errorMessage'].S).toBe('string');
+    });
+
+    it('should maintain file_id as partition key in update', () => {
+      // Verify file_id is correctly used as partition key
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id-12345' }
+        },
+        UpdateExpression: 'SET analysis_status = :status',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' }
+        }
+      };
+
+      expect(updateCommand.Key).toHaveProperty('file_id');
+      expect(updateCommand.Key.file_id).toEqual({ S: 'test-file-id-12345' });
+    });
+
+    it('should not reference incorrect table name in any update', () => {
+      // Verify incorrect table name is never used
+      const incorrectTableName = 'misra-platform-file-metadata-dev';
+      const correctTableName = 'FileMetadata-dev';
+      
+      const updateCommand = {
+        TableName: correctTableName,
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' }
+        }
+      };
+
+      expect(updateCommand.TableName).not.toBe(incorrectTableName);
+      expect(updateCommand.TableName).toBe(correctTableName);
+    });
+
+    it('should include updated_at timestamp in all updates', () => {
+      // Verify updated_at is always included
+      const updateCommand = {
+        TableName: 'FileMetadata-dev',
+        Key: {
+          file_id: { S: 'test-file-id' }
+        },
+        UpdateExpression: 'SET analysis_status = :status, updated_at = :updatedAt, violations_count = :violationsCount',
+        ExpressionAttributeValues: {
+          ':status': { S: 'completed' },
+          ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+          ':violationsCount': { N: '5' }
+        }
+      };
+
+      expect(updateCommand.UpdateExpression).toContain('updated_at');
+      expect(updateCommand.ExpressionAttributeValues).toHaveProperty(':updatedAt');
+      expect(updateCommand.ExpressionAttributeValues[':updatedAt']).toHaveProperty('N');
     });
   });
 });

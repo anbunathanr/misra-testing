@@ -242,4 +242,104 @@ describe('upload handler', () => {
     expect(mockSQSSend).toHaveBeenCalled();
     delete process.env.ANALYSIS_QUEUE_URL;
   });
+
+  it('includes all required fields in SQS message (Requirement 2.3)', async () => {
+    process.env.ANALYSIS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123/misra-analysis-queue';
+    
+    mockGeneratePresignedUploadUrl.mockResolvedValue({
+      fileId: 'file-123',
+      s3Key: 'uploads/org-456/user-123/1234567890-file-123-main.cpp',
+      uploadUrl: 'https://s3.example.com/upload',
+      downloadUrl: 'https://s3.example.com/download',
+      expiresIn: 3600,
+    });
+
+    const event = buildEvent({
+      httpMethod: 'POST',
+      body: JSON.stringify({ fileName: 'main.cpp', fileSize: 1024, contentType: 'text/plain' }),
+    });
+
+    const result = await uploadHandler(event);
+    expect(result.statusCode).toBe(200);
+
+    // Verify SQS message was sent with all required fields
+    expect(mockSQSSend).toHaveBeenCalled();
+    
+    // Get the SendMessageCommand that was passed to SQS
+    const sendMessageCall = mockSQSSend.mock.calls[0][0];
+    const messageBody = JSON.parse(sendMessageCall.MessageBody);
+
+    // Verify all required fields are present
+    expect(messageBody).toHaveProperty('fileId', 'file-123');
+    expect(messageBody).toHaveProperty('fileName', 'main.cpp');
+    expect(messageBody).toHaveProperty('s3Key', 'uploads/org-456/user-123/1234567890-file-123-main.cpp');
+    expect(messageBody).toHaveProperty('language', 'CPP');
+    expect(messageBody).toHaveProperty('userId', 'user-123');
+    expect(messageBody).toHaveProperty('organizationId', 'org-456');
+
+    delete process.env.ANALYSIS_QUEUE_URL;
+  });
+
+  it('derives language correctly from file extension', async () => {
+    process.env.ANALYSIS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123/misra-analysis-queue';
+    
+    const testCases = [
+      { fileName: 'test.c', expectedLanguage: 'C' },
+      { fileName: 'test.h', expectedLanguage: 'C' },
+      { fileName: 'test.cpp', expectedLanguage: 'CPP' },
+      { fileName: 'test.hpp', expectedLanguage: 'CPP' },
+    ];
+
+    for (const testCase of testCases) {
+      mockGeneratePresignedUploadUrl.mockResolvedValue({
+        fileId: 'file-123',
+        s3Key: `uploads/org-456/user-123/1234567890-file-123-${testCase.fileName}`,
+        uploadUrl: 'https://s3.example.com/upload',
+        downloadUrl: 'https://s3.example.com/download',
+        expiresIn: 3600,
+      });
+
+      const event = buildEvent({
+        httpMethod: 'POST',
+        body: JSON.stringify({ fileName: testCase.fileName, fileSize: 1024, contentType: 'text/plain' }),
+      });
+
+      const result = await uploadHandler(event);
+      expect(result.statusCode).toBe(200);
+
+      const sendMessageCall = mockSQSSend.mock.calls[mockSQSSend.mock.calls.length - 1][0];
+      const messageBody = JSON.parse(sendMessageCall.MessageBody);
+      expect(messageBody.language).toBe(testCase.expectedLanguage);
+    }
+
+    delete process.env.ANALYSIS_QUEUE_URL;
+  });
+
+  it('uses consistent s3Key between FileMetadata and SQS message', async () => {
+    process.env.ANALYSIS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/123/misra-analysis-queue';
+    
+    const expectedS3Key = 'uploads/org-456/user-123/1234567890-file-123-main.cpp';
+    mockGeneratePresignedUploadUrl.mockResolvedValue({
+      fileId: 'file-123',
+      s3Key: expectedS3Key,
+      uploadUrl: 'https://s3.example.com/upload',
+      downloadUrl: 'https://s3.example.com/download',
+      expiresIn: 3600,
+    });
+
+    const event = buildEvent({
+      httpMethod: 'POST',
+      body: JSON.stringify({ fileName: 'main.cpp', fileSize: 1024, contentType: 'text/plain' }),
+    });
+
+    const result = await uploadHandler(event);
+    expect(result.statusCode).toBe(200);
+
+    // Verify SQS message has the same s3Key
+    const sendMessageCall = mockSQSSend.mock.calls[0][0];
+    const messageBody = JSON.parse(sendMessageCall.MessageBody);
+    expect(messageBody.s3Key).toBe(expectedS3Key);
+
+    delete process.env.ANALYSIS_QUEUE_URL;
+  });
 });

@@ -37,7 +37,18 @@ export const timestampGenerator = (): fc.Arbitrary<number> => {
 }
 
 export const userIdGenerator = (): fc.Arbitrary<string> =>
-  fc.stringMatching(/^[a-zA-Z0-9]{8,32}$/)
+  fc.oneof(
+    // Cognito sub UUIDs (36 chars with hyphens)
+    fc.tuple(
+      fc.hexaString({ minLength: 8, maxLength: 8 }),
+      fc.hexaString({ minLength: 4, maxLength: 4 }),
+      fc.hexaString({ minLength: 4, maxLength: 4 }),
+      fc.hexaString({ minLength: 4, maxLength: 4 }),
+      fc.hexaString({ minLength: 12, maxLength: 12 })
+    ).map(([a, b, c, d, e]) => `${a}-${b}-${c}-${d}-${e}`),
+    // Custom user IDs (3-128 chars with alphanumeric, hyphen, underscore, @, dot)
+    fc.stringMatching(/^[a-zA-Z0-9-_@.]{3,128}$/)
+  )
 
 export const s3KeyGenerator = (): fc.Arbitrary<string> =>
   fc.tuple(

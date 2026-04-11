@@ -8,8 +8,8 @@ import { CostTracker } from '../../services/misra-analysis/cost-tracker';
 
 const bucketName = process.env.FILE_STORAGE_BUCKET_NAME || '';
 const region = process.env.AWS_REGION || 'us-east-1';
-const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'misra-platform-file-metadata-dev';
-const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'misra-platform-analysis-results';
+const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'FileMetadata-dev';
+const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults-dev';
 
 const s3Client = new S3Client({ region });
 const dynamoClient = new DynamoDBClient({ region });

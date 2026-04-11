@@ -11,14 +11,16 @@ import {
   ListItemText,
   ListItemIcon,
   IconButton,
-  Chip
+  Chip,
+  CircularProgress
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import DeleteIcon from '@mui/icons-material/Delete'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
-import { useGetUploadUrlMutation, useUploadToS3Mutation } from '../store/api/filesApi'
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
+import { useGetUploadUrlMutation, useUploadToS3Mutation, useGetFilesQuery } from '../store/api/filesApi'
 
 interface FileUploadItem {
   file: File
@@ -33,6 +35,7 @@ function FileUpload() {
   const [dragActive, setDragActive] = useState(false)
   const [getUploadUrl] = useGetUploadUrlMutation()
   const [uploadToS3] = useUploadToS3Mutation()
+  const { data: backendFiles = [], isLoading: isLoadingFiles, refetch: refetchFiles } = useGetFilesQuery()
 
   const allowedExtensions = ['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx']
   const maxFileSize = 50 * 1024 * 1024 // 50MB
@@ -121,6 +124,9 @@ function FileUpload() {
             : f
         )
       )
+
+      // Refresh backend file list after successful upload
+      await refetchFiles()
     } catch (error) {
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -155,6 +161,31 @@ function FileUpload() {
   const pendingCount = files.filter((f) => f.status === 'pending').length
   const successCount = files.filter((f) => f.status === 'success').length
   const errorCount = files.filter((f) => f.status === 'error').length
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircleIcon sx={{ color: 'success.main' }} />
+      case 'pending':
+        return <HourglassEmptyIcon sx={{ color: 'warning.main' }} />
+      case 'in_progress':
+        return <CircularProgress size={24} />
+      case 'failed':
+        return <ErrorIcon sx={{ color: 'error.main' }} />
+      default:
+        return <InsertDriveFileIcon />
+    }
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString()
+  }
 
   return (
     <Box>
@@ -199,7 +230,7 @@ function FileUpload() {
         <Box sx={{ mt: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">
-              Files ({files.length})
+              Local Files ({files.length})
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               {successCount > 0 && (
@@ -282,6 +313,63 @@ function FileUpload() {
               </ListItem>
             ))}
           </List>
+        </Box>
+      )}
+
+      {backendFiles && backendFiles.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Uploaded Files ({backendFiles.length})
+            </Typography>
+            {isLoadingFiles && <CircularProgress size={24} />}
+          </Box>
+
+          <List>
+            {backendFiles.map((file) => (
+              <ListItem key={file.file_id}>
+                <ListItemIcon>
+                  {getStatusIcon(file.analysis_status)}
+                </ListItemIcon>
+                <ListItemText
+                  primary={file.filename}
+                  secondary={
+                    <Box sx={{ display: 'flex', gap: 2, mt: 1, alignItems: 'center' }}>
+                      <Typography variant="caption">
+                        {formatFileSize(file.file_size)}
+                      </Typography>
+                      <Typography variant="caption">
+                        {formatDate(file.upload_timestamp)}
+                      </Typography>
+                      <Chip
+                        label={file.analysis_status}
+                        size="small"
+                        color={
+                          file.analysis_status === 'completed'
+                            ? 'success'
+                            : file.analysis_status === 'pending'
+                            ? 'warning'
+                            : file.analysis_status === 'in_progress'
+                            ? 'info'
+                            : file.analysis_status === 'failed'
+                            ? 'error'
+                            : 'default'
+                        }
+                      />
+                    </Box>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      )}
+
+      {!isLoadingFiles && backendFiles.length === 0 && files.length === 0 && (
+        <Box sx={{ mt: 3, p: 2, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            No files uploaded yet. Start by selecting files above.
+          </Typography>
         </Box>
       )}
     </Box>

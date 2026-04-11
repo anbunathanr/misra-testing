@@ -7,6 +7,7 @@ export interface FileUploadRequest {
 }
 export interface FileUploadResponse {
     fileId: string;
+    s3Key: string;
     uploadUrl: string;
     downloadUrl: string;
     expiresIn: number;
