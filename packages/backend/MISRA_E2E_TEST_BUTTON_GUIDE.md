@@ -24,65 +24,76 @@ The `test-button.html` file provides a single-click automated testing interface 
 
 ## Setup Instructions
 
-### Option 1: Local Development Testing (Recommended)
+### Option 1: Test Against Deployed Backend (Recommended)
+
+This is the easiest approach - test against your development, staging, or production environment.
 
 #### Prerequisites
-- Node.js and npm installed
-- Backend running locally with test mode enabled
-
-#### Step 1: Start Backend with Test Mode
-
-```bash
-cd packages/backend
-
-# Set environment variables
-$env:TEST_MODE_ENABLED = "true"
-$env:ENVIRONMENT = "development"
-$env:COGNITO_USER_POOL_ID = "your-pool-id"
-$env:COGNITO_CLIENT_ID = "your-client-id"
-
-# Start backend on port 3001
-npm run dev -- --port 3001
-```
-
-#### Step 2: Open Test Button
-
-```bash
-# Option A: Open directly in browser
-# Navigate to: file:///path/to/packages/backend/test-button.html
-
-# Option B: Use a local server (recommended to avoid CORS issues)
-cd packages/backend
-npx http-server -p 8080
-# Then navigate to: http://localhost:8080/test-button.html
-```
-
-#### Step 3: Run Test
-
-1. Select "Local Development (localhost:3000)" from Environment dropdown
-2. URLs should auto-populate:
-   - Application URL: `http://localhost:3000`
-   - Backend API URL: `http://localhost:3001`
-3. Click "▶ Run Test" button
-4. Monitor output for success or errors
-
-### Option 2: Staging/Production Testing
+- Backend deployed to AWS with test mode enabled
+- Internet connection to reach deployed backend
 
 #### Step 1: Open Test Button
 
 ```bash
-# Use a local server to avoid CORS issues
 cd packages/backend
 npx http-server -p 8080
 # Navigate to: http://localhost:8080/test-button.html
 ```
 
-#### Step 2: Configure Environment
+#### Step 2: Select Environment
 
-1. Select "Staging" or "Production" from Environment dropdown
-2. URLs will auto-populate with correct endpoints
-3. Ensure backend has TEST_MODE_ENABLED=true in that environment
-4. Click "▶ Run Test" button
+1. Open the test button in your browser
+2. Select "Development", "Staging", or "Production" from Environment dropdown
+3. URLs auto-populate with correct endpoints
+4. Verify backend has TEST_MODE_ENABLED=true in that environment
+
+#### Step 3: Run Test
+
+1. Click "▶ Run Test" button
+2. Monitor output for success or errors
+
+### Option 2: Test Against Local Backend (Advanced)
+
+For local development and testing without deploying to AWS.
+
+#### Prerequisites
+- Node.js and npm installed
+- AWS CDK installed and configured
+- AWS credentials configured locally
+
+#### Step 1: Build Backend
+
+```bash
+cd packages/backend
+npm run build
+npm run synth
+```
+
+#### Step 2: Deploy Locally or to AWS
+
+Option A - Deploy to AWS (recommended for testing):
+```bash
+npm run deploy
+```
+
+Option B - Run Lambda locally (requires SAM CLI):
+```bash
+sam local start-api
+```
+
+#### Step 3: Open Test Button
+
+```bash
+cd packages/backend
+npx http-server -p 8080
+# Navigate to: http://localhost:8080/test-button.html
+```
+
+#### Step 4: Configure for Local
+
+1. Select "Local Development (localhost:3000)" from Environment dropdown
+2. Update Backend API URL to your local endpoint (e.g., http://localhost:3001)
+3. Click "▶ Run Test" button
 
 ## Environment Configurations
 
@@ -90,13 +101,13 @@ npx http-server -p 8080
 - **Application URL**: `http://localhost:3000`
 - **Backend API URL**: `http://localhost:3001`
 - **Use Case**: Local development and testing
-- **Requirements**: Backend running locally with TEST_MODE_ENABLED=true
+- **Requirements**: Backend deployed locally via CDK or SAM CLI
 
 ### Development
 - **Application URL**: `https://dev.misra.digitransolutions.in`
 - **Backend API URL**: `https://api-dev.misra.digitransolutions.in`
 - **Use Case**: Development environment testing
-- **Requirements**: Deployed to dev environment
+- **Requirements**: Deployed to dev environment with TEST_MODE_ENABLED=true
 
 ### Staging
 - **Application URL**: `https://staging.misra.digitransolutions.in`

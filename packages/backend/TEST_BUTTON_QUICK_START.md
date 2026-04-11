@@ -2,25 +2,45 @@
 
 ## TL;DR - Get Running Now
 
-### 1. Start Backend (Terminal 1)
-```bash
-cd packages/backend
-$env:TEST_MODE_ENABLED = "true"
-$env:ENVIRONMENT = "development"
-npm run dev -- --port 3001
-```
+### Option A: Test Against Deployed Backend (Recommended)
 
-### 2. Open Test Button (Terminal 2)
-```bash
-cd packages/backend
-npx http-server -p 8080
-# Then open: http://localhost:8080/test-button.html
-```
+1. **Open Test Button**
+   ```bash
+   cd packages/backend
+   npx http-server -p 8080
+   # Then open: http://localhost:8080/test-button.html
+   ```
 
-### 3. Run Test
-1. Environment dropdown should show "Local Development (localhost:3000)"
-2. Click "▶ Run Test" button
-3. Watch the output for success/failure
+2. **Select Environment**
+   - Choose "Development", "Staging", or "Production" from dropdown
+   - URLs auto-populate with correct endpoints
+   - Ensure backend has TEST_MODE_ENABLED=true in that environment
+
+3. **Run Test**
+   - Click "▶ Run Test" button
+   - Watch the output for success/failure
+
+### Option B: Test Against Local Backend (Advanced)
+
+1. **Build Backend**
+   ```bash
+   cd packages/backend
+   npm run build
+   npm run synth
+   npm run deploy
+   ```
+
+2. **Open Test Button**
+   ```bash
+   cd packages/backend
+   npx http-server -p 8080
+   # Then open: http://localhost:8080/test-button.html
+   ```
+
+3. **Configure for Local**
+   - Select "Local Development (localhost:3000)" from dropdown
+   - Update Backend API URL to your local endpoint
+   - Click "▶ Run Test" button
 
 ## What Happens
 
