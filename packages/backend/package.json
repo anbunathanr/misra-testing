@@ -7,6 +7,9 @@
     "build": "tsc && node esbuild.lambda.js",
     "build:lambdas": "node esbuild.lambda.js",
     "test": "jest",
+    "test:misra": "ts-node run-misra-test.ts",
+    "test:misra:headless": "HEADLESS=true ts-node run-misra-test.ts",
+    "test:misra:debug": "HEADLESS=false ts-node run-misra-test.ts",
     "lint": "eslint src --ext ts --report-unused-disable-directives --max-warnings 0",
     "deploy": "npm run build && cdk deploy",
     "synth": "npm run build && cdk synth"
@@ -31,6 +34,7 @@
     "jsonwebtoken": "^9.0.0",
     "openai": "^4.104.0",
     "pdfkit": "^0.15.0",
+    "playwright": "^1.40.0",
     "playwright-core": "^1.40.0",
     "puppeteer": "^21.6.0",
     "uuid": "^9.0.0",
