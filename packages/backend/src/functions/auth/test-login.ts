@@ -1,135 +1,111 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { JWTService } from '../../services/auth/jwt-service';
-import { UserService } from '../../services/user/user-service';
+import { APIGatewayProxyHandler } from 'aws-lambda';
+import { CognitoIdentityServiceProvider } from 'aws-sdk';
+import { v4 as uuidv4 } from 'uuid';
 
-interface TestLoginRequest {
-  email: string;
-  password: string;
-  testMode?: boolean;
-}
+const cognito = new CognitoIdentityServiceProvider();
 
 interface TestLoginResponse {
   accessToken: string;
   refreshToken: string;
-  user: any;
+  user: {
+    userId: string;
+    email: string;
+    name: string;
+  };
   expiresIn: number;
-  testOtp?: string; // Only in test mode
+  testOtp: string;
   testMode: boolean;
 }
 
-const jwtService = new JWTService();
-const userService = new UserService();
-
-// Generate a 6-digit OTP for testing
-function generateTestOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+export const handler: APIGatewayProxyHandler = async (event) => {
   try {
-    // Only allow test mode in development/staging
-    const isTestModeAllowed = process.env.ENVIRONMENT === 'development' || 
-                              process.env.ENVIRONMENT === 'staging' ||
-                              process.env.TEST_MODE_ENABLED === 'true';
+    // Only allow in development/staging
+    const environment = process.env.ENVIRONMENT || 'production';
+    const testModeEnabled = process.env.TEST_MODE_ENABLED === 'true';
 
-    if (!isTestModeAllowed) {
-      return errorResponse(403, 'TEST_MODE_DISABLED', 'Test mode is not enabled in this environment');
-    }
-
-    if (!event.body) {
-      return errorResponse(400, 'MISSING_BODY', 'Request body is required');
-    }
-
-    const loginRequest: TestLoginRequest = JSON.parse(event.body);
-
-    if (!loginRequest.email || !loginRequest.password) {
-      return errorResponse(400, 'INVALID_INPUT', 'Email and password are required');
-    }
-
-    // In test mode, accept any password for test accounts
-    if (loginRequest.testMode) {
-      // Get or create test user
-      let user = await userService.getUserByEmail(loginRequest.email);
-
-      if (!user) {
-        user = await userService.createUser({
-          email: loginRequest.email,
-          organizationId: 'test-org',
-          role: 'developer',
-          preferences: {
-            theme: 'light',
-            notifications: { email: true, webhook: false },
-            defaultMisraRuleSet: 'MISRA_C_2012',
-          },
-        });
-      } else {
-        await userService.updateLastLogin(user.userId);
-      }
-
-      // Generate platform JWT tokens
-      const tokenPair = await jwtService.generateTokenPair({
-        userId: user.userId,
-        email: user.email,
-        organizationId: user.organizationId,
-        role: user.role,
-      });
-
-      const testOtp = generateTestOtp();
-
-      // Store OTP in memory cache (in production, use Redis or DynamoDB)
-      // For now, we'll return it directly in test mode
-      console.log(`[TEST_MODE] Generated OTP for ${loginRequest.email}: ${testOtp}`);
-
-      const response: TestLoginResponse = {
-        accessToken: tokenPair.accessToken,
-        refreshToken: tokenPair.refreshToken,
-        user,
-        expiresIn: tokenPair.expiresIn,
-        testOtp, // Return OTP for automated testing
-        testMode: true,
-      };
-
+    if (!testModeEnabled || environment === 'production') {
       return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        },
-        body: JSON.stringify(response),
+        statusCode: 403,
+        body: JSON.stringify({ error: 'Test mode not enabled' }),
       };
     }
 
-    // Regular login (non-test mode) - would use Cognito
-    return errorResponse(400, 'INVALID_REQUEST', 'Use test-login endpoint with testMode: true');
+    const userPoolId = process.env.COGNITO_USER_POOL_ID!;
+    const clientId = process.env.COGNITO_CLIENT_ID!;
 
+    // Generate test credentials
+    const testEmail = 'test-misra@example.com';
+    const testPassword = 'TestPassword123!';
+    const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const userId = uuidv4();
+
+    // Create or update test user
+    try {
+      await cognito.adminCreateUser({
+        UserPoolId: userPoolId,
+        Username: testEmail,
+        TemporaryPassword: testPassword,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: [
+          { Name: 'email', Value: testEmail },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'custom:user_id', Value: userId },
+          { Name: 'name', Value: 'Test User' },
+        ],
+      }).promise();
+    } catch (err: any) {
+      // User might already exist, that's fine
+      if (err.code !== 'UsernameExistsException') {
+        throw err;
+      }
+    }
+
+    // Set permanent password
+    await cognito.adminSetUserPassword({
+      UserPoolId: userPoolId,
+      Username: testEmail,
+      Password: testPassword,
+      Permanent: true,
+    }).promise();
+
+    // Initiate auth
+    const authResponse = await cognito.adminInitiateAuth({
+      UserPoolId: userPoolId,
+      ClientId: clientId,
+      AuthFlow: 'ADMIN_NO_SRP_AUTH',
+      AuthParameters: {
+        USERNAME: testEmail,
+        PASSWORD: testPassword,
+      },
+    }).promise();
+
+    // Store OTP in DynamoDB for verification (optional, for real OTP flow)
+    // For now, we'll just return it directly in test mode
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        accessToken: authResponse.AuthenticationResult?.AccessToken,
+        refreshToken: authResponse.AuthenticationResult?.RefreshToken,
+        user: {
+          userId,
+          email: testEmail,
+          name: 'Test User',
+        },
+        expiresIn: authResponse.AuthenticationResult?.ExpiresIn || 3600,
+        testOtp, // OTP returned directly in test mode
+        testMode: true,
+      } as TestLoginResponse),
+    };
   } catch (error) {
-    console.error('Test login error:', error);
-    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
+    console.error('[TEST-LOGIN] Error:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal server error' }),
+    };
   }
 };
-
-function errorResponse(
-  statusCode: number,
-  code: string,
-  message: string
-): APIGatewayProxyResult {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    },
-    body: JSON.stringify({
-      error: {
-        code,
-        message,
-        timestamp: new Date().toISOString(),
-        requestId: Math.random().toString(36).substring(7),
-      },
-    }),
-  };
-}

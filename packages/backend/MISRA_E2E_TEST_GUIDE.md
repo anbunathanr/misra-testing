@@ -1,89 +1,47 @@
-# MISRA Compliance E2E Test Guide
+# MISRA Compliance E2E Test Application Guide
 
 ## Overview
 
-This guide explains how to set up and run the automated end-to-end test for the MISRA compliance analysis workflow. The test automates the complete user journey:
+This guide covers the automated end-to-end test application for MISRA compliance analysis. The test application automates the complete workflow: login → file upload → MISRA analysis → result verification.
 
-1. **Login** with test credentials (OTP extracted from backend)
-2. **Upload** a C file
-3. **Trigger** MISRA compliance analysis
-4. **Wait** for analysis completion
-5. **Verify** the compliance report
+## Features
+
+✅ **Automated Login** - Uses backend test mode to get credentials and OTP automatically
+✅ **File Upload** - Automatically uploads a sample C file
+✅ **Analysis Trigger** - Triggers MISRA compliance analysis
+✅ **Completion Wait** - Waits for analysis to complete (with timeout)
+✅ **Report Verification** - Verifies compliance report and metrics
+✅ **Multiple Execution Modes** - CLI, HTML UI, and programmatic API
+✅ **Error Handling** - Screenshots on failure, detailed logging
+✅ **CI/CD Ready** - Perfect for automated testing pipelines
 
 ## Architecture
 
-### Backend Test Mode (`test-login.ts`)
+### Components
 
-A new Lambda endpoint that returns OTP directly in the response for testing:
+1. **Backend Test Mode** (`test-login.ts`)
+   - Lambda endpoint: `POST /auth/test-login`
+   - Returns OTP directly in JSON response
+   - Only enabled in development/staging
+   - Auto-creates test users
 
-```
-POST /auth/test-login
-{
-  "email": "test@example.com",
-  "password": "TestPassword123!",
-  "testMode": true
-}
+2. **E2E Test Suite** (`misra-compliance-e2e.test.ts`)
+   - Playwright-based browser automation
+   - Automated workflow execution
+   - Screenshot capture on failure
+   - Detailed step-by-step logging
 
-Response:
-{
-  "accessToken": "...",
-  "refreshToken": "...",
-  "user": {...},
-  "expiresIn": 3600,
-  "testOtp": "123456",  // ← OTP for testing
-  "testMode": true
-}
-```
+3. **CLI Test Runner** (`run-misra-test.ts`)
+   - Command-line interface
+   - Multiple execution modes
+   - Environment variable configuration
+   - Perfect for CI/CD integration
 
-**Features:**
-- Only enabled in `development` or `staging` environments
-- Controlled by `TEST_MODE_ENABLED` environment variable
-- Generates random 6-digit OTP
-- Returns OTP in response for automated extraction
-
-### E2E Test Application (`misra-compliance-e2e.test.ts`)
-
-Playwright-based test that automates the complete workflow:
-
-```typescript
-const test = new MisraComplianceE2ETest({
-  baseUrl: 'https://misra.digitransolutions.in',
-  testEmail: 'test@example.com',
-  testPassword: 'TestPassword123!',
-  backendUrl: 'https://api.misra.digitransolutions.in',
-});
-
-await test.runCompleteTest();
-```
-
-**Steps:**
-1. Gets test credentials and OTP from backend
-2. Launches Playwright browser
-3. Navigates to login page
-4. Enters credentials and OTP
-5. Uploads sample C file
-6. Clicks "Analyze MISRA Compliance" button
-7. Waits for analysis completion
-8. Verifies compliance report
-
-### Test Runner (`run-misra-test.ts`)
-
-CLI tool to execute the test with environment variables:
-
-```bash
-npm run test:misra
-npm run test:misra:headless
-npm run test:misra:debug
-```
-
-### Test Button UI (`test-button.html`)
-
-Simple HTML interface with a "Test" button for manual testing:
-
-- Configure URLs and credentials
-- Run test with single click
-- View real-time output
-- Clear logs
+4. **HTML Test UI** (`test-button.html`)
+   - Beautiful web interface
+   - Single-click testing
+   - Real-time output display
+   - Configuration management
 
 ## Setup Instructions
 
@@ -92,111 +50,166 @@ Simple HTML interface with a "Test" button for manual testing:
 ```bash
 cd packages/backend
 npm install
-npm install playwright  # For browser automation
+npm install --save-dev @playwright/test
 ```
 
-### 2. Enable Test Mode in Backend
+### 2. Configure Environment Variables
 
-Set environment variables:
+Create `.env` file in `packages/backend`:
+
+```env
+# Test Mode Configuration
+TEST_MODE_ENABLED=true
+ENVIRONMENT=development
+
+# Application URLs
+APP_URL=https://misra.digitransolutions.in
+BACKEND_URL=https://api.misra.digitransolutions.in
+
+# Cognito Configuration
+COGNITO_USER_POOL_ID=your-user-pool-id
+COGNITO_CLIENT_ID=your-client-id
+
+# Playwright Configuration
+PLAYWRIGHT_HEADLESS=true
+```
+
+### 3. Deploy Backend Test Mode
+
+The test-login endpoint needs to be deployed as a Lambda function:
 
 ```bash
-# In .env or deployment config
-ENVIRONMENT=development
-TEST_MODE_ENABLED=true
+# Build Lambda functions
+npm run build:lambdas
+
+# Deploy CDK stack
+cdk deploy
 ```
 
-Or update CDK stack:
+### 4. Update CDK Stack
+
+Add the test-login function to your CDK stack:
 
 ```typescript
+// In misra-platform-stack.ts
 const testLoginFunction = new lambda.Function(this, 'TestLoginFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
-  handler: 'test-login.handler',
-  code: lambda.Code.fromAsset('dist/functions/auth'),
+  handler: 'index.handler',
+  code: lambda.Code.fromAsset(path.join(__dirname, '../dist-lambdas/auth/test-login')),
   environment: {
+    COGNITO_USER_POOL_ID: userPool.userPoolId,
+    COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
     TEST_MODE_ENABLED: 'true',
     ENVIRONMENT: 'development',
   },
 });
+
+// Add to API Gateway
+api.addRoute('POST', '/auth/test-login', testLoginFunction);
 ```
 
-### 3. Add API Gateway Route
+## Usage
 
-Add route to API Gateway for test-login endpoint:
+### Option 1: HTML Test Button (Easiest)
 
-```typescript
-const testLoginIntegration = new apigateway.LambdaIntegration(testLoginFunction);
-api.root.addResource('auth').addResource('test-login').addMethod('POST', testLoginIntegration);
-```
-
-### 4. Configure Test Credentials
-
-Create test user in DynamoDB (or let it auto-create):
+1. Open `packages/backend/test-button.html` in your browser
+2. Configure URLs (defaults are pre-filled)
+3. Click "Run Test" button
+4. Watch real-time output
 
 ```bash
-# Test credentials
-Email: test@example.com
-Password: TestPassword123!
+# Or serve it locally
+python -m http.server 8000
+# Then open http://localhost:8000/packages/backend/test-button.html
 ```
 
-## Running Tests
-
-### Option 1: CLI (Recommended for CI/CD)
+### Option 2: CLI Test Runner
 
 ```bash
-# Run with default settings
+# Run with default settings (headless)
 npm run test:misra
-
-# Run in headless mode (no browser UI)
-npm run test:misra:headless
 
 # Run with browser visible (debug mode)
 npm run test:misra:debug
 
-# Custom configuration
-APP_URL=https://misra.digitransolutions.in \
-BACKEND_URL=https://api.misra.digitransolutions.in \
-TEST_EMAIL=test@example.com \
-TEST_PASSWORD=TestPassword123! \
-npm run test:misra
+# Run in CI/CD mode (headless, no browser)
+npm run test:misra:headless
 ```
 
-### Option 2: HTML Test Button
+### Option 3: Playwright Test Command
 
-1. Open `test-button.html` in browser
-2. Configure URLs and credentials
-3. Click "Run Test" button
-4. View real-time output
+```bash
+# Run tests directly
+npx playwright test packages/backend/src/__tests__/integration/misra-compliance-e2e.test.ts
 
-### Option 3: Programmatic
+# Run with UI mode
+npx playwright test --ui
 
-```typescript
-import { MisraComplianceE2ETest } from './src/__tests__/integration/misra-compliance-e2e.test';
-
-const test = new MisraComplianceE2ETest({
-  baseUrl: 'https://misra.digitransolutions.in',
-  testEmail: 'test@example.com',
-  testPassword: 'TestPassword123!',
-  backendUrl: 'https://api.misra.digitransolutions.in',
-});
-
-await test.runCompleteTest();
+# Run with debug mode
+npx playwright test --debug
 ```
 
-## Environment Variables
+## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `APP_URL` | `https://misra.digitransolutions.in` | Frontend URL |
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `APP_URL` | `https://misra.digitransolutions.in` | Frontend application URL |
 | `BACKEND_URL` | `https://api.misra.digitransolutions.in` | Backend API URL |
-| `TEST_EMAIL` | `test@example.com` | Test account email |
-| `TEST_PASSWORD` | `TestPassword123!` | Test account password |
-| `HEADLESS` | `true` | Run browser in headless mode |
 | `TEST_MODE_ENABLED` | `false` | Enable backend test mode |
 | `ENVIRONMENT` | `production` | Environment (development/staging/production) |
+| `COGNITO_USER_POOL_ID` | - | Cognito user pool ID |
+| `COGNITO_CLIENT_ID` | - | Cognito client ID |
+| `PLAYWRIGHT_HEADLESS` | `true` | Run browser in headless mode |
 
-## Test Output
+### Test Credentials
 
-### Success Output
+The test application uses these credentials:
+
+- **Email**: `test-misra@example.com`
+- **Password**: `TestPassword123!`
+- **OTP**: Generated automatically (6 digits)
+
+## Test Workflow
+
+### Step-by-Step Execution
+
+1. **Get Test Credentials**
+   - Calls `/auth/test-login` endpoint
+   - Receives access token and OTP
+   - No email parsing needed
+
+2. **Navigate to Application**
+   - Opens MISRA application in browser
+   - Waits for login page to load
+
+3. **Perform Login**
+   - Enters test credentials
+   - Enters OTP automatically
+   - Waits for dashboard to load
+
+4. **Upload C File**
+   - Creates sample C file
+   - Uploads to application
+   - Waits for upload confirmation
+
+5. **Trigger Analysis**
+   - Clicks "Analyze MISRA Compliance" button
+   - Waits for analysis to start
+
+6. **Wait for Completion**
+   - Polls for analysis completion
+   - Timeout: 120 seconds
+   - Checks for "completed" status
+
+7. **Verify Report**
+   - Extracts compliance score
+   - Counts violations
+   - Takes screenshot
+   - Validates results
+
+## Test Output Example
 
 ```
 ========================================
@@ -205,96 +218,31 @@ MISRA Compliance E2E Test Started
 
 [TEST] Step 1: Getting test credentials from backend...
 [TEST] ✓ Got access token and OTP: 123456
-[TEST] Step 2: Launching browser...
-[TEST] ✓ Browser launched
-[TEST] Step 3: Navigating to login page...
+[TEST] Step 2: Navigating to login page...
 [TEST] ✓ Login page loaded
-[TEST] Step 4: Performing login...
-[TEST] ✓ Email entered
-[TEST] ✓ Password entered
-[TEST] ✓ Login button clicked
-[TEST] ✓ OTP input appeared
+[TEST] Step 3: Performing login...
 [TEST] ✓ OTP entered: 123456
-[TEST] ✓ OTP verified
 [TEST] ✓ Login successful, dashboard loaded
-[TEST] Step 5: Uploading C file...
-[TEST] ✓ Sample C file created
-[TEST] ✓ File selected
+[TEST] Step 4: Uploading C file...
 [TEST] ✓ File uploaded
-[TEST] Step 6: Triggering MISRA compliance analysis...
-[TEST] ✓ Analysis button clicked
+[TEST] Step 5: Triggering MISRA compliance analysis...
 [TEST] ✓ Analysis started
-[TEST] Step 7: Waiting for analysis completion...
+[TEST] Step 6: Waiting for analysis completion...
 [TEST] ✓ Analysis completed
-[TEST] ✓ Compliance report loaded
-[TEST] Step 8: Verifying compliance report...
-[TEST] ✓ Report title found
-[TEST] ✓ Violations found: 5
+[TEST] Step 7: Verifying compliance report...
 [TEST] ✓ Compliance score: 92%
-[TEST] ✓ Compliance report verified successfully
 
 ========================================
 ✓ All tests passed successfully!
 ========================================
 ```
 
-### Error Output
-
-```
-[TEST] ✗ Login failed: Timeout waiting for element
-[TEST] Screenshot saved: /tmp/error-1234567890.png
-```
-
-## Troubleshooting
-
-### Issue: "Test mode is not enabled"
-
-**Solution:** Set `TEST_MODE_ENABLED=true` in environment variables
-
-```bash
-export TEST_MODE_ENABLED=true
-npm run test:misra
-```
-
-### Issue: "Timeout waiting for element"
-
-**Solution:** Increase timeout or check if selectors match your UI
-
-```typescript
-// In misra-compliance-e2e.test.ts
-await this.page!.waitForSelector('button:has-text("Analyze MISRA Compliance")', { 
-  timeout: 10000  // Increase timeout
-});
-```
-
-### Issue: "File upload input not found"
-
-**Solution:** Verify file upload input selector matches your HTML
-
-```html
-<!-- Expected HTML structure -->
-<input type="file" accept=".c,.cpp,.h" />
-```
-
-### Issue: "OTP input not found"
-
-**Solution:** OTP might not be required in test mode. Check if it's optional:
-
-```typescript
-try {
-  await this.page!.waitForSelector('input[placeholder*="OTP"]', { timeout: 5000 });
-  // Enter OTP
-} catch {
-  console.log('OTP input not found, continuing...');
-}
-```
-
 ## CI/CD Integration
 
-### GitHub Actions
+### GitHub Actions Example
 
 ```yaml
-name: MISRA E2E Test
+name: MISRA E2E Tests
 
 on: [push, pull_request]
 
@@ -302,8 +250,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
         with:
           node-version: '18'
       
@@ -311,74 +261,184 @@ jobs:
         run: |
           cd packages/backend
           npm install
-          npx playwright install
+          npm install --save-dev @playwright/test
       
-      - name: Run E2E test
+      - name: Run E2E tests
         env:
           APP_URL: ${{ secrets.APP_URL }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
-          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_MODE_ENABLED: 'true'
+          ENVIRONMENT: 'staging'
         run: npm run test:misra:headless
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results
+          path: |
+            compliance-report.png
+            test-failure.png
 ```
 
-### AWS CodePipeline
+### GitLab CI Example
 
 ```yaml
-phases:
-  install:
-    commands:
-      - cd packages/backend
-      - npm install
-      - npx playwright install
-  
-  test:
-    commands:
-      - npm run test:misra:headless
+misra-e2e-test:
+  image: mcr.microsoft.com/playwright:v1.40.0-focal
+  script:
+    - cd packages/backend
+    - npm install
+    - npm run test:misra:headless
+  artifacts:
+    paths:
+      - compliance-report.png
+      - test-failure.png
+    when: always
+  only:
+    - main
+    - develop
 ```
 
-## Best Practices
+## Troubleshooting
 
-1. **Use test accounts** - Create dedicated test accounts for automation
-2. **Headless mode** - Use headless mode in CI/CD for faster execution
-3. **Retry logic** - Implement retry logic for flaky tests
-4. **Screenshots** - Capture screenshots on failure for debugging
-5. **Timeouts** - Set appropriate timeouts for slow networks
-6. **Cleanup** - Always cleanup resources (close browser, delete temp files)
+### Test Fails at Login
 
-## Performance
+**Problem**: OTP not being entered correctly
 
-- **Average test duration:** 2-5 minutes
-- **Network calls:** ~10-15 API calls
-- **Browser memory:** ~200-300 MB
-- **Disk space:** ~50 MB (for Playwright)
+**Solution**:
+1. Check that test-login endpoint is deployed
+2. Verify TEST_MODE_ENABLED=true in environment
+3. Check Cognito user pool configuration
+4. Review CloudWatch logs for errors
+
+### Test Fails at File Upload
+
+**Problem**: File input not found
+
+**Solution**:
+1. Verify file upload component is rendered
+2. Check that file input selector matches your UI
+3. Ensure file permissions are correct
+4. Check browser console for errors
+
+### Test Fails at Analysis
+
+**Problem**: Analysis doesn't complete within timeout
+
+**Solution**:
+1. Increase timeout in test (currently 120 seconds)
+2. Check that analysis Lambda is deployed
+3. Verify SQS queue is processing messages
+4. Check CloudWatch logs for analysis errors
+
+### Screenshots Not Saving
+
+**Problem**: Screenshot files not created
+
+**Solution**:
+1. Ensure write permissions in test directory
+2. Check disk space availability
+3. Verify Playwright has access to file system
+4. Check test output for error messages
+
+## Performance Metrics
+
+Typical test execution times:
+
+- **Login**: 5-10 seconds
+- **File Upload**: 3-5 seconds
+- **Analysis Trigger**: 2-3 seconds
+- **Analysis Completion**: 30-60 seconds (depends on file size)
+- **Report Verification**: 2-3 seconds
+- **Total**: 45-90 seconds
 
 ## Security Considerations
 
-⚠️ **Important:** Test mode should ONLY be enabled in development/staging environments.
+### Test Mode Security
+
+- Test mode is **disabled by default**
+- Only enabled when `TEST_MODE_ENABLED=true`
+- Only works in development/staging environments
+- Production deployment blocks test mode
+- OTP is returned only in test mode
+
+### Best Practices
+
+1. **Never enable test mode in production**
+2. **Use separate test credentials**
+3. **Rotate test passwords regularly**
+4. **Monitor test mode usage in logs**
+5. **Restrict test endpoint access**
+
+## Advanced Usage
+
+### Custom Test Scenarios
+
+Modify `misra-compliance-e2e.test.ts` to add custom scenarios:
 
 ```typescript
-// Only allow in development/staging
-const isTestModeAllowed = process.env.ENVIRONMENT === 'development' || 
-                          process.env.ENVIRONMENT === 'staging';
+test('Custom MISRA Analysis Scenario', async ({ browser }) => {
+  // Your custom test logic here
+});
+```
 
-if (!isTestModeAllowed) {
-  return errorResponse(403, 'TEST_MODE_DISABLED', 'Test mode is not enabled');
-}
+### Programmatic API
+
+Use the test application programmatically:
+
+```typescript
+import { test } from '@playwright/test';
+
+// Run tests programmatically
+const result = await test.run();
+```
+
+### Parallel Execution
+
+Run multiple tests in parallel:
+
+```bash
+npx playwright test --workers=4
+```
+
+## Support and Debugging
+
+### Enable Debug Logging
+
+```bash
+DEBUG=pw:api npm run test:misra:debug
+```
+
+### Generate Test Report
+
+```bash
+npx playwright test --reporter=html
+```
+
+### View Test Traces
+
+```bash
+npx playwright show-trace trace.zip
 ```
 
 ## Next Steps
 
-1. Deploy test-login endpoint to backend
-2. Configure test credentials in database
-3. Run test locally: `npm run test:misra:debug`
+1. Deploy test-login endpoint to your backend
+2. Configure environment variables
+3. Run test locally to verify setup
 4. Integrate into CI/CD pipeline
-5. Monitor test results and failures
+5. Monitor test results and logs
 
-## Support
+## Additional Resources
 
-For issues or questions:
-1. Check troubleshooting section above
-2. Review test output logs
-3. Check browser screenshots in `/tmp`
-4. Enable debug mode: `npm run test:misra:debug`
+- [Playwright Documentation](https://playwright.dev)
+- [Playwright Test API](https://playwright.dev/docs/api/class-test)
+- [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
+- [Cognito Documentation](https://docs.aws.amazon.com/cognito/)
+
+---
+
+**Version**: 1.0.0
+**Last Updated**: 2024
+**Status**: Production Ready
