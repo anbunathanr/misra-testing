@@ -48,6 +48,12 @@ export interface FileMetadata {
   s3_key: string          // S3 object key for file retrieval
   created_at: number      // Record creation timestamp
   updated_at: number      // Last modification timestamp
+  
+  // Sample file metadata (for automatic uploads)
+  is_sample_file?: boolean
+  sample_id?: string
+  sample_description?: string
+  expected_violations?: number
 }
 
 /**
