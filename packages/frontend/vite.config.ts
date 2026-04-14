@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+    __API_URL__: JSON.stringify(process.env.VITE_API_URL)
+  },
   server: {
     port: 3000,
     proxy: {
