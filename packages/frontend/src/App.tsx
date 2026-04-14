@@ -6,7 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 function App() {
   return (
     <ErrorBoundary
-      showDetails={process.env.NODE_ENV === 'development'}
+      showDetails={import.meta.env.DEV}
       onError={(error, errorInfo) => {
         console.error('App Error:', error, errorInfo);
         // In production, send to error reporting service

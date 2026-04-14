@@ -159,7 +159,7 @@ export class MockBackendService {
     if (!this.isEnabled) return false;
     
     // Use mock if API URL is not reachable or in development
-    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isDevelopment = import.meta.env.MODE === 'development';
     const isLocalhost = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
     
     return isDevelopment || isLocalhost || this.isEnabled;
@@ -169,6 +169,6 @@ export class MockBackendService {
 export const mockBackend = MockBackendService.getInstance();
 
 // Auto-enable in development mode
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.MODE === 'development') {
   mockBackend.enable();
 }

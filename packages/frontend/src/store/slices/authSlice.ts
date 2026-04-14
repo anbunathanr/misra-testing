@@ -32,8 +32,8 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const result = await authService.login(email, password);
-      // Store token in localStorage for persistence
-      localStorage.setItem('token', result.token);
+      // Token storage is now handled by authService.login() via storeTokens()
+      // Just store user info for backward compatibility
       localStorage.setItem('user', JSON.stringify(result.user));
       return result;
     } catch (error: any) {
@@ -59,7 +59,7 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await authService.logout();
-      localStorage.removeItem('token');
+      // authService.logout() now handles clearing all tokens via clearTokens()
       localStorage.removeItem('user');
       localStorage.removeItem('demo-mode'); // Remove demo mode flag
     } catch (error: any) {
@@ -72,6 +72,14 @@ export const checkAuth = createAsyncThunk(
   'auth/checkAuth',
   async (_, { rejectWithValue }) => {
     try {
+      // Try to restore session with automatic token refresh
+      const session = await authService.restoreSession();
+      
+      if (session) {
+        return { token: session.token, user: session.user };
+      }
+      
+      // Fallback: Check localStorage directly
       const token = await authService.getToken();
       const userInfo = await authService.getUserInfo();
       
@@ -79,7 +87,7 @@ export const checkAuth = createAsyncThunk(
         return { token, user: userInfo };
       }
       
-      // Check localStorage as fallback
+      // Final fallback: Check raw localStorage
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
       

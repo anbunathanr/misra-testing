@@ -8,7 +8,40 @@ import {
 } from '@aws-sdk/client-cognito-identity-provider';
 import { JWTService } from './jwt-service';
 import { UserService } from '../user/user-service';
+import { EmailVerificationService } from './email-verification-service';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthErrorHandler } from '../../utils/auth-error-handler';
+import { createLogger } from '../../utils/logger';
+
+export interface AuthFlowResult {
+  state: AuthenticationState;
+  requiresEmailVerification: boolean;
+  requiresOTPSetup: boolean;
+  message: string;
+}
+
+export interface OTPSetupResult {
+  otpSetup: {
+    secret: string;
+    qrCodeUrl: string;
+    backupCodes: string[];
+    issuer: string;
+    accountName: string;
+  };
+  nextStep: AuthenticationState;
+  message: string;
+}
+
+export enum AuthenticationState {
+  INITIAL = 'initial',
+  REGISTERING = 'registering',
+  EMAIL_VERIFICATION_REQUIRED = 'email_verification_required',
+  EMAIL_VERIFYING = 'email_verifying',
+  OTP_SETUP_REQUIRED = 'otp_setup_required',
+  OTP_VERIFYING = 'otp_verifying',
+  AUTHENTICATED = 'authenticated',
+  ERROR = 'error'
+}
 
 export interface AuthRequest {
   email: string;
@@ -41,6 +74,9 @@ export class UnifiedAuthService {
   private cognitoClient: CognitoIdentityProviderClient;
   private jwtService: JWTService;
   private userService: UserService;
+  private emailVerificationService: EmailVerificationService;
+  private errorHandler: AuthErrorHandler;
+  private logger: ReturnType<typeof createLogger>;
   private defaultRetryConfig: RetryConfig = {
     maxRetries: 3,
     baseDelay: 1000, // 1 second
@@ -53,6 +89,9 @@ export class UnifiedAuthService {
     });
     this.jwtService = new JWTService();
     this.userService = new UserService();
+    this.emailVerificationService = new EmailVerificationService();
+    this.errorHandler = new AuthErrorHandler('UnifiedAuthService');
+    this.logger = createLogger('UnifiedAuthService');
   }
 
   /**
@@ -94,6 +133,307 @@ export class UnifiedAuthService {
     );
   }
 
+  /**
+   * Enhanced authentication flow initiation
+   */
+  async initiateAuthenticationFlow(email: string, name?: string): Promise<AuthFlowResult> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Initiating authentication flow', {
+      correlationId,
+      email,
+      hasName: !!name
+    });
+
+    if (!this.isValidEmail(email)) {
+      const error = new Error('INVALID_EMAIL: Valid email address is required');
+      this.errorHandler.handleError(error, {
+        operation: 'initiateAuthenticationFlow',
+        email,
+        step: 'validation'
+      });
+      throw error;
+    }
+
+    try {
+      // Check if user exists and their verification status
+      const userExists = await this.checkUserExists(email);
+      
+      if (!userExists) {
+        // Create new user - this will require email verification
+        await this.createCognitoUser(email, name || email.split('@')[0]);
+        
+        this.errorHandler.logAuthEvent('user_created', {
+          operation: 'initiateAuthenticationFlow',
+          email,
+          step: 'registration'
+        }, true, { correlationId });
+        
+        return {
+          state: AuthenticationState.EMAIL_VERIFICATION_REQUIRED,
+          requiresEmailVerification: true,
+          requiresOTPSetup: false,
+          message: 'Account created successfully. Please check your email for the verification code.'
+        };
+      }
+
+      // User exists, check their status
+      const isEmailVerified = await this.emailVerificationService.isEmailVerified(email);
+      const isOTPEnabled = await this.emailVerificationService.isOTPEnabled(email);
+
+      this.logger.info('User authentication state checked', {
+        correlationId,
+        email,
+        isEmailVerified,
+        isOTPEnabled
+      });
+
+      if (!isEmailVerified) {
+        return {
+          state: AuthenticationState.EMAIL_VERIFICATION_REQUIRED,
+          requiresEmailVerification: true,
+          requiresOTPSetup: false,
+          message: 'Please verify your email address to continue.'
+        };
+      }
+
+      if (!isOTPEnabled) {
+        return {
+          state: AuthenticationState.OTP_SETUP_REQUIRED,
+          requiresEmailVerification: false,
+          requiresOTPSetup: true,
+          message: 'Please complete OTP setup for enhanced security.'
+        };
+      }
+
+      // User is fully set up
+      return {
+        state: AuthenticationState.AUTHENTICATED,
+        requiresEmailVerification: false,
+        requiresOTPSetup: false,
+        message: 'User is ready for authentication.'
+      };
+    } catch (error: any) {
+      this.errorHandler.handleError(error, {
+        operation: 'initiateAuthenticationFlow',
+        email,
+        step: 'flow_initiation'
+      });
+      throw new Error(`AUTH_FLOW_ERROR: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle email verification completion with automatic OTP setup
+   */
+  async handleEmailVerificationComplete(email: string, verificationCode: string): Promise<OTPSetupResult> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Handling email verification completion', {
+      correlationId,
+      email
+    });
+
+    try {
+      // Verify email using EmailVerificationService
+      const verificationResult = await this.emailVerificationService.verifyEmail(email, verificationCode);
+
+      if (!verificationResult.success) {
+        const error = new Error(`EMAIL_VERIFICATION_FAILED: ${verificationResult.message}`);
+        this.errorHandler.handleError(error, {
+          operation: 'handleEmailVerificationComplete',
+          email,
+          step: 'email_verification'
+        });
+        throw error;
+      }
+
+      this.errorHandler.logAuthEvent('email_verified', {
+        operation: 'handleEmailVerificationComplete',
+        email,
+        step: 'email_verification'
+      }, true, { correlationId });
+
+      // Email verification automatically sets up OTP, so return the setup data
+      if (verificationResult.otpSecret && verificationResult.backupCodes) {
+        this.logger.info('OTP setup data generated', {
+          correlationId,
+          email,
+          hasSecret: !!verificationResult.otpSecret,
+          backupCodesCount: verificationResult.backupCodes.length
+        });
+
+        return {
+          otpSetup: {
+            secret: verificationResult.otpSecret,
+            qrCodeUrl: this.generateQRCodeUrl(email, verificationResult.otpSecret),
+            backupCodes: verificationResult.backupCodes,
+            issuer: 'MISRA Platform',
+            accountName: email
+          },
+          nextStep: AuthenticationState.OTP_SETUP_REQUIRED,
+          message: 'Email verified successfully. Please complete OTP setup.'
+        };
+      }
+
+      const error = new Error('OTP_SETUP_FAILED: Failed to generate OTP setup data');
+      this.errorHandler.handleError(error, {
+        operation: 'handleEmailVerificationComplete',
+        email,
+        step: 'otp_generation'
+      });
+      throw error;
+    } catch (error: any) {
+      this.errorHandler.handleError(error, {
+        operation: 'handleEmailVerificationComplete',
+        email,
+        step: 'email_verification_complete'
+      });
+      throw new Error(`EMAIL_VERIFICATION_ERROR: ${error.message}`);
+    }
+  }
+
+  /**
+   * Complete OTP setup and establish user session
+   */
+  async completeOTPSetup(email: string, otpCode: string): Promise<AuthResult> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Completing OTP setup', {
+      correlationId,
+      email
+    });
+
+    try {
+      // Verify OTP code
+      const otpResult = await this.emailVerificationService.verifyOTP(email, otpCode);
+
+      if (!otpResult.success) {
+        const error = new Error(`OTP_VERIFICATION_FAILED: ${otpResult.message}`);
+        this.errorHandler.handleError(error, {
+          operation: 'completeOTPSetup',
+          email,
+          step: 'otp_verification'
+        });
+        throw error;
+      }
+
+      this.errorHandler.logAuthEvent('otp_verified', {
+        operation: 'completeOTPSetup',
+        email,
+        step: 'otp_verification'
+      }, true, { correlationId });
+
+      // Get user information
+      const cognitoUser = await this.cognitoClient.send(new AdminGetUserCommand({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+        Username: email
+      }));
+
+      const subAttribute = cognitoUser.UserAttributes?.find(attr => attr.Name === 'sub');
+      const cognitoSub = subAttribute?.Value || uuidv4();
+
+      // Get or create user in our system
+      const user = await this.getOrCreateUser(email, cognitoSub);
+
+      this.logger.info('User retrieved for session creation', {
+        correlationId,
+        userId: user.userId,
+        email: user.email
+      });
+
+      // Generate JWT tokens
+      const tokenPair = await this.jwtService.generateTokenPair({
+        userId: user.userId,
+        email: user.email,
+        organizationId: user.organizationId,
+        role: user.role
+      });
+
+      this.errorHandler.logAuthEvent('session_created', {
+        operation: 'completeOTPSetup',
+        email,
+        userId: user.userId,
+        step: 'session_creation'
+      }, true, { correlationId });
+
+      return {
+        accessToken: tokenPair.accessToken,
+        refreshToken: tokenPair.refreshToken,
+        user: {
+          userId: user.userId,
+          email: user.email,
+          name: user.email.split('@')[0],
+          organizationId: user.organizationId,
+          role: user.role
+        },
+        expiresIn: tokenPair.expiresIn,
+        isNewUser: false,
+        message: 'OTP setup completed successfully. You are now logged in.'
+      };
+    } catch (error: any) {
+      this.errorHandler.handleError(error, {
+        operation: 'completeOTPSetup',
+        email,
+        step: 'otp_setup_complete'
+      });
+      throw new Error(`OTP_SETUP_ERROR: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get authentication state for a user
+   */
+  async getAuthenticationState(email: string): Promise<AuthenticationState> {
+    try {
+      const userExists = await this.checkUserExists(email);
+      
+      if (!userExists) {
+        return AuthenticationState.INITIAL;
+      }
+
+      const isEmailVerified = await this.emailVerificationService.isEmailVerified(email);
+      const isOTPEnabled = await this.emailVerificationService.isOTPEnabled(email);
+
+      if (!isEmailVerified) {
+        return AuthenticationState.EMAIL_VERIFICATION_REQUIRED;
+      }
+
+      if (!isOTPEnabled) {
+        return AuthenticationState.OTP_SETUP_REQUIRED;
+      }
+
+      return AuthenticationState.AUTHENTICATED;
+    } catch (error) {
+      return AuthenticationState.ERROR;
+    }
+  }
+
+  /**
+   * Validate authentication step
+   */
+  async validateAuthenticationStep(email: string, step: AuthenticationState): Promise<boolean> {
+    try {
+      const currentState = await this.getAuthenticationState(email);
+      
+      // Define valid state transitions
+      const validTransitions: Record<AuthenticationState, AuthenticationState[]> = {
+        [AuthenticationState.INITIAL]: [AuthenticationState.REGISTERING],
+        [AuthenticationState.REGISTERING]: [AuthenticationState.EMAIL_VERIFICATION_REQUIRED],
+        [AuthenticationState.EMAIL_VERIFICATION_REQUIRED]: [AuthenticationState.EMAIL_VERIFYING],
+        [AuthenticationState.EMAIL_VERIFYING]: [AuthenticationState.OTP_SETUP_REQUIRED],
+        [AuthenticationState.OTP_SETUP_REQUIRED]: [AuthenticationState.OTP_VERIFYING],
+        [AuthenticationState.OTP_VERIFYING]: [AuthenticationState.AUTHENTICATED],
+        [AuthenticationState.AUTHENTICATED]: [],
+        [AuthenticationState.ERROR]: [AuthenticationState.INITIAL, AuthenticationState.EMAIL_VERIFICATION_REQUIRED, AuthenticationState.OTP_SETUP_REQUIRED]
+      };
+
+      return validTransitions[currentState]?.includes(step) || currentState === step;
+    } catch (error) {
+      return false;
+    }
+  }
+
   private async performAuthentication(request: AuthRequest): Promise<AuthResult> {
     if (!this.isValidEmail(request.email)) {
       throw new Error('INVALID_EMAIL: Valid email address is required');
@@ -119,18 +459,27 @@ export class UnifiedAuthService {
         UserPoolId: process.env.COGNITO_USER_POOL_ID!,
         Username: email
       }));
-      
-      // User exists, get their Cognito sub
-      const subAttribute = existingUser.UserAttributes?.find(attr => attr.Name === 'sub');
-      cognitoSub = subAttribute?.Value || uuidv4();
-      
-    } catch (cognitoError: any) {
-      if (cognitoError.name === 'UserNotFoundException') {
-        // User doesn't exist, create new user
+
+      // Check if user is confirmed (email verified)
+      if (existingUser.UserStatus !== 'CONFIRMED') {
+        throw new Error('USER_NOT_CONFIRMED: Please verify your email address before logging in. Check your email for the verification code.');
+      }
+
+      cognitoSub = existingUser.Username!;
+      isNewUser = false;
+    } catch (error: any) {
+      if (error.name === 'UserNotFoundException') {
+        // Create new user - this will require email verification
         isNewUser = true;
         cognitoSub = await this.createCognitoUser(email, userName);
+        
+        // Throw error to indicate verification is required
+        throw new Error('EMAIL_VERIFICATION_REQUIRED: Account created successfully. Please check your email for the verification code to complete registration.');
+      } else if (error.message.includes('USER_NOT_CONFIRMED')) {
+        // Re-throw confirmation error
+        throw error;
       } else {
-        throw new Error(`COGNITO_ERROR: ${cognitoError.message}`);
+        throw new Error(`COGNITO_ERROR: ${error.message}`);
       }
     }
 
@@ -371,5 +720,35 @@ export class UnifiedAuthService {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password + 'A1!'; // Ensure it meets Cognito requirements
+  }
+
+  /**
+   * Check if user exists in Cognito
+   */
+  private async checkUserExists(email: string): Promise<boolean> {
+    try {
+      await this.cognitoClient.send(new AdminGetUserCommand({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+        Username: email
+      }));
+      return true;
+    } catch (error: any) {
+      if (error.name === 'UserNotFoundException') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Generate QR code URL for OTP setup
+   */
+  private generateQRCodeUrl(email: string, secret: string): string {
+    const issuer = 'MISRA Platform';
+    const label = `${issuer}:${email}`;
+    const otpAuthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;
+    
+    // Return Google Charts QR code URL
+    return `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
   }
 }

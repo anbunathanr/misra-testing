@@ -87,6 +87,21 @@ export class CognitoAuth extends Construct {
           maxLen: 50,
           mutable: true,
         }),
+        otpSecret: new cognito.StringAttribute({
+          minLen: 1,
+          maxLen: 256,
+          mutable: true,
+        }),
+        backupCodes: new cognito.StringAttribute({
+          minLen: 1,
+          maxLen: 2048,
+          mutable: true,
+        }),
+        otpEnabled: new cognito.StringAttribute({
+          minLen: 1,
+          maxLen: 10,
+          mutable: true,
+        }),
       },
       passwordPolicy: {
         minLength: passwordMinLength,
@@ -141,7 +156,7 @@ export class CognitoAuth extends Construct {
           givenName: true,
           familyName: true,
         })
-        .withCustomAttributes('organizationId', 'role'),
+        .withCustomAttributes('organizationId', 'role', 'otpSecret', 'backupCodes', 'otpEnabled'),
       writeAttributes: new cognito.ClientAttributes()
         .withStandardAttributes({
           email: true,
@@ -149,7 +164,7 @@ export class CognitoAuth extends Construct {
           givenName: true,
           familyName: true,
         })
-        .withCustomAttributes('organizationId', 'role'),
+        .withCustomAttributes('organizationId', 'role', 'otpSecret', 'backupCodes', 'otpEnabled'),
     });
 
     // Store IDs for easy access

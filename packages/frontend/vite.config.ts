@@ -4,14 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   define: {
-    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
-    __API_URL__: JSON.stringify(process.env.VITE_API_URL)
+    // Remove process references - use import.meta.env instead
+    global: 'globalThis',
   },
   server: {
     port: 3000,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:4000',
+        target: 'http://localhost:4000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }

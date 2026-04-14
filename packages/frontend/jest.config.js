@@ -16,7 +16,8 @@ export default {
       env: {
         VITE_COGNITO_USER_POOL_ID: 'test-pool-id',
         VITE_COGNITO_CLIENT_ID: 'test-client-id',
-        VITE_ENVIRONMENT: 'demo'
+        VITE_ENVIRONMENT: 'demo',
+        VITE_API_URL: 'http://localhost:3000/api'
       }
     }
   },

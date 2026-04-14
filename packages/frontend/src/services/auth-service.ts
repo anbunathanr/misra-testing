@@ -24,7 +24,16 @@ export interface LoginResponse {
   expiresIn?: number;
 }
 
+export interface TokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // Unix timestamp
+}
+
 export class AuthService {
+  private refreshTimer: NodeJS.Timeout | null = null;
+  private readonly TOKEN_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiration
+
   /**
    * Login user via backend API
    */
@@ -49,6 +58,12 @@ export class AuthService {
         name: data.user.name,
         sub: data.user.userId,
       };
+
+      // Store tokens with lifecycle management
+      this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
+      
+      // Also store user info
+      localStorage.setItem('user', JSON.stringify(userInfo));
 
       return { token: data.accessToken, user: userInfo };
     } catch (error: any) {
@@ -101,8 +116,8 @@ export class AuthService {
    * Logout user
    */
   async logout(): Promise<void> {
-    // Clear any stored tokens
-    localStorage.removeItem('token');
+    // Clear all stored tokens and user data
+    this.clearTokens();
     localStorage.removeItem('user');
   }
 
@@ -208,6 +223,196 @@ export class AuthService {
   async isAuthenticated(): Promise<boolean> {
     const token = await this.getToken();
     return token !== null;
+  }
+
+  /**
+   * Store tokens with expiration tracking
+   */
+  storeTokens(accessToken: string, refreshToken: string, expiresIn?: number): void {
+    const expiresAt = Date.now() + (expiresIn || 3600) * 1000; // Default 1 hour
+    
+    const tokenData: TokenData = {
+      accessToken,
+      refreshToken,
+      expiresAt
+    };
+
+    localStorage.setItem('token', accessToken);
+    localStorage.setItem('tokenData', JSON.stringify(tokenData));
+    
+    // Schedule automatic token refresh
+    this.scheduleTokenRefresh(expiresAt);
+  }
+
+  /**
+   * Get stored token data with expiration info
+   */
+  getTokenData(): TokenData | null {
+    try {
+      const tokenDataStr = localStorage.getItem('tokenData');
+      if (!tokenDataStr) return null;
+      
+      const tokenData: TokenData = JSON.parse(tokenDataStr);
+      
+      // Check if token is expired
+      if (Date.now() >= tokenData.expiresAt) {
+        console.log('Token expired, clearing stored data');
+        this.clearTokens();
+        return null;
+      }
+      
+      return tokenData;
+    } catch (error) {
+      console.error('Error parsing token data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if token needs refresh (within buffer time of expiration)
+   */
+  needsRefresh(): boolean {
+    const tokenData = this.getTokenData();
+    if (!tokenData) return false;
+    
+    const timeUntilExpiry = tokenData.expiresAt - Date.now();
+    return timeUntilExpiry <= this.TOKEN_REFRESH_BUFFER;
+  }
+
+  /**
+   * Refresh access token using refresh token
+   */
+  async refreshAccessToken(): Promise<string | null> {
+    try {
+      const tokenData = this.getTokenData();
+      if (!tokenData) {
+        console.log('No token data available for refresh');
+        return null;
+      }
+
+      console.log('Refreshing access token...');
+      
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken: tokenData.refreshToken }),
+      });
+
+      if (!response.ok) {
+        console.error('Token refresh failed:', response.status);
+        this.clearTokens();
+        return null;
+      }
+
+      const data = await response.json();
+      
+      // Store new tokens
+      this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
+      
+      console.log('Token refreshed successfully');
+      return data.accessToken;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      this.clearTokens();
+      return null;
+    }
+  }
+
+  /**
+   * Schedule automatic token refresh before expiration
+   */
+  private scheduleTokenRefresh(expiresAt: number): void {
+    // Clear existing timer
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
+    const timeUntilRefresh = expiresAt - Date.now() - this.TOKEN_REFRESH_BUFFER;
+    
+    if (timeUntilRefresh <= 0) {
+      // Token expires soon, refresh immediately
+      console.log('Token expires soon, refreshing immediately');
+      this.refreshAccessToken();
+      return;
+    }
+
+    console.log(`Scheduling token refresh in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
+    
+    this.refreshTimer = setTimeout(() => {
+      this.refreshAccessToken();
+    }, timeUntilRefresh);
+  }
+
+  /**
+   * Restore session from localStorage on page load
+   */
+  async restoreSession(): Promise<{ token: string; user: UserInfo } | null> {
+    try {
+      const tokenData = this.getTokenData();
+      const userInfo = await this.getUserInfo();
+      
+      if (!tokenData || !userInfo) {
+        console.log('No valid session to restore');
+        return null;
+      }
+
+      // Check if token needs refresh
+      if (this.needsRefresh()) {
+        console.log('Token needs refresh during session restoration');
+        const newToken = await this.refreshAccessToken();
+        if (!newToken) {
+          return null;
+        }
+        return { token: newToken, user: userInfo };
+      }
+
+      // Schedule refresh for valid token
+      this.scheduleTokenRefresh(tokenData.expiresAt);
+      
+      console.log('Session restored successfully');
+      return { token: tokenData.accessToken, user: userInfo };
+    } catch (error) {
+      console.error('Error restoring session:', error);
+      this.clearTokens();
+      return null;
+    }
+  }
+
+  /**
+   * Validate current token and refresh if needed
+   */
+  async validateAndRefreshToken(): Promise<string | null> {
+    const tokenData = this.getTokenData();
+    
+    if (!tokenData) {
+      console.log('No token to validate');
+      return null;
+    }
+
+    // If token needs refresh, refresh it
+    if (this.needsRefresh()) {
+      console.log('Token needs refresh');
+      return await this.refreshAccessToken();
+    }
+
+    // Token is still valid
+    return tokenData.accessToken;
+  }
+
+  /**
+   * Clear all stored tokens and cancel refresh timer
+   */
+  clearTokens(): void {
+    localStorage.removeItem('token');
+    localStorage.removeItem('tokenData');
+    
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   // Cognito fallback methods

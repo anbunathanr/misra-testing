@@ -15,14 +15,25 @@ import TerminalOutput from './TerminalOutput';
 import AutomatedQuickStartForm from './AutomatedQuickStartForm';
 import RealTimeProgressDisplay from './RealTimeProgressDisplay';
 import MISRAResultsDisplay from './MISRAResultsDisplay';
+import EmailVerificationModal from './EmailVerificationModal';
+import OTPSetupModal from './OTPSetupModal';
 import ErrorBoundary from './ErrorBoundary';
 import { loggingService, LogEntry } from '../services/logging';
 import { mockBackend } from '../services/mock-backend';
 import { errorHandlingService, ErrorDetails } from '../services/error-handling';
+import { 
+  AuthStateManager, 
+  AuthenticationState, 
+  OTPSetupData, 
+  AuthError,
+  AuthenticationContext 
+} from '../services/auth-state-manager';
 
 interface ProductionMISRAAppProps {
   onComplete?: (results: AnalysisResults) => void;
   onError?: (error: AppError) => void;
+  onAuthenticationComplete?: (userSession: any) => void;
+  onAuthenticationError?: (error: AuthError) => void;
 }
 
 interface AnalysisResults {
@@ -85,11 +96,21 @@ interface UserInfo {
   email: string;
   name?: string;
   isRegistered: boolean;
+  isEmailVerified: boolean;
+  isOTPEnabled: boolean;
+}
+
+interface OTPSetupData {
+  secret: string;
+  qrCodeUrl: string;
+  backupCodes: string[];
 }
 
 const ProductionMISRAApp: React.FC<ProductionMISRAAppProps> = ({
   onComplete,
-  onError
+  onError,
+  onAuthenticationComplete,
+  onAuthenticationError
 }) => {
   // Core state
   const [currentStep, setCurrentStep] = useState(0);
@@ -109,6 +130,14 @@ const ProductionMISRAApp: React.FC<ProductionMISRAAppProps> = ({
   // Form state for quick registration
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+
+  // Authentication state management
+  const [authStateManager] = useState(() => new AuthStateManager());
+  const [authState, setAuthState] = useState<AuthenticationState>(AuthenticationState.INITIAL);
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
+  const [showOTPSetupModal, setShowOTPSetupModal] = useState(false);
+  const [otpSetupData, setOtpSetupData] = useState<OTPSetupData | null>(null);
+  const [authError, setAuthError] = useState<AuthError | null>(null);
 
   const steps: StepDefinition[] = [
     { id: 1, label: '1. Login', status: 'pending' },
@@ -137,8 +166,62 @@ const ProductionMISRAApp: React.FC<ProductionMISRAAppProps> = ({
     };
   }, []);
 
+  // Authentication state management listeners
+  useEffect(() => {
+    // Subscribe to authentication state changes
+    const unsubscribeStateChange = authStateManager.addStateChangeListener((context: AuthenticationContext) => {
+      setAuthState(context.state);
+      
+      // Update user info from context
+      if (context.userInfo.email) {
+        setUserInfo({
+          email: context.userInfo.email,
+          name: context.userInfo.name,
+          isRegistered: context.userInfo.isRegistered || false,
+          isEmailVerified: context.userInfo.isEmailVerified || false,
+          isOTPEnabled: context.userInfo.isOTPEnabled || false
+        });
+      }
+
+      // Handle authentication completion
+      if (context.state === AuthenticationState.AUTHENTICATED) {
+        loggingService.success('[AUTH] ✓ Authentication complete - user is fully authenticated');
+        onAuthenticationComplete?.(context.userInfo);
+      }
+
+      // Handle authentication errors
+      if (context.error) {
+        setAuthError(context.error);
+        onAuthenticationError?.(context.error);
+      }
+    });
+
+    // Subscribe to modal visibility changes
+    const unsubscribeModalVisibility = authStateManager.addModalVisibilityListener(
+      (modalType, visible, data) => {
+        if (modalType === 'email_verification') {
+          setShowEmailVerificationModal(visible);
+          if (visible) {
+            loggingService.info('[AUTH] Email verification required - please check your email');
+          }
+        } else if (modalType === 'otp_setup') {
+          setShowOTPSetupModal(visible);
+          if (visible && data?.otpSetup) {
+            setOtpSetupData(data.otpSetup);
+            loggingService.info('[AUTH] OTP setup required - please configure your authenticator app');
+          }
+        }
+      }
+    );
+
+    return () => {
+      unsubscribeStateChange();
+      unsubscribeModalVisibility();
+    };
+  }, [authStateManager, onAuthenticationComplete, onAuthenticationError]);
+
   // Production API endpoints - use environment variable or default
-  const API_BASE = process.env.REACT_APP_API_URL || 'https://api.misra.digitransolutions.in';
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.misra.digitransolutions.in';
 
   // Sample file library for automated selection
   const sampleFiles: SampleFile[] = [
@@ -226,42 +309,11 @@ int main() {
     try {
       loggingService.info('[AUTH] Starting quick registration...', { email });
 
-      // Use mock backend if enabled or if real backend is not available
-      if (mockBackend.shouldUseMock(API_BASE)) {
-        loggingService.info('[AUTH] Using mock backend for testing');
-        const result = await mockBackend.mockQuickRegister(email, name);
-        
-        setUserInfo({
-          email,
-          name: name || email.split('@')[0],
-          isRegistered: true
-        });
+      // Use AuthStateManager for authentication flow
+      await authStateManager.initiateRegistration(email, name);
 
-        loggingService.success('[AUTH] ✓ Mock registration successful', { userId: result.user.userId });
-        return result;
-      }
-
-      // Real backend call with enhanced error handling
-      const response = await errorHandlingService.fetchWithErrorHandling(
-        `${API_BASE}/auth/quick-register`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name })
-        },
-        { maxAttempts: 3, initialDelay: 1000 }
-      );
-
-      const result = await response.json();
-      
-      setUserInfo({
-        email,
-        name: name || email.split('@')[0],
-        isRegistered: true
-      });
-
-      loggingService.success('[AUTH] ✓ Quick registration successful', { userId: result.userId });
-      return result;
+      // The state change listener will handle the rest
+      loggingService.success('[AUTH] ✓ Registration initiated successfully');
     } catch (error: any) {
       const errorDetails = errorHandlingService.handleError(error, { operation: 'authentication' });
       loggingService.error('[AUTH] Registration failed', { 
@@ -617,7 +669,7 @@ int main() {
 
   return (
     <ErrorBoundary
-      showDetails={process.env.NODE_ENV === 'development'}
+      showDetails={import.meta.env.MODE === 'development'}
       onError={(error, errorInfo) => {
         console.error('ProductionMISRAApp Error:', error, errorInfo);
         // In production, you could send this to an error reporting service
@@ -785,6 +837,45 @@ int main() {
               visible={showOutput}
             />
           </Paper>
+
+          {/* Email Verification Modal */}
+          <EmailVerificationModal
+            open={showEmailVerificationModal}
+            email={email}
+            onClose={() => setShowEmailVerificationModal(false)}
+            onVerificationComplete={(otpSetup) => {
+              loggingService.success('[AUTH] ✓ Email verified successfully');
+              setOtpSetupData(otpSetup);
+              setShowEmailVerificationModal(false);
+              // Modal visibility listener will handle showing OTP setup modal
+            }}
+            onVerificationError={(error) => {
+              loggingService.error('[AUTH] Email verification failed', { error: error.message });
+              setAuthError(error);
+            }}
+            authStateManager={authStateManager}
+          />
+
+          {/* OTP Setup Modal */}
+          {otpSetupData && (
+            <OTPSetupModal
+              open={showOTPSetupModal}
+              email={email}
+              otpSetup={otpSetupData}
+              onClose={() => setShowOTPSetupModal(false)}
+              onSetupComplete={() => {
+                loggingService.success('[AUTH] ✓ OTP setup completed successfully');
+                setShowOTPSetupModal(false);
+                setOtpSetupData(null);
+                // Authentication is now complete
+              }}
+              onSetupError={(error) => {
+                loggingService.error('[AUTH] OTP setup failed', { error: error.message });
+                setAuthError(error);
+              }}
+              authStateManager={authStateManager}
+            />
+          )}
         </Container>
       </Box>
     </ErrorBoundary>
