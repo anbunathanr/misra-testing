@@ -90,13 +90,26 @@ async function processAnalysisMessage(
     fileSize = fileContent.length;
     console.log(`File downloaded successfully, size: ${fileSize} bytes`);
 
-    // Invoke MISRA Analysis Engine (Requirement 6.4)
+    // Invoke MISRA Analysis Engine with progress tracking (Requirement 6.4, 3.3)
     console.log(`Starting MISRA analysis for ${language} file`);
+    
+    // Create progress callback to update DynamoDB every 2 seconds
+    const progressCallback = async (progress: number, message: string) => {
+      try {
+        await updateAnalysisProgress(fileId, progress, message);
+        console.log(`[Progress] ${progress}% - ${message}`);
+      } catch (error) {
+        console.error('[Progress] Failed to update progress:', error);
+        // Don't throw - progress updates are non-critical
+      }
+    };
+    
     const analysisResult = await analysisEngine.analyzeFile(
       fileContent,
       language,
       fileId,
-      userId
+      userId,
+      { progressCallback, updateInterval: 2000 } // 2-second updates (Requirement 3.3)
     );
 
     const duration = Date.now() - startTime;
@@ -267,5 +280,33 @@ async function updateFileMetadataStatus(
   } catch (error) {
     console.error('Error updating file metadata:', error);
     throw new Error(`Failed to update file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Update analysis progress in DynamoDB
+ * Requirements: 3.3 (2-second progress updates)
+ */
+async function updateAnalysisProgress(
+  fileId: string,
+  progress: number,
+  message: string
+): Promise<void> {
+  try {
+    const command = new UpdateItemCommand({
+      TableName: fileMetadataTable,
+      Key: marshall({ file_id: fileId }),
+      UpdateExpression: 'SET analysis_progress = :progress, analysis_message = :message, updated_at = :updatedAt',
+      ExpressionAttributeValues: {
+        ':progress': { N: progress.toString() },
+        ':message': { S: message },
+        ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+      },
+    });
+
+    await dynamoClient.send(command);
+  } catch (error) {
+    console.error('Error updating analysis progress:', error);
+    // Don't throw - progress updates are non-critical
   }
 }

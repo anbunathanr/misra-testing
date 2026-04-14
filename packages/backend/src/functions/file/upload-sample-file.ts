@@ -3,6 +3,8 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SampleFileService } from '../../services/sample-file-service';
 import { FileMetadataService } from '../../services/file-metadata-service';
 import { UploadProgressService } from '../../services/upload-progress-service';
+import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
+import { FileType, AnalysisStatus } from '../../types/file-metadata';
 import { SampleFileUploadRequest, SampleFileUploadResponse } from '../../types/sample-file';
 import { v4 as uuidv4 } from 'uuid';
 import { getUserFromContext } from '../../utils/auth-util';
@@ -54,7 +56,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     const sampleFileService = new SampleFileService();
-    const fileMetadataService = new FileMetadataService();
+    const dbClient = new DynamoDBClientWrapper();
+    const fileMetadataService = new FileMetadataService(dbClient);
     
     // Randomly select a sample file based on preferences
     const selectedSample = await sampleFileService.getRandomSampleFile(
@@ -113,19 +116,22 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     await s3Client.send(uploadCommand);
 
     // Create file metadata record
+    const now = Date.now();
     await fileMetadataService.createFileMetadata({
       file_id: fileId,
       filename: sampleFile.filename,
-      file_type: sampleFile.language.toLowerCase() as 'c' | 'cpp',
+      file_type: sampleFile.language.toLowerCase() === 'c' ? FileType.C : FileType.CPP,
       file_size: sampleFile.file_size,
       user_id: request.userEmail, // Using email as user ID for now
-      upload_timestamp: Date.now(),
-      analysis_status: 'pending',
+      upload_timestamp: now,
+      analysis_status: AnalysisStatus.PENDING,
       s3_key: s3Key,
       is_sample_file: true,
       sample_id: sampleFile.sample_id,
       sample_description: sampleFile.description,
       expected_violations: sampleFile.expected_violations,
+      created_at: now,
+      updated_at: now,
     });
 
     const response: SampleFileUploadResponse = {

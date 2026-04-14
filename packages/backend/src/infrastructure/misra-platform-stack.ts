@@ -17,6 +17,9 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
@@ -37,6 +40,30 @@ export class MisraPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Production domain configuration
+    const productionDomain = 'misra.digitransolutions.in';
+    const apiDomain = 'api.misra.digitransolutions.in';
+    const hostedZoneName = 'digitransolutions.in';
+    
+    // Import existing hosted zone (must exist in Route53)
+    // Note: The hosted zone must be created manually in Route53 before deploying this stack
+    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: hostedZoneName,
+    });
+
+    // Create SSL certificate for CloudFront (must be in us-east-1)
+    // CloudFront requires certificates to be in us-east-1 region
+    const frontendCertificate = new certificatemanager.Certificate(this, 'FrontendCertificate', {
+      domainName: productionDomain,
+      validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
+    });
+
+    // Create SSL certificate for API Gateway (can be in any region)
+    const apiCertificate = new certificatemanager.Certificate(this, 'ApiCertificate', {
+      domainName: apiDomain,
+      validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
+    });
+
     // S3 Buckets for file storage
     const fileStorageBucket = new s3.Bucket(this, 'FileStorageBucket', {
       bucketName: `misra-platform-files-${this.account}`,
@@ -55,12 +82,17 @@ export class MisraPlatformStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
     });
 
-    // CloudFront distribution for frontend
+    // CloudFront distribution for frontend with custom domain
     const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
         origin: new origins.S3Origin(frontendBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
       },
+      domainNames: [productionDomain],
+      certificate: frontendCertificate,
+      defaultRootObject: 'index.html',
       errorResponses: [
         {
           httpStatus: 404,
@@ -75,6 +107,19 @@ export class MisraPlatformStack extends cdk.Stack {
           ttl: cdk.Duration.minutes(5),
         },
       ],
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // Use only North America and Europe edge locations
+      enableLogging: true,
+      comment: 'MISRA Platform Production Frontend Distribution',
+    });
+
+    // Create Route53 A record for frontend domain
+    new route53.ARecord(this, 'FrontendAliasRecord', {
+      zone: hostedZone,
+      recordName: productionDomain,
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.CloudFrontTarget(distribution)
+      ),
+      comment: 'CloudFront distribution for MISRA Platform frontend',
     });
 
     // Cognito User Pool for authentication
@@ -267,7 +312,7 @@ export class MisraPlatformStack extends cdk.Stack {
     const sampleFilesTable = new SampleFilesTable(this, 'SampleFilesTable');
 
     // Upload Progress Table for tracking file upload progress
-    const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment });
+    const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment: 'dev' });
 
     // Projects Table for Web App Testing System - Using existing TestProjects table
     const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
@@ -1475,6 +1520,24 @@ export class MisraPlatformStack extends cdk.Stack {
     analysisResultsTable.grantReadData(queryResultsFunction);
     analysisResultsTable.grantReadData(userStatsFunction);
 
+    // Analysis Status Lambda Function (Task 5.2)
+    const analysisStatusFunction = new lambda.Function(this, 'AnalysisStatusFunction', {
+      functionName: 'misra-platform-analysis-status',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/analysis/status'),
+      environment: {
+        ANALYSIS_RESULTS_TABLE_NAME: analysisResultsTable.tableName,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 256,
+      reservedConcurrentExecutions: 0,
+    });
+
+    // Grant analysis status function access to analysis results
+    analysisResultsTable.grantReadData(analysisStatusFunction);
+
     // AI Insights Lambda Function
     const aiInsightsFunction = new lambda.Function(this, 'AIInsightsFunction', {
       functionName: 'misra-platform-ai-insights',
@@ -1506,7 +1569,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // Grant upload-complete function permission to start workflow executions
     workflow.stateMachine.grantStartExecution(uploadCompleteFunction);
 
-    // API Gateway
+    // API Gateway with custom domain
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
       apiName: 'misra-platform-api',
       description: 'MISRA Platform REST API',
@@ -1521,6 +1584,32 @@ export class MisraPlatformStack extends cdk.Stack {
         ],
         allowHeaders: ['Content-Type', 'Authorization'],
       },
+    });
+
+    // Create custom domain for API Gateway
+    const apiDomainName = new apigateway.DomainName(this, 'ApiCustomDomain', {
+      domainName: apiDomain,
+      certificate: apiCertificate,
+    });
+
+    // Map the custom domain to the API Gateway stage
+    new apigateway.ApiMapping(this, 'ApiMapping', {
+      api: api,
+      domainName: apiDomainName,
+      stage: api.defaultStage!,
+    });
+
+    // Create Route53 A record for API domain
+    new route53.ARecord(this, 'ApiAliasRecord', {
+      zone: hostedZone,
+      recordName: apiDomain,
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.ApiGatewayv2DomainProperties(
+          apiDomainName.regionalDomainName,
+          apiDomainName.regionalHostedZoneId
+        )
+      ),
+      comment: 'API Gateway custom domain for MISRA Platform API',
     });
 
     // Create HTTP API Lambda Authorizer for JWT verification
@@ -1627,6 +1716,16 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/analysis/stats/{userId}',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('UserStatsIntegration', userStatsFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+      authorizer: authorizer,
+    });
+
+    // Add analysis status route (Task 5.2)
+    api.addRoutes({
+      path: '/analysis/{analysisId}/status',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('AnalysisStatusIntegration', analysisStatusFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
       authorizer: authorizer,
@@ -1889,6 +1988,18 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'CloudFrontDistributionDomain', {
       value: distribution.distributionDomainName,
       description: 'CloudFront distribution domain',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendCustomDomain', {
+      value: `https://${productionDomain}`,
+      description: 'Production frontend URL with custom domain',
+      exportName: 'misra-platform-frontend-url',
+    });
+
+    new cdk.CfnOutput(this, 'ApiCustomDomainUrl', {
+      value: `https://${apiDomain}`,
+      description: 'Production API URL with custom domain',
+      exportName: 'misra-platform-api-url',
     });
 
     new cdk.CfnOutput(this, 'ProcessingQueueUrl', {

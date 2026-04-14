@@ -33,7 +33,7 @@ export class UploadProgressTable extends Construct {
       },
       
       // Billing mode - on-demand for variable workloads
-      billingMode: BillingMode.ON_DEMAND,
+      billingMode: BillingMode.PAY_PER_REQUEST,
       
       // Enable point-in-time recovery for production
       pointInTimeRecovery: environment === 'prod',

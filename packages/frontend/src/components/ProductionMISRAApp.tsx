@@ -5,19 +5,16 @@ import {
   Typography,
   Button,
   Alert,
-  Container,
-  Card,
-  CardContent,
-  Grid
+  Container
 } from '@mui/material';
 import { 
-  PlayArrow as PlayArrowIcon,
-  Download as DownloadIcon
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 import StepIndicator, { StepDefinition } from './StepIndicator';
 import TerminalOutput from './TerminalOutput';
 import AutomatedQuickStartForm from './AutomatedQuickStartForm';
 import RealTimeProgressDisplay from './RealTimeProgressDisplay';
+import MISRAResultsDisplay from './MISRAResultsDisplay';
 import { loggingService, LogEntry } from '../services/logging';
 import { mockBackend } from '../services/mock-backend';
 
@@ -616,72 +613,19 @@ int main() {
             </Alert>
           )}
 
-          {/* Results Display */}
+          {/* Comprehensive Results Display */}
           {analysisResults && (
-            <Card sx={{ mb: 3, backgroundColor: '#f0f8ff' }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, color: '#333' }}>
-                  📊 Analysis Results
-                </Typography>
-                
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h3" sx={{ color: analysisResults.complianceScore >= 80 ? '#4caf50' : '#ff9800', fontWeight: 'bold' }}>
-                        {analysisResults.complianceScore}%
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Compliance Score
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h3" sx={{ color: '#f44336', fontWeight: 'bold' }}>
-                        {analysisResults.violations.length}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Violations Found
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h3" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
-                        {Math.round(analysisResults.duration / 1000)}s
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Analysis Time
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                {analysisResults.reportUrl && (
-                  <Box sx={{ mt: 2, textAlign: 'center' }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<DownloadIcon />}
-                      onClick={downloadReport}
-                      sx={{ mr: 2 }}
-                    >
-                      Download Detailed Report
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setAnalysisResults(null);
-                        setSelectedSampleFile(null);
-                        setEmail('');
-                        setName('');
-                      }}
-                    >
-                      Analyze Another File
-                    </Button>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+            <MISRAResultsDisplay
+              results={analysisResults}
+              onDownloadReport={downloadReport}
+              onAnalyzeAnother={() => {
+                setAnalysisResults(null);
+                setSelectedSampleFile(null);
+                setEmail('');
+                setName('');
+                clearOutput();
+              }}
+            />
           )}
 
           {/* Real-Time Progress Display */}

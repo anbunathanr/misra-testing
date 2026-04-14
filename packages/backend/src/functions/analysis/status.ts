@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { analysisMonitor } from '../../services/misra-analysis/analysis-monitor';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 
@@ -9,6 +10,9 @@ interface AnalysisStatusResponse {
   status: 'queued' | 'running' | 'completed' | 'failed';
   progress: number;
   estimatedTimeRemaining?: number;
+  rulesProcessed?: number;
+  totalRules?: number;
+  currentStep?: string;
   results?: AnalysisResults;
   error?: string;
   createdAt: string;
@@ -47,47 +51,49 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'MISSING_ANALYSIS_ID', 'Analysis ID is required');
     }
 
-    // Get analysis record from DynamoDB
-    const analysisRecord = await dynamoClient.send(new GetCommand({
-      TableName: process.env.ANALYSIS_RESULTS_TABLE_NAME!,
-      Key: { analysisId }
-    }));
+    // Use analysis monitor to get comprehensive progress information
+    // Requirements: 3.3 (2-second polling), 3.4 (estimated time remaining)
+    const progress = await analysisMonitor.getAnalysisProgress(analysisId);
 
-    if (!analysisRecord.Item) {
+    if (!progress) {
       return errorResponse(404, 'ANALYSIS_NOT_FOUND', 'Analysis not found');
     }
 
-    const analysis = analysisRecord.Item;
-    
-    // Return real analysis status from database
-    let currentProgress = analysis.progress || 0;
-    let status = analysis.status;
-    let estimatedTimeRemaining;
+    // Get full analysis record for results if completed
+    let results: AnalysisResults | undefined;
+    let error: string | undefined;
+    let completedAt: string | undefined;
 
-    // Calculate estimated time remaining for running analyses
-    if (status === 'running' && currentProgress < 100) {
-      const runTime = Date.now() - new Date(analysis.createdAt).getTime();
-      const estimatedTotal = analysis.estimatedDuration || 120000; // 2 minutes default
-      const progressRate = currentProgress / runTime;
-      estimatedTimeRemaining = Math.max(5, Math.floor((100 - currentProgress) / progressRate / 1000));
-    }
+    if (progress.status === 'completed' || progress.status === 'failed') {
+      try {
+        const analysisRecord = await dynamoClient.send(new GetCommand({
+          TableName: process.env.ANALYSIS_RESULTS_TABLE_NAME!,
+          Key: { analysisId }
+        }));
 
-    // If analysis is completed, ensure we have results
-    if (status === 'completed' && !analysis.results) {
-      // This shouldn't happen in production, but handle gracefully
-      status = 'failed';
-      analysis.error = 'Analysis completed but results not found';
+        if (analysisRecord && analysisRecord.Item) {
+          results = analysisRecord.Item.results;
+          error = analysisRecord.Item.error;
+          completedAt = analysisRecord.Item.completedAt;
+        }
+      } catch (dbError) {
+        // Log error but don't fail the request - progress data is sufficient
+        console.warn('Failed to fetch additional analysis data from DynamoDB:', dbError);
+      }
     }
 
     const response: AnalysisStatusResponse = {
       analysisId,
-      status,
-      progress: currentProgress,
-      estimatedTimeRemaining,
-      results: analysis.results,
-      error: analysis.error,
-      createdAt: analysis.createdAt,
-      completedAt: analysis.completedAt
+      status: progress.status,
+      progress: progress.progress,
+      estimatedTimeRemaining: progress.estimatedTimeRemaining,
+      rulesProcessed: progress.rulesProcessed,
+      totalRules: progress.totalRules,
+      currentStep: progress.currentStep,
+      results,
+      error,
+      createdAt: new Date(progress.startTime).toISOString(),
+      completedAt
     };
 
     return {

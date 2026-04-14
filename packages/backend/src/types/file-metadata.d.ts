@@ -44,6 +44,10 @@ export interface FileMetadata {
     s3_key: string;
     created_at: number;
     updated_at: number;
+    is_sample_file?: boolean;
+    sample_id?: string;
+    sample_description?: string;
+    expected_violations?: number;
 }
 /**
  * Pagination options for query operations

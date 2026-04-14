@@ -1,4 +1,4 @@
-import { Table, AttributeType, BillingMode } from 'aws-cdk-lib/aws-dynamodb';
+import { Table, AttributeType, BillingMode, TableEncryption } from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import { RemovalPolicy } from 'aws-cdk-lib';
 
@@ -17,7 +17,7 @@ export class SampleFilesTable extends Construct {
       billingMode: BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.RETAIN,
       pointInTimeRecovery: true,
-      encryption: Table.ENCRYPTION_DEFAULT,
+      encryption: TableEncryption.AWS_MANAGED,
     });
 
     // Global Secondary Index for querying by language
