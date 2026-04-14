@@ -1,0 +1,16 @@
+{
+  "MisraPlatformProductionStack": {
+    "ProductionDeploymentProductionGetProjectsFunctionNameA5E928C2": "misra-platform-get-projects-prod",
+    "ProductionDeploymentProductionGetAnalysisResultsFunctionName0570A981": "misra-platform-get-analysis-results-prod",
+    "ProductionDeploymentProductionCreateProjectFunctionName56AE2D2C": "misra-platform-create-project-prod",
+    "ProductionDeploymentProductionSampleFilesTableName4B647166": "misra-platform-sample-files-prod",
+    "ProductionDeploymentProductionAnalyzeFileFunctionName633F40F9": "misra-platform-analyze-file-prod",
+    "ProductionDeploymentProductionUsersTableName62F68872": "misra-platform-users-prod",
+    "ProductionDeploymentProductionUploadFileFunctionName205CC342": "misra-platform-upload-file-prod",
+    "ProductionDeploymentProductionAnalysisResultsTableName3832C9F6": "misra-platform-analysis-results-prod",
+    "ProductionDeploymentProductionBucketName7B613D1F": "misra-platform-files-prod-982479882798",
+    "ProductionDeploymentProductionFileMetadataTableNameC918F36B": "misra-platform-file-metadata-prod",
+    "ProductionDeploymentProductionAuthorizerFunctionName7CBEE924": "misra-platform-authorizer-prod",
+    "ProductionDeploymentProductionProjectsTableName4749B6D4": "misra-platform-projects-prod"
+  }
+}

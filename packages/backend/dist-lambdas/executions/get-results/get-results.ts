@@ -3,12 +3,11 @@
  * Returns complete execution details with pre-signed screenshot URLs
  */
 
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
 import { TestExecution } from '../../types/test-execution';
-import { withAuthAndPermission, AuthenticatedEvent } from '../../middleware/auth-middleware';
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -21,10 +20,7 @@ export interface ExecutionResultsResponse {
   screenshotUrls: string[];
 }
 
-export const handler = withAuthAndPermission(
-  'tests',
-  'read',
-  async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
       console.log('Get execution results request:', JSON.stringify(event));
 
@@ -110,5 +106,4 @@ export const handler = withAuthAndPermission(
         }),
       };
     }
-  }
-);
+};

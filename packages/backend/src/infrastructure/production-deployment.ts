@@ -6,8 +6,12 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as kms from 'aws-cdk-lib/aws-kms';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as cdk from 'aws-cdk-lib';
 import { RemovalPolicy, Duration } from 'aws-cdk-lib';
+import { MonitoringStack } from './monitoring-stack';
 
 /**
  * Production S3 Bucket Configuration
@@ -209,7 +213,9 @@ export class ProductionDynamoDBTable extends Construct {
       encryptionKey,
       
       // Point-in-time recovery for production
-      pointInTimeRecovery: environment === 'prod',
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: environment === 'prod'
+      },
       
       // Removal policy
       removalPolicy: environment === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
@@ -271,16 +277,7 @@ export class ProductionLambdaFunction extends Construct {
     // Create CloudWatch log group with encryption
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/aws/lambda/${id}`,
-      retention: props.timeout?.toSeconds() ? Math.ceil(props.timeout.toSeconds() / 60) * 90 : 14,
-    });
-
-    // Create KMS key for function encryption
-    const functionKey = new kms.Key(this, 'FunctionEncryptionKey', {
-      alias: `misra-platform-${id}`,
-      description: `KMS key for MISRA Platform ${id} Lambda function`,
-      enableKeyRotation: true,
-      pendingWindow: Duration.days(30),
-      removalPolicy: RemovalPolicy.RETAIN,
+      retention: logs.RetentionDays.TWO_WEEKS, // Use a valid retention value
     });
 
     // Build environment variables
@@ -326,43 +323,74 @@ export class ProductionLambdaFunction extends Construct {
  * Production Deployment Stack
  * 
  * Deploys production-specific infrastructure enhancements for Task 7.2
+ * Fixes duplicate table issues and provides comprehensive production deployment
+ * 
+ * Task 8.2 Enhancement: Adds comprehensive monitoring and alerting
  */
 export class ProductionDeploymentStack extends Construct {
+  public readonly monitoringStack: MonitoringStack;
+  public readonly apiGateway: apigateway.RestApi;
+
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    // Production S3 Bucket
+    // Production S3 Bucket with versioning and encryption
     const productionBucket = new ProductionS3Bucket(this, 'ProductionFileStorage', {
       environment: 'prod',
     });
 
-    // Production DynamoDB Tables
-    const usersTable = new ProductionDynamoDBTable(this, 'UsersTable', {
+    // Production DynamoDB Tables with unique names to avoid conflicts
+    const usersTable = new ProductionDynamoDBTable(this, 'ProductionUsersTable', {
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       environment: 'prod',
-      tableName: 'misra-platform-users',
+      tableName: 'misra-platform-users-prod',
     });
 
-    const analysesTable = new ProductionDynamoDBTable(this, 'AnalysesTable', {
-      partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
-      environment: 'prod',
-      tableName: 'misra-platform-analyses',
-    });
-
-    // Add GSI for analyses table
-    analysesTable.addGlobalSecondaryIndex({
-      indexName: 'projectId-createdAt-index',
-      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.NUMBER },
+    // Add GSI for email queries
+    usersTable.addGlobalSecondaryIndex({
+      indexName: 'email-index',
+      partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    const analysisResultsTable = new ProductionDynamoDBTable(this, 'AnalysisResultsTable', {
+    const projectsTable = new ProductionDynamoDBTable(this, 'ProductionProjectsTable', {
+      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
+      environment: 'prod',
+      tableName: 'misra-platform-projects-prod',
+    });
+
+    // Add GSIs for projects table
+    projectsTable.addGlobalSecondaryIndex({
+      indexName: 'userId-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    projectsTable.addGlobalSecondaryIndex({
+      indexName: 'organizationId-index',
+      partitionKey: { name: 'organizationId', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const fileMetadataTable = new ProductionDynamoDBTable(this, 'ProductionFileMetadataTable', {
+      partitionKey: { name: 'fileId', type: dynamodb.AttributeType.STRING },
+      environment: 'prod',
+      tableName: 'misra-platform-file-metadata-prod',
+    });
+
+    // Add GSIs for file metadata table
+    fileMetadataTable.addGlobalSecondaryIndex({
+      indexName: 'userId-uploadTimestamp-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'uploadTimestamp', type: dynamodb.AttributeType.NUMBER },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const analysisResultsTable = new ProductionDynamoDBTable(this, 'ProductionAnalysisResultsTable', {
       partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
       environment: 'prod',
-      tableName: 'misra-platform-analysis-results',
+      tableName: 'misra-platform-analysis-results-prod',
     });
 
     // Add GSIs for analysis results table
@@ -380,27 +408,23 @@ export class ProductionDeploymentStack extends Construct {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // Production Lambda Functions
-    const analysisFunction = new ProductionLambdaFunction(this, 'misra-platform-analysis', {
-      entry: '../functions/analysis/analyze-file',
-      handler: 'index.handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
-      timeout: Duration.minutes(5),
-      memorySize: 2048,
-      environment: {
-        FILE_STORAGE_BUCKET_NAME: productionBucket.bucket.bucketName,
-        ANALYSIS_RESULTS_TABLE: analysisResultsTable.table.tableName,
-        ANALYSIS_CACHE_TABLE: 'misra-platform-analysis-cache',
-      },
+    const sampleFilesTable = new ProductionDynamoDBTable(this, 'ProductionSampleFilesTable', {
+      partitionKey: { name: 'sampleId', type: dynamodb.AttributeType.STRING },
+      environment: 'prod',
+      tableName: 'misra-platform-sample-files-prod',
     });
 
-    // Grant permissions
-    productionBucket.grantReadWrite(analysisFunction.function);
-    analysisResultsTable.grantReadWriteData(analysisFunction.function);
+    // Add GSI for sample files by language
+    sampleFilesTable.addGlobalSecondaryIndex({
+      indexName: 'language-difficultyLevel-index',
+      partitionKey: { name: 'language', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'difficultyLevel', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
 
     // Secrets Manager for production secrets
-    const jwtSecret = new secretsmanager.Secret(this, 'JWTSecret', {
-      secretName: 'misra-platform-jwt-secret',
+    const jwtSecret = new secretsmanager.Secret(this, 'ProductionJWTSecret', {
+      secretName: 'misra-platform-jwt-secret-prod',
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'jwt' }),
         generateStringKey: 'secret',
@@ -408,13 +432,250 @@ export class ProductionDeploymentStack extends Construct {
       },
     });
 
-    // Grant Lambda function access to JWT secret
-    jwtSecret.grantRead(analysisFunction.function);
+    const openaiSecret = new secretsmanager.Secret(this, 'ProductionOpenAISecret', {
+      secretName: 'misra-platform-openai-secret-prod',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ username: 'openai' }),
+        generateStringKey: 'apiKey',
+        excludeCharacters: '"@/\\',
+      },
+    });
+
+    // Production Lambda Functions with proper environment variables
+    const analyzeFileFunction = new ProductionLambdaFunction(this, 'misra-platform-analyze-file-prod', {
+      entry: '../functions/analysis/analyze-file',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.minutes(5),
+      memorySize: 2048,
+      reservedConcurrentExecutions: 10,
+      environment: {
+        FILE_STORAGE_BUCKET_NAME: productionBucket.bucket.bucketName,
+        FILE_METADATA_TABLE_NAME: fileMetadataTable.table.tableName,
+        ANALYSIS_RESULTS_TABLE_NAME: analysisResultsTable.table.tableName,
+        USERS_TABLE_NAME: usersTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const getAnalysisResultsFunction = new ProductionLambdaFunction(this, 'misra-platform-get-analysis-results-prod', {
+      entry: '../functions/analysis/get-analysis-results',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        ANALYSIS_RESULTS_TABLE_NAME: analysisResultsTable.table.tableName,
+        FILE_METADATA_TABLE_NAME: fileMetadataTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const uploadFileFunction = new ProductionLambdaFunction(this, 'misra-platform-upload-file-prod', {
+      entry: '../functions/file/upload',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.minutes(2),
+      memorySize: 1024,
+      environment: {
+        FILE_STORAGE_BUCKET_NAME: productionBucket.bucket.bucketName,
+        FILE_METADATA_TABLE_NAME: fileMetadataTable.table.tableName,
+        SAMPLE_FILES_TABLE_NAME: sampleFilesTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const createProjectFunction = new ProductionLambdaFunction(this, 'misra-platform-create-project-prod', {
+      entry: '../functions/projects/create-project',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        PROJECTS_TABLE_NAME: projectsTable.table.tableName,
+        USERS_TABLE_NAME: usersTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const getProjectsFunction = new ProductionLambdaFunction(this, 'misra-platform-get-projects-prod', {
+      entry: '../functions/projects/get-projects',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        PROJECTS_TABLE_NAME: projectsTable.table.tableName,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const authorizerFunction = new ProductionLambdaFunction(this, 'misra-platform-authorizer-prod', {
+      entry: '../functions/auth/authorizer',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.seconds(10),
+      memorySize: 256,
+      environment: {
+        JWT_SECRET_NAME: jwtSecret.secretName,
+        USERS_TABLE_NAME: usersTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    // Grant S3 permissions
+    productionBucket.grantReadWrite(analyzeFileFunction.function);
+    productionBucket.grantReadWrite(uploadFileFunction.function);
+
+    // Grant DynamoDB permissions
+    usersTable.grantReadWriteData(authorizerFunction.function);
+    usersTable.grantReadWriteData(createProjectFunction.function);
+    
+    projectsTable.grantReadWriteData(createProjectFunction.function);
+    projectsTable.grantReadData(getProjectsFunction.function);
+    
+    fileMetadataTable.grantReadWriteData(analyzeFileFunction.function);
+    fileMetadataTable.grantReadWriteData(uploadFileFunction.function);
+    fileMetadataTable.grantReadData(getAnalysisResultsFunction.function);
+    
+    analysisResultsTable.grantReadWriteData(analyzeFileFunction.function);
+    analysisResultsTable.grantReadData(getAnalysisResultsFunction.function);
+    
+    sampleFilesTable.grantReadData(uploadFileFunction.function);
+
+    // Grant Secrets Manager permissions
+    jwtSecret.grantRead(authorizerFunction.function);
+    jwtSecret.grantRead(createProjectFunction.function);
+    jwtSecret.grantRead(getProjectsFunction.function);
+    openaiSecret.grantRead(analyzeFileFunction.function);
+
+    // Create API Gateway for monitoring endpoints
+    this.apiGateway = new apigateway.RestApi(this, 'MISRAPlatformAPI', {
+      restApiName: 'MISRA Platform Production API',
+      description: 'Production API for MISRA Platform with monitoring endpoints',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key', 'X-Correlation-ID'],
+      },
+    });
+
+    // Task 8.2: Add monitoring Lambda functions
+    const healthCheckFunction = new ProductionLambdaFunction(this, 'misra-platform-health-check-prod', {
+      entry: '../functions/monitoring/health-check',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        FILE_STORAGE_BUCKET_NAME: productionBucket.bucket.bucketName,
+        USERS_TABLE_NAME: usersTable.table.tableName,
+        PROJECTS_TABLE_NAME: projectsTable.table.tableName,
+        FILE_METADATA_TABLE_NAME: fileMetadataTable.table.tableName,
+        ANALYSIS_RESULTS_TABLE_NAME: analysisResultsTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    const metricsCollectorFunction = new ProductionLambdaFunction(this, 'misra-platform-metrics-collector-prod', {
+      entry: '../functions/monitoring/metrics-collector',
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: Duration.minutes(5),
+      memorySize: 1024,
+      environment: {
+        FILE_STORAGE_BUCKET_NAME: productionBucket.bucket.bucketName,
+        USERS_TABLE_NAME: usersTable.table.tableName,
+        PROJECTS_TABLE_NAME: projectsTable.table.tableName,
+        FILE_METADATA_TABLE_NAME: fileMetadataTable.table.tableName,
+        ANALYSIS_RESULTS_TABLE_NAME: analysisResultsTable.table.tableName,
+        SAMPLE_FILES_TABLE_NAME: sampleFilesTable.table.tableName,
+        ENVIRONMENT: 'prod',
+      },
+    });
+
+    // Grant additional S3 permissions for monitoring
+    productionBucket.grantRead(healthCheckFunction.function);
+    productionBucket.grantRead(metricsCollectorFunction.function);
+
+    // Grant additional DynamoDB permissions for monitoring
+    usersTable.grantReadData(healthCheckFunction.function);
+    usersTable.grantReadData(metricsCollectorFunction.function);
+    projectsTable.grantReadData(metricsCollectorFunction.function);
+    fileMetadataTable.grantReadData(metricsCollectorFunction.function);
+    analysisResultsTable.grantReadData(metricsCollectorFunction.function);
+    sampleFilesTable.grantReadData(metricsCollectorFunction.function);
+
+    // Grant CloudWatch permissions for monitoring functions
+    const cloudWatchPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cloudwatch:PutMetricData',
+        'cloudwatch:GetMetricStatistics',
+        'cloudwatch:ListMetrics',
+        'logs:CreateLogGroup',
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+      ],
+      resources: ['*'],
+    });
+
+    healthCheckFunction.function.addToRolePolicy(cloudWatchPolicy);
+    metricsCollectorFunction.function.addToRolePolicy(cloudWatchPolicy);
+
+    // Add monitoring endpoints to API Gateway
+    const healthResource = this.apiGateway.root.addResource('health');
+    healthResource.addMethod('GET', new apigateway.LambdaIntegration(healthCheckFunction.function));
+    
+    const detailedHealthResource = healthResource.addResource('detailed');
+    detailedHealthResource.addMethod('GET', new apigateway.LambdaIntegration(healthCheckFunction.function));
+    
+    const serviceHealthResource = healthResource.addResource('service').addResource('{serviceName}');
+    serviceHealthResource.addMethod('GET', new apigateway.LambdaIntegration(healthCheckFunction.function));
+
+    const metricsResource = this.apiGateway.root.addResource('metrics');
+    const collectMetricsResource = metricsResource.addResource('collect');
+    collectMetricsResource.addMethod('POST', new apigateway.LambdaIntegration(metricsCollectorFunction.function));
+
+    // Schedule metrics collection every 5 minutes
+    const metricsCollectionRule = new events.Rule(this, 'MetricsCollectionSchedule', {
+      schedule: events.Schedule.rate(Duration.minutes(5)),
+      description: 'Trigger metrics collection every 5 minutes',
+    });
+
+    metricsCollectionRule.addTarget(new targets.LambdaFunction(metricsCollectorFunction.function));
+
+    // Task 8.2: Create comprehensive monitoring stack
+    this.monitoringStack = new MonitoringStack(this, 'MonitoringStack', {
+      environment: 'prod',
+      apiGateway: this.apiGateway,
+      lambdaFunctions: {
+        'analyze-file': analyzeFileFunction.function,
+        'get-analysis-results': getAnalysisResultsFunction.function,
+        'upload-file': uploadFileFunction.function,
+        'create-project': createProjectFunction.function,
+        'get-projects': getProjectsFunction.function,
+        'authorizer': authorizerFunction.function,
+        'health-check': healthCheckFunction.function,
+        'metrics-collector': metricsCollectorFunction.function,
+      },
+      dynamoTables: {
+        'users': usersTable.table,
+        'projects': projectsTable.table,
+        'file-metadata': fileMetadataTable.table,
+        'analysis-results': analysisResultsTable.table,
+        'sample-files': sampleFilesTable.table,
+      },
+      s3Bucket: productionBucket.bucket,
+      alertEmail: 'alerts@digitransolutions.in', // Configure as needed
+    });
 
     // Output production configuration
     new cdk.CfnOutput(this, 'ProductionBucketName', {
       value: productionBucket.bucket.bucketName,
-      description: 'Production S3 bucket name',
+      description: 'Production S3 bucket name for file storage',
     });
 
     new cdk.CfnOutput(this, 'ProductionUsersTableName', {
@@ -422,9 +683,14 @@ export class ProductionDeploymentStack extends Construct {
       description: 'Production users table name',
     });
 
-    new cdk.CfnOutput(this, 'ProductionAnalysesTableName', {
-      value: analysesTable.table.tableName,
-      description: 'Production analyses table name',
+    new cdk.CfnOutput(this, 'ProductionProjectsTableName', {
+      value: projectsTable.table.tableName,
+      description: 'Production projects table name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionFileMetadataTableName', {
+      value: fileMetadataTable.table.tableName,
+      description: 'Production file metadata table name',
     });
 
     new cdk.CfnOutput(this, 'ProductionAnalysisResultsTableName', {
@@ -432,9 +698,65 @@ export class ProductionDeploymentStack extends Construct {
       description: 'Production analysis results table name',
     });
 
-    new cdk.CfnOutput(this, 'AnalysisFunctionName', {
-      value: analysisFunction.function.functionName,
-      description: 'Production analysis Lambda function name',
+    new cdk.CfnOutput(this, 'ProductionSampleFilesTableName', {
+      value: sampleFilesTable.table.tableName,
+      description: 'Production sample files table name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionAnalyzeFileFunctionName', {
+      value: analyzeFileFunction.function.functionName,
+      description: 'Production analyze file Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionGetAnalysisResultsFunctionName', {
+      value: getAnalysisResultsFunction.function.functionName,
+      description: 'Production get analysis results Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionUploadFileFunctionName', {
+      value: uploadFileFunction.function.functionName,
+      description: 'Production upload file Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionCreateProjectFunctionName', {
+      value: createProjectFunction.function.functionName,
+      description: 'Production create project Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionGetProjectsFunctionName', {
+      value: getProjectsFunction.function.functionName,
+      description: 'Production get projects Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionAuthorizerFunctionName', {
+      value: authorizerFunction.function.functionName,
+      description: 'Production authorizer Lambda function name',
+    });
+
+    // Task 8.2: Monitoring outputs
+    new cdk.CfnOutput(this, 'ProductionHealthCheckFunctionName', {
+      value: healthCheckFunction.function.functionName,
+      description: 'Production health check Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionMetricsCollectorFunctionName', {
+      value: metricsCollectorFunction.function.functionName,
+      description: 'Production metrics collector Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'ProductionAPIGatewayURL', {
+      value: this.apiGateway.url,
+      description: 'Production API Gateway URL',
+    });
+
+    new cdk.CfnOutput(this, 'HealthCheckEndpoint', {
+      value: `${this.apiGateway.url}health`,
+      description: 'Health check endpoint URL',
+    });
+
+    new cdk.CfnOutput(this, 'DetailedHealthCheckEndpoint', {
+      value: `${this.apiGateway.url}health/detailed`,
+      description: 'Detailed health check endpoint URL',
     });
   }
 }

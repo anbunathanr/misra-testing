@@ -5,6 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
 import { notificationTemplateService } from '../../services/notification-template-service';
 import { NotificationTemplate } from '../../types/notification';
 
@@ -12,8 +13,43 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
   console.log('Update template request', { path: event.path });
 
   try {
-    // TODO: Add admin role check from JWT token
-    // For now, assuming authorized
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
+      return {
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      };
+    }
+
+    // Check admin role
+    if (user.role !== 'admin') {
+      return {
+        statusCode: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Admin role required',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      };
+    }
 
     // Extract templateId from path parameters
     const templateId = event.pathParameters?.templateId;
@@ -21,8 +57,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!templateId) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'templateId is required' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'templateId is required',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -30,8 +75,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!event.body) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Request body is required' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Request body is required',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -42,7 +96,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(updatedTemplate),
     };
   } catch (error) {
@@ -53,8 +110,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: errorMessage }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: statusCode === 400 ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

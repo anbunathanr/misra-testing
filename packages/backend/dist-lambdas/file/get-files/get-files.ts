@@ -1,42 +1,42 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
+import { FileMetadataService } from '../../services/file-metadata-service';
+import { DynamoDBClientWrapper } from '../../database/dynamodb-client';
+
+const environment = process.env.ENVIRONMENT || 'dev';
+const dbClient = new DynamoDBClientWrapper(environment);
+const fileMetadataService = new FileMetadataService(dbClient);
 
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  };
+
   try {
-    // Extract and validate JWT token
-    const authHeader = event.headers.Authorization || event.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const user = getUserFromContext(event);
+    if (!user.userId) {
       return {
         statusCode: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: JSON.stringify({ error: 'Authorization token is required' }),
+        headers,
+        body: JSON.stringify({ error: 'User not authenticated' }),
       };
     }
 
-    // Get all files for the user (return empty for demo)
-    const files: any[] = [];
+    const result = await fileMetadataService.getUserFiles(user.userId, { limit: 100 });
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify(files),
+      headers,
+      body: JSON.stringify(result.items),
     };
   } catch (error) {
     console.error('Error getting files:', error);
-    
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers,
       body: JSON.stringify([]),
     };
   }

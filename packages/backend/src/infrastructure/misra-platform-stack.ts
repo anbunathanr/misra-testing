@@ -234,14 +234,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     // Use existing TestProjects table
-    const projectsTable = new dynamodb.Table(this, 'ProjectsTable', {
-      tableName: 'TestProjects',
-      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'organizationId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
-    });
+    const projectsTable = dynamodb.Table.fromTableName(this, 'TestProjectsTable', 'TestProjects');
 
     const analysesTable = new dynamodb.Table(this, 'AnalysesTable', {
       tableName: 'misra-platform-analyses',

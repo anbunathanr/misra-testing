@@ -15,8 +15,10 @@ import TerminalOutput from './TerminalOutput';
 import AutomatedQuickStartForm from './AutomatedQuickStartForm';
 import RealTimeProgressDisplay from './RealTimeProgressDisplay';
 import MISRAResultsDisplay from './MISRAResultsDisplay';
+import ErrorBoundary from './ErrorBoundary';
 import { loggingService, LogEntry } from '../services/logging';
 import { mockBackend } from '../services/mock-backend';
+import { errorHandlingService, ErrorDetails } from '../services/error-handling';
 
 interface ProductionMISRAAppProps {
   onComplete?: (results: AnalysisResults) => void;
@@ -95,7 +97,8 @@ const ProductionMISRAApp: React.FC<ProductionMISRAAppProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showOutput, setShowOutput] = useState(false);
-  const [workflowError, setWorkflowError] = useState<AppError | null>(null);
+  const [workflowError, setWorkflowError] = useState<ErrorDetails | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   // User and file state
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -116,7 +119,22 @@ const ProductionMISRAApp: React.FC<ProductionMISRAAppProps> = ({
 
   useEffect(() => {
     const unsubscribe = loggingService.subscribe(setLogs);
-    return unsubscribe;
+    
+    // Add error listener for global error handling
+    const handleError = (error: ErrorDetails) => {
+      loggingService.error(`[ERROR] ${error.userMessage}`, { 
+        code: error.code,
+        correlationId: error.correlationId 
+      });
+      setWorkflowError(error);
+    };
+    
+    errorHandlingService.addErrorListener(handleError);
+    
+    return () => {
+      unsubscribe();
+      errorHandlingService.removeErrorListener(handleError);
+    };
   }, []);
 
   // Production API endpoints - use environment variable or default
@@ -223,16 +241,16 @@ int main() {
         return result;
       }
 
-      // Real backend call
-      const response = await fetch(`${API_BASE}/auth/quick-register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Registration failed: ${response.statusText}`);
-      }
+      // Real backend call with enhanced error handling
+      const response = await errorHandlingService.fetchWithErrorHandling(
+        `${API_BASE}/auth/quick-register`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        },
+        { maxAttempts: 3, initialDelay: 1000 }
+      );
 
       const result = await response.json();
       
@@ -245,7 +263,11 @@ int main() {
       loggingService.success('[AUTH] ✓ Quick registration successful', { userId: result.userId });
       return result;
     } catch (error: any) {
-      loggingService.error('[AUTH] Registration failed', error);
+      const errorDetails = errorHandlingService.handleError(error, { operation: 'authentication' });
+      loggingService.error('[AUTH] Registration failed', { 
+        error: errorDetails.message,
+        code: errorDetails.code 
+      });
       throw error;
     }
   };
@@ -282,37 +304,41 @@ int main() {
         return response;
       }
 
-      // Real backend call
+      // Real backend call with enhanced error handling
       // Create a blob from the sample file content
       const blob = new Blob([sampleFile.content], { type: 'text/plain' });
       const file = new File([blob], sampleFile.name, { type: 'text/plain' });
 
-      // Get upload URL from backend
-      const uploadUrlResponse = await fetch(`${API_BASE}/files/upload-sample`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail: userInfo?.email || email,
-          sampleId: sampleFile.id,
-          fileName: sampleFile.name,
-          fileSize: sampleFile.size,
-          language: sampleFile.language
-        })
-      });
-
-      if (!uploadUrlResponse.ok) {
-        throw new Error(`Upload URL generation failed: ${uploadUrlResponse.statusText}`);
-      }
+      // Get upload URL from backend with retry
+      const uploadUrlResponse = await errorHandlingService.fetchWithErrorHandling(
+        `${API_BASE}/files/upload-sample`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: userInfo?.email || email,
+            sampleId: sampleFile.id,
+            fileName: sampleFile.name,
+            fileSize: sampleFile.size,
+            language: sampleFile.language
+          })
+        },
+        { maxAttempts: 3, initialDelay: 1000 }
+      );
 
       const uploadData = await uploadUrlResponse.json();
       
       // If backend provides upload URL, use it; otherwise simulate successful upload
       if (uploadData.uploadUrl) {
-        await fetch(uploadData.uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': 'text/plain' }
-        });
+        await errorHandlingService.fetchWithErrorHandling(
+          uploadData.uploadUrl,
+          {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': 'text/plain' }
+          },
+          { maxAttempts: 2, initialDelay: 500 }
+        );
       }
 
       const response: UploadResponse = {
@@ -329,7 +355,11 @@ int main() {
       loggingService.success('[FILE] ✓ Sample file uploaded successfully', response);
       return response;
     } catch (error: any) {
-      loggingService.error('[FILE] Sample file upload failed', error);
+      const errorDetails = errorHandlingService.handleError(error, { operation: 'file-upload' });
+      loggingService.error('[FILE] Sample file upload failed', { 
+        error: errorDetails.message,
+        code: errorDetails.code 
+      });
       throw error;
     }
   };
@@ -437,108 +467,132 @@ int main() {
     loggingService.clearLogs();
 
     try {
-      loggingService.info('========================================');
-      loggingService.success('🚀 MISRA Compliance Analysis Started');
-      loggingService.info('🤖 Fully Automated Workflow');
-      loggingService.info(`📧 User: ${email}`);
-      loggingService.info('========================================\n');
+      await errorHandlingService.executeWithRetry(
+        async () => {
+          loggingService.info('========================================');
+          loggingService.success('🚀 MISRA Compliance Analysis Started');
+          loggingService.info('🤖 Fully Automated Workflow');
+          loggingService.info(`📧 User: ${email}`);
+          if (retryCount > 0) {
+            loggingService.info(`🔄 Retry attempt: ${retryCount + 1}`);
+          }
+          loggingService.info('========================================\n');
 
-      // Step 1: Quick Registration/Login
-      loggingService.info('[STEP 1] 🔐 User Authentication...');
-      setCurrentStep(1);
+          // Step 1: Quick Registration/Login
+          loggingService.info('[STEP 1] 🔐 User Authentication...');
+          setCurrentStep(1);
 
-      if (!userInfo?.isRegistered) {
-        await handleQuickRegistration(email, name);
-      } else {
-        loggingService.info('[AUTH] Using existing user session');
-      }
+          if (!userInfo?.isRegistered) {
+            await handleQuickRegistration(email, name);
+          } else {
+            loggingService.info('[AUTH] Using existing user session');
+          }
 
-      loggingService.success('[STEP 1] ✓ Authentication successful');
-      setCompletedSteps(prev => [...prev, 1]);
+          loggingService.success('[STEP 1] ✓ Authentication successful');
+          setCompletedSteps(prev => [...prev, 1]);
 
-      // Step 2: Automatic File Selection and Upload
-      loggingService.info('\n[STEP 2] 📤 Selecting sample file automatically...');
-      setCurrentStep(2);
+          // Step 2: Automatic File Selection and Upload
+          loggingService.info('\n[STEP 2] 📤 Selecting sample file automatically...');
+          setCurrentStep(2);
 
-      // Automatically select a random sample file
-      const selectedSample = selectRandomSampleFile();
-      setSelectedSampleFile(selectedSample);
-      
-      loggingService.info(`[FILE] Selected: ${selectedSample.name}`, {
-        size: `${selectedSample.size} bytes`,
-        language: selectedSample.language,
-        description: selectedSample.description,
-        expectedViolations: selectedSample.expectedViolations
-      });
+          // Automatically select a random sample file
+          const selectedSample = selectRandomSampleFile();
+          setSelectedSampleFile(selectedSample);
+          
+          loggingService.info(`[FILE] Selected: ${selectedSample.name}`, {
+            size: `${selectedSample.size} bytes`,
+            language: selectedSample.language,
+            description: selectedSample.description,
+            expectedViolations: selectedSample.expectedViolations
+          });
 
-      // Upload the selected sample file
-      const uploadResult = await uploadSampleFileToS3(selectedSample);
+          // Upload the selected sample file
+          const uploadResult = await uploadSampleFileToS3(selectedSample);
 
-      loggingService.success('[STEP 2] ✓ Sample file uploaded successfully');
-      loggingService.info(`[STEP 2] 📋 File ID: ${uploadResult.fileId}`);
-      setCompletedSteps(prev => [...prev, 2]);
+          loggingService.success('[STEP 2] ✓ Sample file uploaded successfully');
+          loggingService.info(`[STEP 2] 📋 File ID: ${uploadResult.fileId}`);
+          setCompletedSteps(prev => [...prev, 2]);
 
-      // Step 3: MISRA Analysis
-      loggingService.info('\n[STEP 3] 🔍 Starting MISRA compliance analysis...');
-      setCurrentStep(3);
+          // Step 3: MISRA Analysis
+          loggingService.info('\n[STEP 3] 🔍 Starting MISRA compliance analysis...');
+          setCurrentStep(3);
 
-      const analysisStart = await startAnalysis(uploadResult.fileId);
-      loggingService.info(`[STEP 3] 📊 Analysis ID: ${analysisStart.analysisId}`);
-      loggingService.info('[STEP 3] ⏳ Analysis in progress - this may take 2-5 minutes...');
+          const analysisStart = await startAnalysis(uploadResult.fileId);
+          loggingService.info(`[STEP 3] 📊 Analysis ID: ${analysisStart.analysisId}`);
+          loggingService.info('[STEP 3] ⏳ Analysis in progress - this may take 2-5 minutes...');
 
-      // Poll for results
-      const results = await pollAnalysisStatus(analysisStart.analysisId);
+          // Poll for results
+          const results = await pollAnalysisStatus(analysisStart.analysisId);
 
-      loggingService.success('[STEP 3] ✓ Analysis completed successfully');
-      loggingService.info(`[STEP 3] 📈 Compliance Score: ${results.complianceScore}%`);
-      loggingService.info(`[STEP 3] ⚠️  Violations Found: ${results.violations.length}`);
-      setCompletedSteps(prev => [...prev, 3]);
+          loggingService.success('[STEP 3] ✓ Analysis completed successfully');
+          loggingService.info(`[STEP 3] 📈 Compliance Score: ${results.complianceScore}%`);
+          loggingService.info(`[STEP 3] ⚠️  Violations Found: ${results.violations.length}`);
+          setCompletedSteps(prev => [...prev, 3]);
 
-      // Step 4: Results Verification
-      loggingService.info('\n[STEP 4] ✅ Verifying and preparing results...');
-      setCurrentStep(4);
+          // Step 4: Results Verification
+          loggingService.info('\n[STEP 4] ✅ Verifying and preparing results...');
+          setCurrentStep(4);
 
-      // Process and display results
-      setAnalysisResults({
-        ...results,
-        fileInfo: {
-          name: selectedSample.name,
-          size: selectedSample.size,
-          type: selectedSample.language
+          // Process and display results
+          setAnalysisResults({
+            ...results,
+            fileInfo: {
+              name: selectedSample.name,
+              size: selectedSample.size,
+              type: selectedSample.language
+            }
+          });
+
+          loggingService.success('[STEP 4] ✓ Results verified and ready');
+          loggingService.info(`[STEP 4] 📄 Detailed report available for download`);
+          setCompletedSteps(prev => [...prev, 4]);
+
+          loggingService.info('\n========================================');
+          loggingService.success('🎉 MISRA Analysis Complete!');
+          loggingService.info(`📊 Final Score: ${results.complianceScore}%`);
+          loggingService.info(`📄 File: ${selectedSample.name} (${selectedSample.language})`);
+          loggingService.info(`⏱️  Total Time: ${Math.round(results.duration / 1000)}s`);
+          loggingService.info('========================================\n');
+
+          onComplete?.(results);
+          setRetryCount(0); // Reset retry count on success
+        },
+        { 
+          maxAttempts: 3, 
+          initialDelay: 2000,
+          maxDelay: 10000,
+          backoffMultiplier: 2
         }
-      });
-
-      loggingService.success('[STEP 4] ✓ Results verified and ready');
-      loggingService.info(`[STEP 4] 📄 Detailed report available for download`);
-      setCompletedSteps(prev => [...prev, 4]);
-
-      loggingService.info('\n========================================');
-      loggingService.success('🎉 MISRA Analysis Complete!');
-      loggingService.info(`📊 Final Score: ${results.complianceScore}%`);
-      loggingService.info(`📄 File: ${selectedSample.name} (${selectedSample.language})`);
-      loggingService.info(`⏱️  Total Time: ${Math.round(results.duration / 1000)}s`);
-      loggingService.info('========================================\n');
-
-      onComplete?.(results);
+      );
 
     } catch (error: any) {
-      const appError: AppError = {
-        code: 'WORKFLOW_ERROR',
-        message: error.message || 'Unknown error occurred',
-        details: error,
-        timestamp: new Date(),
-        recoverable: true,
-        userMessage: `Analysis failed: ${error.message}. Please try again.`
-      };
+      const errorDetails = errorHandlingService.handleError(error, { operation: 'workflow' });
+      
+      setWorkflowError(errorDetails);
+      setRetryCount(prev => prev + 1);
+      
+      loggingService.error(`\n❌ Analysis failed: ${errorDetails.userMessage}`);
+      loggingService.info(`\n💡 ${errorDetails.suggestion}`);
+      
+      if (errorDetails.retryable && retryCount < 2) {
+        loggingService.info('\n🔧 Troubleshooting:');
+        loggingService.info('• This error is recoverable');
+        loggingService.info('• You can try again using the "Retry" button');
+        loggingService.info('• Check your internet connection');
+      } else {
+        loggingService.info('\n🔧 Troubleshooting:');
+        loggingService.info('• Check your internet connection');
+        loggingService.info('• Try again in a few moments');
+        if (errorDetails.contactSupport) {
+          loggingService.info('• Contact support if the issue persists');
+          if (errorDetails.correlationId) {
+            loggingService.info(`• Reference ID: ${errorDetails.correlationId}`);
+          }
+        }
+      }
+      loggingService.info('');
 
-      setWorkflowError(appError);
-      loggingService.error(`\n❌ Analysis failed: ${error.message}`);
-      loggingService.info('\n🔧 Troubleshooting:');
-      loggingService.info('• Check your internet connection');
-      loggingService.info('• Try again in a few moments');
-      loggingService.info('• Contact support if the issue persists\n');
-
-      onError?.(appError);
+      onError?.(errorDetails);
     } finally {
       setIsRunning(false);
     }
@@ -562,147 +616,178 @@ int main() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 2.5
+    <ErrorBoundary
+      showDetails={process.env.NODE_ENV === 'development'}
+      onError={(error, errorInfo) => {
+        console.error('ProductionMISRAApp Error:', error, errorInfo);
+        // In production, you could send this to an error reporting service
       }}
     >
-      <Container maxWidth="md">
-        <Paper
-          sx={{
-            borderRadius: 3,
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            p: 5
-          }}
-        >
-          {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h4" sx={{ color: '#333', fontSize: '28px', mb: 1.25 }}>
-              🔍 MISRA Compliance Analyzer
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#666', fontSize: '14px' }}>
-              Professional C/C++ Code Analysis Platform
-            </Typography>
-          </Box>
-
-          {/* Automated Quick Start Form */}
-          <AutomatedQuickStartForm
-            email={email}
-            name={name}
-            onEmailChange={setEmail}
-            onNameChange={setName}
-            selectedSampleFile={selectedSampleFile}
-            isRunning={isRunning}
-            visible={!isRunning && !analysisResults}
-          />
-
-          {/* Error Display */}
-          {workflowError && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                ❌ Analysis Error
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 2.5
+        }}
+      >
+        <Container maxWidth="md">
+          <Paper
+            sx={{
+              borderRadius: 3,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              p: 5
+            }}
+          >
+            {/* Header */}
+            <Box sx={{ textAlign: 'center', mb: 4 }}>
+              <Typography variant="h4" sx={{ color: '#333', fontSize: '28px', mb: 1.25 }}>
+                🔍 MISRA Compliance Analyzer
               </Typography>
-              <Typography variant="body2">
-                {workflowError.userMessage}
+              <Typography variant="body2" sx={{ color: '#666', fontSize: '14px' }}>
+                Professional C/C++ Code Analysis Platform
               </Typography>
-            </Alert>
-          )}
+            </Box>
 
-          {/* Comprehensive Results Display */}
-          {analysisResults && (
-            <MISRAResultsDisplay
-              results={analysisResults}
-              onDownloadReport={downloadReport}
-              onAnalyzeAnother={() => {
-                setAnalysisResults(null);
-                setSelectedSampleFile(null);
-                setEmail('');
-                setName('');
-                clearOutput();
-              }}
+            {/* Automated Quick Start Form */}
+            <AutomatedQuickStartForm
+              email={email}
+              name={name}
+              onEmailChange={setEmail}
+              onNameChange={setName}
+              selectedSampleFile={selectedSampleFile}
+              isRunning={isRunning}
+              visible={!isRunning && !analysisResults}
             />
-          )}
 
-          {/* Real-Time Progress Display */}
-          <RealTimeProgressDisplay
-            currentStep={currentStep}
-            completedSteps={completedSteps}
-            analysisProgress={analysisProgress}
-            isRunning={isRunning}
-            visible={isRunning || completedSteps.length > 0}
-            estimatedTimeRemaining={currentStep === 3 ? Math.max(0, 300 - (analysisProgress * 3)) : undefined}
-            rulesProcessed={Math.floor((analysisProgress / 100) * 50)}
-            totalRules={50}
-          />
-
-          {/* Step Indicator */}
-          <StepIndicator
-            steps={steps}
-            currentStep={currentStep}
-            completedSteps={completedSteps}
-          />
-
-          {/* Progress Bar for Analysis */}
-          {/* Removed - now handled by RealTimeProgressDisplay */}
-
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1.25, mb: 3 }}>
-            <Button
-              variant="contained"
-              fullWidth
-              startIcon={<PlayArrowIcon />}
-              onClick={runAutomatedWorkflow}
-              disabled={isRunning || !email}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                fontWeight: 600,
-                py: 1.5,
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 10px 20px rgba(102, 126, 234, 0.3)'
-                },
-                '&:disabled': {
-                  opacity: 0.6
+            {/* Error Display with Enhanced Information */}
+            {workflowError && (
+              <Alert 
+                severity={workflowError.retryable ? "warning" : "error"} 
+                sx={{ mb: 3 }}
+                action={
+                  workflowError.retryable && retryCount < 3 ? (
+                    <Button 
+                      color="inherit" 
+                      size="small" 
+                      onClick={() => {
+                        setWorkflowError(null);
+                        runAutomatedWorkflow();
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  ) : null
                 }
-              }}
-            >
-              {isRunning ? 'Analyzing...' : 'Start MISRA Analysis'}
-            </Button>
-            
-            {showOutput && (
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  {workflowError.retryable ? '⚠️ Temporary Issue' : '❌ Analysis Error'}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  {workflowError.userMessage}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.875rem', opacity: 0.8 }}>
+                  💡 {workflowError.suggestion}
+                </Typography>
+                {workflowError.correlationId && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                    Reference ID: {workflowError.correlationId}
+                  </Typography>
+                )}
+              </Alert>
+            )}
+
+            {/* Comprehensive Results Display */}
+            {analysisResults && (
+              <MISRAResultsDisplay
+                results={analysisResults}
+                onDownloadReport={downloadReport}
+                onAnalyzeAnother={() => {
+                  setAnalysisResults(null);
+                  setSelectedSampleFile(null);
+                  setEmail('');
+                  setName('');
+                  setRetryCount(0);
+                  clearOutput();
+                }}
+              />
+            )}
+
+            {/* Real-Time Progress Display */}
+            <RealTimeProgressDisplay
+              currentStep={currentStep}
+              completedSteps={completedSteps}
+              analysisProgress={analysisProgress}
+              isRunning={isRunning}
+              visible={isRunning || completedSteps.length > 0}
+              estimatedTimeRemaining={currentStep === 3 ? Math.max(0, 300 - (analysisProgress * 3)) : undefined}
+              rulesProcessed={Math.floor((analysisProgress / 100) * 50)}
+              totalRules={50}
+            />
+
+            {/* Step Indicator */}
+            <StepIndicator
+              steps={steps}
+              currentStep={currentStep}
+              completedSteps={completedSteps}
+            />
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', gap: 1.25, mb: 3 }}>
               <Button
-                variant="outlined"
-                onClick={clearOutput}
+                variant="contained"
+                fullWidth
+                startIcon={<PlayArrowIcon />}
+                onClick={runAutomatedWorkflow}
+                disabled={isRunning || !email}
                 sx={{
-                  minWidth: 'auto',
-                  px: 2,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  py: 1.5,
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 10px 20px rgba(102, 126, 234, 0.3)'
+                  },
+                  '&:disabled': {
+                    opacity: 0.6
+                  }
                 }}
               >
-                Clear
+                {isRunning ? 'Analyzing...' : 'Start MISRA Analysis'}
               </Button>
-            )}
-          </Box>
+              
+              {showOutput && (
+                <Button
+                  variant="outlined"
+                  onClick={clearOutput}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    fontWeight: 600
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </Box>
 
-          {/* Terminal Output */}
-          <TerminalOutput
-            logs={logs}
-            isRunning={isRunning}
-            onClear={clearOutput}
-            visible={showOutput}
-          />
-        </Paper>
-      </Container>
-    </Box>
+            {/* Terminal Output */}
+            <TerminalOutput
+              logs={logs}
+              isRunning={isRunning}
+              onClear={clearOutput}
+              visible={showOutput}
+            />
+          </Paper>
+        </Container>
+      </Box>
+    </ErrorBoundary>
   );
 };
 

@@ -1,12 +1,24 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { ApplicationAnalyzer } from '../../services/ai-test-generation/application-analyzer';
 import { TestGenerator } from '../../services/ai-test-generation/test-generator';
-import { AIEngine } from '../../services/ai-test-generation/ai-engine';
+import { AIEngineFactory } from '../../services/ai-test-generation/ai-engine-factory';
 import { SelectorGenerator } from '../../services/ai-test-generation/selector-generator';
 import { TestCaseService } from '../../services/test-case-service';
 import { BatchProcessor } from '../../services/ai-test-generation/batch-processor';
 import { CostTracker } from '../../services/ai-test-generation/cost-tracker';
 import { BatchGenerateRequest, BatchGenerateResponse, TokenUsage } from '../../types/ai-test-generation';
+import { validateStartupConfiguration } from '../../services/ai-test-generation/startup-validator';
+import { getUserFromContext } from '../../utils/auth-util';
+
+// Task 10.2: Validate configuration on Lambda cold start
+// This runs once when the Lambda container initializes
+try {
+  validateStartupConfiguration();
+} catch (error) {
+  console.error('[Batch] Failed to initialize Lambda due to invalid configuration:', error);
+  // Lambda will fail to initialize, preventing requests from being processed
+  throw error;
+}
 
 /**
  * POST /api/ai-test-generation/batch
@@ -36,7 +48,8 @@ export const handler = async (
 
   try {
     // Get user ID from authorizer context
-    const userId = event.requestContext.authorizer?.claims?.sub;
+    const user = getUserFromContext(event);
+    const userId = user.userId;
     if (!userId) {
       return {
         statusCode: 401,
@@ -116,7 +129,7 @@ export const handler = async (
     }
 
     const analyzer = ApplicationAnalyzer.getInstance();
-    const aiEngine = new AIEngine();
+    const aiEngine = AIEngineFactory.create();
     const selectorGenerator = SelectorGenerator.getInstance();
     const testCaseService = new TestCaseService();
     const generator = new TestGenerator(aiEngine, selectorGenerator, testCaseService);
@@ -147,6 +160,7 @@ export const handler = async (
       'batch',
       tokensUsed,
       'gpt-4',
+      'OPENAI',
       results.summary.succeeded,
       0
     );

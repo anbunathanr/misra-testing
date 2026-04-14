@@ -6,38 +6,59 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
 import { notificationPreferencesService } from '../../services/notification-preferences-service';
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Get preferences request', { path: event.path });
 
   try {
-    // Extract userId from path parameters or JWT token
-    // For now, using query parameter (should be from JWT in production)
-    const userId = event.queryStringParameters?.userId;
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
 
-    if (!userId) {
+    if (!user.userId) {
       return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'userId is required' }),
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
     // Get user preferences (returns defaults if none configured)
-    const preferences = await notificationPreferencesService.getPreferences(userId);
+    const preferences = await notificationPreferencesService.getPreferences(user.userId);
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(preferences),
     };
   } catch (error) {
     console.error('Error getting preferences', { error });
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Failed to get preferences' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get preferences',
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

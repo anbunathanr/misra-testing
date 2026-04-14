@@ -9,13 +9,15 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
  * - projectId?: string
  * - startDate?: string (ISO format)
  * - endDate?: string (ISO format)
+ * - provider?: string (OPENAI, BEDROCK, HUGGINGFACE)
  *
  * Response:
  * {
  *   today: { requests, tokens, cost },
  *   thisMonth: { requests, tokens, cost },
  *   limits: { dailyRequests, dailyTokens, dailyCost, monthlyRequests, monthlyTokens, monthlyCost },
- *   stats: UsageStats
+ *   stats: UsageStats,
+ *   provider?: string (if filtered)
  * }
  */
 export declare const handler: (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>;

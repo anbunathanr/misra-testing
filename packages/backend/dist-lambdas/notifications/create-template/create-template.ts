@@ -5,6 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
 import { notificationTemplateService } from '../../services/notification-template-service';
 import { NotificationTemplate } from '../../types/notification';
 
@@ -12,15 +13,59 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
   console.log('Create template request', { path: event.path });
 
   try {
-    // TODO: Add admin role check from JWT token
-    // For now, assuming authorized
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
+      return {
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      };
+    }
+
+    // Check admin role
+    if (user.role !== 'admin') {
+      return {
+        statusCode: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Admin role required',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      };
+    }
 
     // Parse request body
     if (!event.body) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Request body is required' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Request body is required',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -30,8 +75,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!templateData.eventType || !templateData.channel || !templateData.format || !templateData.body) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing required fields: eventType, channel, format, body' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing required fields: eventType, channel, format, body',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -40,7 +94,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode: 201,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(createdTemplate),
     };
   } catch (error) {
@@ -51,8 +108,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: errorMessage }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: statusCode === 400 ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

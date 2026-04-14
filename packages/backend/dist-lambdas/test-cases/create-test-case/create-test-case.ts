@@ -1,30 +1,31 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { TestCaseService } from '../../services/test-case-service';
+import { getUserFromContext } from '../../utils/auth-util';
 import { CreateTestCaseInput } from '../../types/test-case';
-import * as jwt from 'jsonwebtoken';
 
 const testCaseService = new TestCaseService();
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  console.log('Create test case request', { path: event.path });
+
   try {
-    const authHeader = event.headers.Authorization || event.headers.authorization;
-    if (!authHeader) {
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing Authorization header' }),
-      };
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.decode(token) as any;
-    const userId = decoded?.userId || decoded?.sub;
-
-    if (!userId) {
-      return {
-        statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Invalid token' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
@@ -33,24 +34,45 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!input.suiteId || !input.projectId || !input.name || !input.description || !input.type || !input.steps) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing required fields: suiteId, projectId, name, description, type, steps' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Missing required fields: suiteId, projectId, name, description, type, steps',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
-    const testCase = await testCaseService.createTestCase(userId, input);
+    const testCase = await testCaseService.createTestCase(user.userId, input);
 
     return {
       statusCode: 201,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(testCase),
     };
   } catch (error) {
-    console.error('Error creating test case:', error);
+    console.error('Error creating test case', { error });
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Internal server error' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to create test case',
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

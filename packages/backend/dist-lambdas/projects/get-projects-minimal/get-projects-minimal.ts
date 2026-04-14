@@ -1,38 +1,68 @@
-import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { ProjectService } from '../../services/project-service';
+import { getUserFromContext } from '../../utils/auth-util';
 
-export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+const projectService = new ProjectService();
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  console.log('Get projects request', { path: event.path });
+
   try {
-    const authHeader = event.headers?.authorization || event.headers?.Authorization;
-    if (!authHeader) {
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
+      console.warn('Missing user context in request');
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Unauthorized' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
       };
     }
 
+    console.log('Fetching projects for user:', user.userId);
+
+    // Fetch real projects from DynamoDB
+    const projects = await projectService.getUserProjects(user.userId);
+
+    console.log('Projects retrieved:', { count: projects.length });
+
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projects: [
-          {
-            projectId: 'demo-1',
-            name: 'E-Commerce Platform',
-            description: 'Test automation for e-commerce',
-            targetUrl: 'https://example.com',
-            environment: 'dev',
-            createdAt: Math.floor(Date.now() / 1000),
-            updatedAt: Math.floor(Date.now() / 1000),
-          },
-        ],
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ projects }),
     };
   } catch (error) {
+    console.error('Error getting projects', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projects: [] }),
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get projects',
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

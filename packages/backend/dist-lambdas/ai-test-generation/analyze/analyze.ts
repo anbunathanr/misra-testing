@@ -1,6 +1,17 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { ApplicationAnalyzer } from '../../services/ai-test-generation/application-analyzer';
 import { AnalyzeRequest, AnalyzeResponse } from '../../types/ai-test-generation';
+import { validateStartupConfiguration } from '../../services/ai-test-generation/startup-validator';
+
+// Task 10.2: Validate configuration on Lambda cold start
+// This runs once when the Lambda container initializes
+try {
+  validateStartupConfiguration();
+} catch (error) {
+  console.error('[Analyze] Failed to initialize Lambda due to invalid configuration:', error);
+  // Lambda will fail to initialize, preventing requests from being processed
+  throw error;
+}
 
 /**
  * POST /api/ai-test-generation/analyze

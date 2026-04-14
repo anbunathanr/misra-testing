@@ -5,6 +5,7 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { getUserFromContext } from '../../utils/auth-util';
 import { notificationHistoryService } from '../../services/notification-history-service';
 import { NotificationHistoryQuery } from '../../types/notification';
 
@@ -12,12 +13,32 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
   console.log('Get notification history request', { path: event.path });
 
   try {
+    // Extract user from request context (populated by Lambda Authorizer)
+    const user = getUserFromContext(event);
+
+    if (!user.userId) {
+      return {
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'User context not found',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      };
+    }
+
     // Extract query parameters
     const params = event.queryStringParameters || {};
 
-    // Build query object
+    // Build query object - use authenticated user's userId
     const query: NotificationHistoryQuery = {
-      userId: params.userId,
+      userId: user.userId,
       startDate: params.startDate,
       endDate: params.endDate,
       eventType: params.eventType,
@@ -32,15 +53,27 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify(result),
     };
   } catch (error) {
     console.error('Error querying notification history', { error });
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Failed to query notification history' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to query notification history',
+          timestamp: new Date().toISOString(),
+        },
+      }),
     };
   }
 };

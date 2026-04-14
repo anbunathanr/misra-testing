@@ -5,6 +5,10 @@ import { marshall } from '@aws-sdk/util-dynamodb';
 import { MISRAAnalysisEngine } from '../../services/misra-analysis/analysis-engine';
 import { Language } from '../../types/misra-analysis';
 import { CostTracker } from '../../services/misra-analysis/cost-tracker';
+import { centralizedErrorHandler } from '../../services/error-handling/centralized-error-handler';
+import { enhancedRetryService } from '../../services/error-handling/enhanced-retry';
+import { CentralizedLogger, withCorrelationId, LoggingUtils } from '../../utils/centralized-logger';
+import { monitoringService } from '../../services/monitoring-service';
 
 const bucketName = process.env.FILE_STORAGE_BUCKET_NAME || '';
 const region = process.env.AWS_REGION || 'us-east-1';
@@ -26,57 +30,143 @@ interface AnalysisMessage {
 }
 
 /**
- * Lambda handler for MISRA file analysis
+ * Lambda handler for MISRA file analysis with enhanced error handling and monitoring
  * Processes SQS messages containing analysis requests
  * 
- * Requirements: 6.2, 6.3, 6.4, 6.5
+ * Requirements: 6.2, 6.3, 6.4, 6.5, 8.1, 8.2
+ * Task 8.2: Enhanced with centralized logging and correlation IDs
  */
-export const handler = async (event: SQSEvent, context: Context): Promise<void> => {
-  console.log('Analysis Lambda invoked');
-  console.log(`Processing ${event.Records.length} message(s)`);
-  console.log(`Remaining time: ${context.getRemainingTimeInMillis()}ms`);
+async function analyzeFileHandler(event: SQSEvent, context: Context): Promise<void> {
+  const logger = CentralizedLogger.getInstance({
+    functionName: context.functionName,
+    requestId: context.awsRequestId,
+  });
+  
+  logger.info('Analysis Lambda invoked', {
+    messageCount: event.Records.length,
+    remainingTime: context.getRemainingTimeInMillis()
+  });
 
-  // Process each SQS message
+  // Process each SQS message with enhanced error handling
   for (const record of event.Records) {
-    await processAnalysisMessage(record, context);
+    const startTime = Date.now();
+    let analysisId: string | undefined;
+    let fileId: string | undefined;
+    
+    try {
+      const result = await centralizedErrorHandler.executeWithErrorHandling(
+        () => processAnalysisMessage(record, context, logger),
+        'analysis-service',
+        {
+          operation: 'process-analysis-message',
+          resource: record.messageId
+        }
+      );
+      
+      // Extract analysis details for monitoring
+      if (result && typeof result === 'object') {
+        analysisId = (result as any).analysisId;
+        fileId = (result as any).fileId;
+      }
+      
+      const duration = Date.now() - startTime;
+      
+      // Record successful analysis metrics
+      await monitoringService.recordAnalysisMetrics(
+        analysisId || 'unknown',
+        fileId || 'unknown',
+        (result as any)?.complianceScore || 0,
+        (result as any)?.violationCount || 0,
+        duration,
+        true
+      );
+      
+      LoggingUtils.logAnalysisOperation(logger, 'completed', analysisId || 'unknown', fileId, duration);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // Record failed analysis metrics
+      if (analysisId && fileId) {
+        await monitoringService.recordAnalysisMetrics(
+          analysisId,
+          fileId,
+          0,
+          0,
+          duration,
+          false
+        );
+      }
+      
+      LoggingUtils.logErrorWithContext(logger, error as Error, 'process-analysis-message', {
+        messageId: record.messageId,
+        fileId,
+        analysisId,
+        duration,
+      });
+      
+      // Let SQS handle retry/DLQ
+      throw error;
+    }
   }
 
-  console.log('All messages processed successfully');
-};
+  logger.info('All messages processed successfully');
+}
 
 /**
- * Process a single analysis message from SQS
+ * Process a single analysis message from SQS with enhanced error handling and monitoring
  */
 async function processAnalysisMessage(
   record: SQSRecord,
-  context: Context
-): Promise<void> {
+  context: Context,
+  logger: CentralizedLogger
+): Promise<{ analysisId: string; fileId: string; complianceScore: number; violationCount: number }> {
   let message: AnalysisMessage;
   
   try {
-    // Parse SQS message
-    message = JSON.parse(record.body) as AnalysisMessage;
-    console.log(`Processing analysis for file: ${message.fileId}`);
-    console.log(`File name: ${message.fileName}`);
-    console.log(`Language: ${message.language}`);
+    // Parse SQS message with validation
+    const parsed = JSON.parse(record.body) as AnalysisMessage;
+    if (!parsed.fileId || !parsed.s3Key || !parsed.language || !parsed.userId) {
+      throw new Error('Invalid SQS message: missing required fields');
+    }
+    message = parsed;
+    
+    // Set user context for logging
+    logger.setUserId(message.userId);
+    
+    logger.info('Processing analysis message', {
+      fileId: message.fileId,
+      fileName: message.fileName,
+      language: message.language,
+      userId: message.userId
+    });
+    
+    LoggingUtils.logAnalysisOperation(logger, 'started', 'pending', message.fileId);
+    
   } catch (error) {
-    console.error('Failed to parse SQS message:', error);
-    console.error('Message body:', record.body);
+    LoggingUtils.logErrorWithContext(logger, error as Error, 'parse-sqs-message', {
+      messageBody: record.body,
+      messageId: record.messageId
+    });
     throw new Error('Invalid SQS message format');
   }
 
   const { fileId, s3Key, language, userId, organizationId } = message;
   const startTime = Date.now();
   let fileSize = 0;
+  let analysisId = '';
 
   try {
     // Update file metadata status to IN_PROGRESS (Requirement 6.2)
-    console.log(`Updating file ${fileId} status to IN_PROGRESS`);
-    await updateFileMetadataStatus(fileId, 'in_progress');
+    logger.info('Updating file status to IN_PROGRESS', { fileId });
+    await enhancedRetryService.executeWithRetry(
+      () => updateFileMetadataStatus(fileId, 'in_progress'),
+      { maxAttempts: 3, initialDelayMs: 500 }
+    );
 
     // Check remaining time before starting analysis
     const remainingTime = context.getRemainingTimeInMillis();
-    console.log(`Remaining Lambda time: ${remainingTime}ms`);
+    logger.debug('Lambda execution time check', { remainingTime });
 
     // Reserve 30 seconds for cleanup and result saving
     const timeoutBuffer = 30000;
@@ -84,42 +174,71 @@ async function processAnalysisMessage(
       throw new Error(`Insufficient time remaining: ${remainingTime}ms`);
     }
 
-    // Download file from S3 (Requirement 6.3)
-    console.log(`Downloading file from S3: ${s3Key}`);
-    const fileContent = await downloadFileFromS3(s3Key);
+    // Download file from S3 with retry (Requirement 6.3, 8.1)
+    logger.info('Downloading file from S3', { s3Key });
+    const downloadStartTime = Date.now();
+    
+    const fileContent = await enhancedRetryService.executeWithRetry(
+      () => downloadFileFromS3(s3Key),
+      { 
+        maxAttempts: 3, 
+        initialDelayMs: 1000,
+        retryableErrors: ['timeout', 'ETIMEDOUT', 'ECONNRESET', 'NetworkError', 'ServiceUnavailable']
+      }
+    );
+    
     fileSize = fileContent.length;
-    console.log(`File downloaded successfully, size: ${fileSize} bytes`);
+    const downloadDuration = Date.now() - downloadStartTime;
+    
+    logger.info('File downloaded successfully', { fileSize, downloadDuration });
+    LoggingUtils.logFileOperation(logger, 'downloaded', fileId, message.fileName, fileSize);
+    
+    // Record S3 operation metrics
+    await monitoringService.monitorS3Operation(bucketName, 'GetObject', true, downloadDuration, fileSize);
 
-    // Invoke MISRA Analysis Engine with progress tracking (Requirement 6.4, 3.3)
-    console.log(`Starting MISRA analysis for ${language} file`);
+    // Invoke MISRA Analysis Engine with progress tracking (Requirement 6.4, 3.3, 8.1)
+    logger.info('Starting MISRA analysis', { language, fileId });
     
     // Create progress callback to update DynamoDB every 2 seconds
     const progressCallback = async (progress: number, message: string) => {
       try {
         await updateAnalysisProgress(fileId, progress, message);
-        console.log(`[Progress] ${progress}% - ${message}`);
+        logger.debug('Progress updated', { fileId, progress, message });
       } catch (error) {
-        console.error('[Progress] Failed to update progress:', error);
+        logger.warn('Failed to update progress', { fileId, progress, error: (error as Error).message });
         // Don't throw - progress updates are non-critical
       }
     };
     
-    const analysisResult = await analysisEngine.analyzeFile(
-      fileContent,
-      language,
-      fileId,
-      userId,
-      { progressCallback, updateInterval: 2000 } // 2-second updates (Requirement 3.3)
+    const analysisResult = await enhancedRetryService.executeWithRetry(
+      () => analysisEngine.analyzeFile(
+        fileContent,
+        language,
+        fileId,
+        userId,
+        { progressCallback, updateInterval: 2000 } // 2-second updates (Requirement 3.3)
+      ),
+      { 
+        maxAttempts: 2, // Limited retries for analysis
+        initialDelayMs: 2000,
+        retryableErrors: ['timeout', 'ANALYSIS_TIMEOUT', 'SERVICE_UNAVAILABLE']
+      }
     );
 
     const duration = Date.now() - startTime;
-    console.log(`Analysis completed in ${duration}ms`);
-    console.log(`Found ${analysisResult.violations.length} violations`);
-    console.log(`Compliance: ${analysisResult.summary.compliancePercentage.toFixed(2)}%`);
+    logger.info('Analysis completed successfully', {
+      fileId,
+      duration,
+      violationsCount: analysisResult.violations.length,
+      complianceScore: analysisResult.summary.compliancePercentage
+    });
 
-    // Store results in DynamoDB (Requirement 6.5)
-    console.log(`Storing analysis results in DynamoDB`);
-    await storeAnalysisResults(analysisResult, organizationId);
+    // Store results in DynamoDB with retry (Requirement 6.5, 8.1)
+    logger.info('Storing analysis results', { analysisId: analysisResult.analysisId });
+    await enhancedRetryService.executeWithRetry(
+      () => storeAnalysisResults(analysisResult, organizationId),
+      { maxAttempts: 3, initialDelayMs: 1000 }
+    );
 
     // Track analysis costs (Requirement 14.1)
     console.log(`Tracking analysis costs`);
@@ -310,3 +429,5 @@ async function updateAnalysisProgress(
     // Don't throw - progress updates are non-critical
   }
 }
+// Export the handler with correlation ID middleware
+export const handler = withCorrelationId(analyzeFileHandler);

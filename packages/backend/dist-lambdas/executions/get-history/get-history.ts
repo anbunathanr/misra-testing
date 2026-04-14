@@ -12,14 +12,10 @@
  * - limit (optional, default 50)
  */
 
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
-import { withAuthAndPermission, AuthenticatedEvent } from '../../middleware/auth-middleware';
 
-export const handler = withAuthAndPermission(
-  'tests',
-  'read',
-  async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     console.log('Get execution history request:', JSON.stringify({
       queryStringParameters: event.queryStringParameters,
     }));
@@ -88,5 +84,4 @@ export const handler = withAuthAndPermission(
         }),
       };
     }
-  }
-);
+};

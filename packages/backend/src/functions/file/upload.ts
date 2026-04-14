@@ -4,6 +4,10 @@ import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { FileUploadService, FileUploadRequest } from '../../services/file/file-upload-service';
 import { getUserFromContext } from '../../utils/auth-util';
+import { centralizedErrorHandler } from '../../services/error-handling/centralized-error-handler';
+import { enhancedRetryService } from '../../services/error-handling/enhanced-retry';
+import { cloudWatchMonitoringService } from '../../services/monitoring/cloudwatch-monitoring';
+import { createLogger } from '../../utils/logger';
 
 const ALLOWED_EXTENSIONS = ['.c', '.cpp', '.h', '.hpp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -11,6 +15,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const sqsClient = new SQSClient({});
 const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FILE_METADATA_TABLE = process.env.FILE_METADATA_TABLE || 'FileMetadata-dev';
+const fileUploadService = new FileUploadService();
+const logger = createLogger('FileUploadFunction');
 
 // Local type definitions
 interface UploadRequestBody {
@@ -26,199 +32,128 @@ interface UploadResponse {
   expiresIn: number;
 }
 
-const fileUploadService = new FileUploadService();
-
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-  try {
-    console.log(`[UPLOAD] Starting file upload handler`);
+/**
+ * Enhanced file upload handler with comprehensive error handling
+ * Requirements: 1.1, 1.2, 6.1, 8.1, 8.2
+ */
+export const handler = centralizedErrorHandler.wrapLambdaHandler(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    const startTime = Date.now();
     
-    // Extract user from Lambda Authorizer context
-    const user = getUserFromContext(event);
-    if (!user.userId) {
-      console.warn(`[UPLOAD] ✗ Unauthorized: No user in context`);
-      return errorResponse(401, 'UNAUTHORIZED', 'User not authenticated');
-    }
-    
-    console.log(`[UPLOAD] User authenticated: ${user.userId}, Organization: ${user.organizationId}`);
-
-    // Parse request body
-    if (!event.body) {
-      console.warn(`[UPLOAD] ✗ Missing request body`);
-      return errorResponse(400, 'MISSING_BODY', 'Request body is required');
-    }
-
-    const uploadRequest: UploadRequestBody = JSON.parse(event.body);
-    console.log(`[UPLOAD] Request parsed: fileName=${uploadRequest.fileName}, fileSize=${uploadRequest.fileSize}, contentType=${uploadRequest.contentType}`);
-
-    // Validate input
-    if (!uploadRequest.fileName || !uploadRequest.fileSize || !uploadRequest.contentType) {
-      console.warn(`[UPLOAD] ✗ Invalid input: missing required fields`);
-      return errorResponse(400, 'INVALID_INPUT', 'fileName, fileSize, and contentType are required');
-    }
-
-    // Validate file extension (Requirements 1.1)
-    const ext = uploadRequest.fileName.substring(uploadRequest.fileName.lastIndexOf('.')).toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      console.warn(`[UPLOAD] ✗ Invalid file type: ${ext}`);
-      return errorResponse(400, 'INVALID_FILE_TYPE', `Only ${ALLOWED_EXTENSIONS.join(', ')} files are allowed`);
-    }
-
-    // Validate file size (Requirements 1.2)
-    if (uploadRequest.fileSize > MAX_FILE_SIZE) {
-      console.warn(`[UPLOAD] ✗ File too large: ${uploadRequest.fileSize} bytes (max: ${MAX_FILE_SIZE})`);
-      return errorResponse(400, 'FILE_TOO_LARGE', `File size must not exceed 10MB (${MAX_FILE_SIZE} bytes)`);
-    }
-
-    console.log(`[UPLOAD] ✓ Validation passed: file type=${ext}, size=${uploadRequest.fileSize} bytes`);
-
-    // Create file upload request
-    const fileUploadRequest: FileUploadRequest = {
-      fileName: uploadRequest.fileName,
-      fileSize: uploadRequest.fileSize,
-      contentType: uploadRequest.contentType,
-      organizationId: user.organizationId,
-      userId: user.userId,
-    };
-
-    // Generate presigned upload URL
-    console.log(`[UPLOAD] Generating presigned upload URL...`);
-    const uploadResponse = await fileUploadService.generatePresignedUploadUrl(fileUploadRequest);
-    console.log(`[UPLOAD] ✓ Presigned URL generated: fileId=${uploadResponse.fileId}, expiresIn=${uploadResponse.expiresIn}s`);
-
-    // Build the s3Key once so it's consistent between metadata and SQS message
-    const s3Key = uploadResponse.s3Key;
-    const language = (ext === '.c' || ext === '.h') ? 'C' : 'CPP';
-
-    // Create FileMetadata record directly (bypass validator to avoid UUID length issues)
-    // CRITICAL: This must succeed or the upload fails - no silent catches!
-    console.log(`[UPLOAD] Creating FileMetadata for file ${uploadResponse.fileId}, user ${user.userId}, table: ${FILE_METADATA_TABLE}`);
     try {
-      const now = Math.floor(Date.now() / 1000);
-      const fileType = (ext === '.c' || ext === '.h') ? 'c' : 'cpp';
+      logger.info('File upload request started');
       
-      console.log(`[UPLOAD] Preparing metadata: fileId=${uploadResponse.fileId}, filename=${uploadRequest.fileName}, fileType=${fileType}, fileSize=${uploadRequest.fileSize}`);
-      
-      await dynamoClient.send(new PutItemCommand({
-        TableName: FILE_METADATA_TABLE,
-        Item: marshall({
-          file_id: uploadResponse.fileId,
-          filename: uploadRequest.fileName,
-          file_type: fileType,
-          file_size: uploadRequest.fileSize,
-          user_id: user.userId,
-          upload_timestamp: now,
-          analysis_status: 'pending',
-          s3_key: s3Key,
-          created_at: now,
-          updated_at: now,
-        }),
-      }));
-      
-      console.log(`[UPLOAD] ✓ FileMetadata record created successfully for file ${uploadResponse.fileId}`);
-    } catch (metadataError) {
-      console.error(`[UPLOAD] ✗ CRITICAL: Failed to create FileMetadata for file ${uploadResponse.fileId}:`, metadataError);
-      
-      // Determine error type and return appropriate status code
-      if (metadataError instanceof Error) {
-        const errorName = (metadataError as any).name || '';
-        const errorMessage = metadataError.message || '';
-        
-        if (errorName === 'AccessDenied' || errorMessage.includes('AccessDenied') || errorMessage.includes('not authorized')) {
-          console.error(`[UPLOAD] ✗ IAM Permission Error: Lambda does not have permission to write to DynamoDB table ${FILE_METADATA_TABLE}`);
-          return errorResponse(500, 'METADATA_PERMISSION_ERROR', 
-            `Failed to save file metadata: Permission denied. FileId: ${uploadResponse.fileId}. Ensure Lambda has dynamodb:PutItem permission.`);
-        }
-        
-        if (errorName === 'ResourceNotFoundException' || errorMessage.includes('ResourceNotFoundException')) {
-          console.error(`[UPLOAD] ✗ Table Not Found: DynamoDB table ${FILE_METADATA_TABLE} does not exist`);
-          return errorResponse(500, 'METADATA_TABLE_ERROR', 
-            `Failed to save file metadata: Table not found. FileId: ${uploadResponse.fileId}. Table: ${FILE_METADATA_TABLE}`);
-        }
-        
-        if (errorName === 'ThrottlingException' || errorName === 'ProvisionedThroughputExceededException') {
-          console.error(`[UPLOAD] ✗ Throttling: DynamoDB is temporarily unavailable`);
-          return errorResponse(503, 'METADATA_THROTTLED', 
-            `Failed to save file metadata: Service temporarily unavailable. FileId: ${uploadResponse.fileId}. Please retry.`);
-        }
-        
-        if (errorName === 'ValidationException') {
-          console.error(`[UPLOAD] ✗ Validation Error: ${errorMessage}`);
-          return errorResponse(400, 'METADATA_VALIDATION_ERROR', 
-            `Failed to save file metadata: Invalid data. FileId: ${uploadResponse.fileId}. Error: ${errorMessage}`);
-        }
+      // Extract user from Lambda Authorizer context
+      const user = getUserFromContext(event);
+      if (!user.userId) {
+        logger.warn('Unauthorized upload attempt');
+        await cloudWatchMonitoringService.recordError('UNAUTHORIZED', 'file-upload-service', 'MISSING_USER');
+        throw new Error('User not authenticated');
       }
       
-      // Generic error
-      console.error(`[UPLOAD] ✗ Unknown error creating metadata:`, metadataError);
-      return errorResponse(500, 'METADATA_CREATION_FAILED', 
-        `Failed to create file metadata. FileId: ${uploadResponse.fileId}. Error: ${metadataError instanceof Error ? metadataError.message : 'Unknown error'}`);
-    }
+      logger.info('User authenticated for upload', { 
+        userId: user.userId, 
+        organizationId: user.organizationId 
+      });
 
-    // Trigger MISRA analysis via SQS (Requirement 6.1)
-    // Only send SQS message if metadata was successfully created
-    const analysisQueueUrl = process.env.ANALYSIS_QUEUE_URL;
-    if (analysisQueueUrl) {
-      try {
-        console.log(`[UPLOAD] Queuing analysis for file ${uploadResponse.fileId}, language: ${language}`);
-        await sqsClient.send(new SendMessageCommand({
-          QueueUrl: analysisQueueUrl,
-          MessageBody: JSON.stringify({
-            fileId: uploadResponse.fileId,
-            fileName: uploadRequest.fileName,
-            s3Key,
-            language,
-            userId: user.userId,
-            organizationId: user.organizationId || 'default-org',
-          }),
-        }));
-        console.log(`[UPLOAD] ✓ Analysis queued successfully for file ${uploadResponse.fileId}`);
-      } catch (sqsError) {
-        console.error(`[UPLOAD] ✗ Failed to queue analysis for file ${uploadResponse.fileId}:`, sqsError);
-        // Log but don't fail - metadata is already saved, analysis can be triggered manually or via retry
-        console.warn(`[UPLOAD] ⚠ Analysis not queued for file ${uploadResponse.fileId}, but metadata was saved. File will be available in UI.`);
+      // Parse and validate request body
+      if (!event.body) {
+        logger.warn('Upload request missing body');
+        await cloudWatchMonitoringService.recordError('VALIDATION_ERROR', 'file-upload-service', 'MISSING_BODY');
+        throw new Error('Request body is required');
       }
-    } else {
-      console.warn('[UPLOAD] ⚠ ANALYSIS_QUEUE_URL is not set - analysis will not be triggered automatically');
-    }
 
-    const response: UploadResponse = {
-      fileId: uploadResponse.fileId,
-      uploadUrl: uploadResponse.uploadUrl,
-      downloadUrl: uploadResponse.downloadUrl,
-      expiresIn: uploadResponse.expiresIn,
-    };
+      const uploadRequest: UploadRequestBody = JSON.parse(event.body);
+      logger.info('Upload request parsed', { 
+        fileName: uploadRequest.fileName, 
+        fileSize: uploadRequest.fileSize 
+      });
 
-    console.log(`[UPLOAD] ✓ Upload complete for file ${uploadResponse.fileId}, user ${user.userId}`);
-    
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-      },
-      body: JSON.stringify(response),
-    };
-  } catch (error) {
-    console.error('[UPLOAD] ✗ Unhandled error in upload handler:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('validation failed')) {
-        console.error('[UPLOAD] ✗ File validation error:', error.message);
-        return errorResponse(400, 'FILE_VALIDATION_ERROR', error.message);
-      }
-      if (error.message.includes('Failed to generate upload URL')) {
-        console.error('[UPLOAD] ✗ Upload service unavailable:', error.message);
-        return errorResponse(503, 'UPLOAD_SERVICE_UNAVAILABLE', 'File upload service temporarily unavailable');
-      }
+      // Validate input with enhanced error handling
+      await enhancedRetryService.executeWithRetry(
+        () => validateUploadRequest(uploadRequest),
+        { maxAttempts: 1 } // No retry for validation
+      );
+
+      logger.info('Upload request validation passed');
+
+      // Create file upload request
+      const fileUploadRequest: FileUploadRequest = {
+        fileName: uploadRequest.fileName,
+        fileSize: uploadRequest.fileSize,
+        contentType: uploadRequest.contentType,
+        organizationId: user.organizationId,
+        userId: user.userId,
+      };
+
+      // Generate presigned upload URL with retry
+      logger.info('Generating presigned upload URL');
+      const uploadResponse = await enhancedRetryService.executeWithRetry(
+        () => fileUploadService.generatePresignedUploadUrl(fileUploadRequest),
+        { 
+          maxAttempts: 3, 
+          initialDelayMs: 500,
+          retryableErrors: ['timeout', 'SERVICE_UNAVAILABLE', 'EXTERNAL_SERVICE_ERROR']
+        }
+      );
+      
+      logger.info('Presigned URL generated successfully', { 
+        fileId: uploadResponse.fileId, 
+        expiresIn: uploadResponse.expiresIn 
+      });
+
+      // Create FileMetadata record with retry
+      await enhancedRetryService.executeWithRetry(
+        () => createFileMetadata(uploadResponse, uploadRequest, user),
+        { 
+          maxAttempts: 3, 
+          initialDelayMs: 1000,
+          retryableErrors: ['ThrottlingException', 'ProvisionedThroughputExceededException', 'ServiceUnavailable']
+        }
+      );
+
+      logger.info('FileMetadata record created successfully');
+
+      // Queue analysis with retry (non-critical)
+      await queueAnalysisWithRetry(uploadResponse, uploadRequest, user);
+
+      // Record success metrics
+      const duration = Date.now() - startTime;
+      await cloudWatchMonitoringService.recordPerformance('file-upload', duration, 'file-upload-service', true);
+      await cloudWatchMonitoringService.recordUserActivity('file-upload', user.userId, user.organizationId);
+
+      const response: UploadResponse = {
+        fileId: uploadResponse.fileId,
+        uploadUrl: uploadResponse.uploadUrl,
+        downloadUrl: uploadResponse.downloadUrl,
+        expiresIn: uploadResponse.expiresIn,
+      };
+
+      logger.info('File upload completed successfully', { 
+        fileId: uploadResponse.fileId, 
+        duration 
+      });
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        },
+        body: JSON.stringify(response),
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      await cloudWatchMonitoringService.recordPerformance('file-upload', duration, 'file-upload-service', false);
+      
+      logger.error('File upload failed', error as Error);
+      throw error; // Let centralized error handler manage this
     }
-    
-    console.error('[UPLOAD] ✗ Internal server error:', error);
-    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
-  }
-};
+  },
+  'file-upload-service'
+);
 
 function errorResponse(
   statusCode: number,
@@ -241,4 +176,172 @@ function errorResponse(
       },
     }),
   };
+}
+
+/**
+ * Validate upload request with enhanced error messages
+ */
+async function validateUploadRequest(uploadRequest: UploadRequestBody): Promise<void> {
+  const ALLOWED_EXTENSIONS = ['.c', '.cpp', '.h', '.hpp'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+  if (!uploadRequest.fileName || !uploadRequest.fileSize || !uploadRequest.contentType) {
+    throw new Error('fileName, fileSize, and contentType are required');
+  }
+
+  // Validate file extension (Requirements 1.1)
+  const ext = uploadRequest.fileName.substring(uploadRequest.fileName.lastIndexOf('.')).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    throw new Error(`Only ${ALLOWED_EXTENSIONS.join(', ')} files are allowed`);
+  }
+
+  // Validate file size (Requirements 1.2)
+  if (uploadRequest.fileSize > MAX_FILE_SIZE) {
+    throw new Error(`File size must not exceed 10MB (${MAX_FILE_SIZE} bytes)`);
+  }
+
+  logger.info('Upload request validation passed', { 
+    fileType: ext, 
+    fileSize: uploadRequest.fileSize 
+  });
+}
+
+/**
+ * Create file metadata record with enhanced error handling
+ */
+async function createFileMetadata(
+  uploadResponse: any,
+  uploadRequest: UploadRequestBody,
+  user: any
+): Promise<void> {
+  const ext = uploadRequest.fileName.substring(uploadRequest.fileName.lastIndexOf('.')).toLowerCase();
+  const fileType = (ext === '.c' || ext === '.h') ? 'c' : 'cpp';
+  const now = Math.floor(Date.now() / 1000);
+
+  logger.info('Creating FileMetadata record', {
+    fileId: uploadResponse.fileId,
+    fileName: uploadRequest.fileName,
+    fileType,
+    userId: user.userId
+  });
+
+  try {
+    await dynamoClient.send(new PutItemCommand({
+      TableName: FILE_METADATA_TABLE,
+      Item: marshall({
+        file_id: uploadResponse.fileId,
+        filename: uploadRequest.fileName,
+        file_type: fileType,
+        file_size: uploadRequest.fileSize,
+        user_id: user.userId,
+        upload_timestamp: now,
+        analysis_status: 'pending',
+        s3_key: uploadResponse.s3Key,
+        created_at: now,
+        updated_at: now,
+      }),
+    }));
+
+    logger.info('FileMetadata record created successfully', { 
+      fileId: uploadResponse.fileId 
+    });
+
+  } catch (error) {
+    logger.error('Failed to create FileMetadata record', error as Error, {
+      fileId: uploadResponse.fileId,
+      table: FILE_METADATA_TABLE
+    });
+
+    // Enhanced error handling for DynamoDB errors
+    if (error instanceof Error) {
+      const errorName = (error as any).name || '';
+      const errorMessage = error.message || '';
+
+      if (errorName === 'AccessDenied' || errorMessage.includes('AccessDenied')) {
+        await cloudWatchMonitoringService.recordError('PERMISSION_DENIED', 'file-upload-service', 'DYNAMODB_ACCESS');
+        throw new Error(`Failed to save file metadata: Permission denied. Ensure Lambda has DynamoDB permissions.`);
+      }
+
+      if (errorName === 'ResourceNotFoundException') {
+        await cloudWatchMonitoringService.recordError('RESOURCE_NOT_FOUND', 'file-upload-service', 'DYNAMODB_TABLE');
+        throw new Error(`Failed to save file metadata: Table ${FILE_METADATA_TABLE} not found.`);
+      }
+
+      if (errorName === 'ThrottlingException' || errorName === 'ProvisionedThroughputExceededException') {
+        await cloudWatchMonitoringService.recordError('THROTTLING', 'file-upload-service', 'DYNAMODB_THROTTLE');
+        throw new Error(`Failed to save file metadata: Service temporarily unavailable. Please retry.`);
+      }
+
+      if (errorName === 'ValidationException') {
+        await cloudWatchMonitoringService.recordError('VALIDATION_ERROR', 'file-upload-service', 'DYNAMODB_VALIDATION');
+        throw new Error(`Failed to save file metadata: Invalid data format.`);
+      }
+    }
+
+    // Generic error
+    await cloudWatchMonitoringService.recordError('DATABASE_ERROR', 'file-upload-service', 'METADATA_CREATION');
+    throw new Error(`Failed to create file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Queue analysis with retry and graceful failure
+ */
+async function queueAnalysisWithRetry(
+  uploadResponse: any,
+  uploadRequest: UploadRequestBody,
+  user: any
+): Promise<void> {
+  const analysisQueueUrl = process.env.ANALYSIS_QUEUE_URL;
+  
+  if (!analysisQueueUrl) {
+    logger.warn('ANALYSIS_QUEUE_URL not configured - analysis will not be triggered automatically');
+    return;
+  }
+
+  const ext = uploadRequest.fileName.substring(uploadRequest.fileName.lastIndexOf('.')).toLowerCase();
+  const language = (ext === '.c' || ext === '.h') ? 'C' : 'CPP';
+
+  try {
+    await enhancedRetryService.executeWithRetry(
+      async () => {
+        logger.info('Queuing analysis', { 
+          fileId: uploadResponse.fileId, 
+          language 
+        });
+
+        await sqsClient.send(new SendMessageCommand({
+          QueueUrl: analysisQueueUrl,
+          MessageBody: JSON.stringify({
+            fileId: uploadResponse.fileId,
+            fileName: uploadRequest.fileName,
+            s3Key: uploadResponse.s3Key,
+            language,
+            userId: user.userId,
+            organizationId: user.organizationId || 'default-org',
+          }),
+        }));
+
+        logger.info('Analysis queued successfully', { 
+          fileId: uploadResponse.fileId 
+        });
+      },
+      { 
+        maxAttempts: 3, 
+        initialDelayMs: 500,
+        retryableErrors: ['timeout', 'SERVICE_UNAVAILABLE', 'ThrottlingException']
+      }
+    );
+
+  } catch (error) {
+    // Log but don't fail the upload - metadata is already saved
+    logger.warn('Failed to queue analysis - file upload succeeded but analysis not triggered', {
+      fileId: uploadResponse.fileId,
+      error: (error as Error).message
+    });
+
+    await cloudWatchMonitoringService.recordError('QUEUE_FAILED', 'file-upload-service', 'SQS_ANALYSIS');
+    
+    // Don't throw - the upload was successful, analysis can be triggered manually
+  }
 }

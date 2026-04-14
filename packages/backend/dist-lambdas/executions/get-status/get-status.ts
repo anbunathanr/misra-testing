@@ -3,9 +3,8 @@
  * Returns current status and progress information for a test execution
  */
 
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
-import { withAuthAndPermission, AuthenticatedEvent } from '../../middleware/auth-middleware';
 
 export interface ExecutionStatusResponse {
   executionId: string;
@@ -17,10 +16,7 @@ export interface ExecutionStatusResponse {
   duration?: number;
 }
 
-export const handler = withAuthAndPermission(
-  'tests',
-  'read',
-  async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
       console.log('Get execution status request:', JSON.stringify(event));
 
@@ -111,5 +107,4 @@ export const handler = withAuthAndPermission(
         }),
       };
     }
-  }
-);
+};

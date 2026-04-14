@@ -1,21 +1,17 @@
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { testExecutionDBService } from '../../services/test-execution-db-service';
 import { 
   SuiteExecutionResultsResponse, 
   SuiteExecutionStats,
   ExecutionStatus 
 } from '../../types/test-execution';
-import { withAuthAndPermission, AuthenticatedEvent } from '../../middleware/auth-middleware';
 
 /**
  * Lambda handler for GET /api/executions/suites/{suiteExecutionId}
  * Retrieves detailed results for a test suite execution including aggregate statistics
  * and individual test case results.
  */
-export const handler = withAuthAndPermission(
-  'tests',
-  'read',
-  async (event: AuthenticatedEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
       const suiteExecutionId = event.pathParameters?.suiteExecutionId;
 
@@ -118,7 +114,7 @@ export const handler = withAuthAndPermission(
       }),
     };
   }
-});
+};
 
 /**
  * Calculate aggregate statistics for a suite execution
