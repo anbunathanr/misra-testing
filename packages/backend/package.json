@@ -12,7 +12,9 @@
     "test:misra:debug": "HEADLESS=false ts-node run-misra-test.ts",
     "lint": "eslint src --ext ts --report-unused-disable-directives --max-warnings 0",
     "deploy": "npm run build && cdk deploy",
-    "synth": "npm run build && cdk synth"
+    "synth": "npm run build && cdk synth",
+    "dev": "node local-test-server.js",
+    "start:local": "node local-test-server.js"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1020.0",

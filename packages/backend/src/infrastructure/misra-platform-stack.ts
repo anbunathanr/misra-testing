@@ -20,6 +20,8 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
+import { SampleFilesTable } from './sample-files-table';
+import { UploadProgressTable } from './upload-progress-table';
 import { ProjectsTable } from './projects-table';
 import { TestSuitesTable } from './test-suites-table';
 import { TestCasesTable } from './test-cases-table';
@@ -260,6 +262,12 @@ export class MisraPlatformStack extends cdk.Stack {
     const fileMetadataTable = new FileMetadataTable(this, 'FileMetadataTable', {
       environment: 'dev'
     });
+
+    // Sample Files Table for storing predefined C/C++ files with known MISRA violations
+    const sampleFilesTable = new SampleFilesTable(this, 'SampleFilesTable');
+
+    // Upload Progress Table for tracking file upload progress
+    const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment });
 
     // Projects Table for Web App Testing System - Using existing TestProjects table
     const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
@@ -648,6 +656,59 @@ export class MisraPlatformStack extends cdk.Stack {
       reservedConcurrentExecutions: 0,
     });
 
+    // Sample File Management Lambda Functions
+    const getSampleFilesFunction = new lambda.Function(this, 'GetSampleFilesFunction', {
+      functionName: 'misra-platform-get-sample-files',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/get-sample-files'),
+      environment: {
+        SAMPLE_FILES_TABLE: sampleFilesTable.table.tableName,
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
+    const uploadSampleFileFunction = new lambda.Function(this, 'UploadSampleFileFunction', {
+      functionName: 'misra-platform-upload-sample-file',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/upload-sample-file'),
+      environment: {
+        SAMPLE_FILES_TABLE: sampleFilesTable.table.tableName,
+        FILE_STORAGE_BUCKET: fileStorageBucket.bucketName,
+        FILE_METADATA_TABLE: fileMetadataTable.table.tableName,
+        UPLOAD_PROGRESS_TABLE: uploadProgressTable.table.tableName,
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
+    const getUploadProgressFunction = new lambda.Function(this, 'GetUploadProgressFunction', {
+      functionName: 'misra-platform-get-upload-progress',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/get-upload-progress'),
+      environment: {
+        UPLOAD_PROGRESS_TABLE: uploadProgressTable.table.tableName,
+      },
+      timeout: cdk.Duration.seconds(15),
+      reservedConcurrentExecutions: 0,
+    });
+
+    const initializeSampleLibraryFunction = new lambda.Function(this, 'InitializeSampleLibraryFunction', {
+      functionName: 'misra-platform-initialize-sample-library',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/file/initialize-sample-library'),
+      environment: {
+        SAMPLE_FILES_TABLE: sampleFilesTable.table.tableName,
+      },
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 512,
+      reservedConcurrentExecutions: 0,
+    });
+
     // Project Management Lambda Functions
     const createProjectFunction = new lambda.Function(this, 'CreateProjectFunction', {
       functionName: 'misra-platform-create-project',
@@ -775,6 +836,17 @@ export class MisraPlatformStack extends cdk.Stack {
     fileMetadataTable.grantReadWriteData(fileUploadFunction);
     fileMetadataTable.grantReadWriteData(uploadCompleteFunction);
     fileMetadataTable.grantReadData(getFilesFunction);
+
+    // Sample file permissions
+    sampleFilesTable.table.grantReadData(getSampleFilesFunction);
+    sampleFilesTable.table.grantReadData(uploadSampleFileFunction);
+    sampleFilesTable.table.grantReadWriteData(initializeSampleLibraryFunction);
+    fileStorageBucket.grantReadWrite(uploadSampleFileFunction);
+    fileMetadataTable.grantReadWriteData(uploadSampleFileFunction);
+
+    // Upload progress permissions
+    uploadProgressTable.grantReadWriteData(uploadSampleFileFunction);
+    uploadProgressTable.grantReadData(getUploadProgressFunction);
 
     // Project management permissions
     testProjectsTable.table.grantReadWriteData(createProjectFunction);
@@ -1421,38 +1493,6 @@ export class MisraPlatformStack extends cdk.Stack {
     analysisResultsTable.grantReadData(aiInsightsFunction);
     // aiInsightsFunction uses Lambda Authorizer context - no JWT secret needed
 
-    // AI Feedback Lambda Function
-    const aiFeedbackFunction = new lambda.Function(this, 'AIFeedbackFunction', {
-      functionName: 'misra-platform-ai-feedback',
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset('dist-lambdas/ai/submit-feedback'),
-      environment: {
-        ENVIRONMENT: this.stackName,
-      },
-      timeout: cdk.Duration.seconds(30),
-      reservedConcurrentExecutions: 0,
-    });
-
-    // Grant feedback function access to store feedback
-    // aiFeedbackFunction uses Lambda Authorizer context - no JWT secret needed
-
-    // Report Generation Lambda Function
-    const reportFunction = new lambda.Function(this, 'ReportFunction', {
-      functionName: 'misra-platform-get-report',
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset('dist-lambdas/reports/get-violation-report'),
-      environment: {
-        ENVIRONMENT: this.stackName,
-      },
-      timeout: cdk.Duration.seconds(30),
-      reservedConcurrentExecutions: 0,
-    });
-
-    // Grant report function access to metadata
-    // Note: Would need file metadata table reference here
-
     // Create Step Functions workflow for analysis orchestration
     const workflow = new AnalysisWorkflow(this, 'AnalysisWorkflow', {
       environment: this.stackName,
@@ -1535,11 +1575,38 @@ export class MisraPlatformStack extends cdk.Stack {
       authorizer: authorizer,
     });
 
-    // Add report routes
+    // Add sample file routes
     api.addRoutes({
-      path: '/reports/{fileId}',
+      path: '/files/samples',
       methods: [apigateway.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration('ReportIntegration', reportFunction, {
+      integration: new integrations.HttpLambdaIntegration('GetSampleFilesIntegration', getSampleFilesFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+      authorizer: authorizer,
+    });
+
+    api.addRoutes({
+      path: '/files/upload-sample',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('UploadSampleFileIntegration', uploadSampleFileFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+      authorizer: authorizer,
+    });
+
+    api.addRoutes({
+      path: '/files/upload-progress/{fileId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetUploadProgressIntegration', getUploadProgressFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+      authorizer: authorizer,
+    });
+
+    api.addRoutes({
+      path: '/files/initialize-samples',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('InitializeSampleLibraryIntegration', initializeSampleLibraryFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
       authorizer: authorizer,
@@ -1570,16 +1637,6 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/ai/insights',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('AIInsightsIntegration', aiInsightsFunction, {
-        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
-      }),
-      authorizer: authorizer,
-    });
-
-    // Add AI feedback routes
-    api.addRoutes({
-      path: '/ai/feedback',
-      methods: [apigateway.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration('AIFeedbackIntegration', aiFeedbackFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
       authorizer: authorizer,

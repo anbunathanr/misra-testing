@@ -278,6 +278,7 @@
             <div class="form-group">
                 <label for="environment">Environment</label>
                 <select id="environment" onchange="updateUrlsForEnvironment()">
+                    <option value="demo" selected>Demo Mode (Mock Backend)</option>
                     <option value="local">Local Development (localhost:3000)</option>
                     <option value="development">Development</option>
                     <option value="staging">Staging</option>
@@ -287,17 +288,24 @@
 
             <div class="form-group">
                 <label for="appUrl">Application URL</label>
-                <input type="text" id="appUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
+                <input type="text" id="appUrl" value="https://demo.misra.digitransolutions.in" placeholder="https://demo.misra.digitransolutions.in">
             </div>
 
             <div class="form-group">
                 <label for="backendUrl">Backend API URL</label>
-                <input type="text" id="backendUrl" value="http://localhost:3001" placeholder="http://localhost:3001">
+                <input type="text" id="backendUrl" value="mock" placeholder="mock">
             </div>
 
-            <div class="info-box" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107; color: #856404;">
-                <strong>💡 Local Testing Setup</strong>
-                For local development, ensure your backend is running on localhost:3001 with TEST_MODE_ENABLED=true
+            <div class="info-box" style="margin-top: 15px; background: #d4edda; border-left-color: #28a745; color: #155724;">
+                <strong>✅ Demo Mode Active</strong>
+                Demo Mode uses a mock backend that runs entirely in your browser. No real backend deployment needed!
+                <br><br>
+                <strong>🔧 Need Real Backend?</strong>
+                Switch to "Local Development" and run: <code>cd packages/backend && npm run dev</code>
+                <br>Or deploy to AWS and use Development/Staging/Production environments.
+                <br><br>
+                <strong>⚠️ Having Connection Issues?</strong>
+                If you get "Failed to fetch" errors with real backends, try Demo Mode first to verify the test workflow works.
             </div>
         </div>
 
@@ -336,6 +344,11 @@
                 backendUrl: 'http://localhost:3001',
                 description: 'Local Development'
             },
+            demo: {
+                appUrl: 'https://demo.misra.digitransolutions.in',
+                backendUrl: 'mock',
+                description: 'Demo Mode (Mock Backend)'
+            },
             development: {
                 appUrl: 'https://dev.misra.digitransolutions.in',
                 backendUrl: 'https://api-dev.misra.digitransolutions.in',
@@ -372,6 +385,10 @@
             outputSection.classList.remove('active');
             clearOutputBtn.style.display = 'none';
             runTestBtn.disabled = false;
+            
+            // Remove any suggestion elements that were added
+            const suggestions = outputEl.parentNode.querySelectorAll('div[style*="cursor: pointer"]');
+            suggestions.forEach(suggestion => suggestion.remove());
         }
 
         function updateStep(stepNum, status) {
@@ -384,16 +401,111 @@
             }
         }
 
+        function suggestDemoMode() {
+            const currentEnv = document.getElementById('environment').value;
+            if (currentEnv !== 'demo') {
+                log('');
+                log('🎯 QUICK FIX SUGGESTION:');
+                log('   Click here to switch to Demo Mode automatically');
+                log('   Demo Mode works 100% offline and shows the full workflow');
+                log('');
+                
+                // Add a clickable suggestion (in a real implementation, you might add a button)
+                const suggestion = document.createElement('div');
+                suggestion.style.cssText = `
+                    background: #e7f3ff; 
+                    border: 1px solid #2196F3; 
+                    border-radius: 4px; 
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    cursor: pointer;
+                    text-align: center;
+                    color: #0c5aa0;
+                    font-weight: bold;
+                `;
+                suggestion.textContent = '🎯 Click here to switch to Demo Mode';
+                suggestion.onclick = () => {
+                    document.getElementById('environment').value = 'demo';
+                    updateUrlsForEnvironment();
+                    log('[AUTO] Switched to Demo Mode - try running the test again!');
+                };
+                
+                // Insert after the output element
+                outputEl.parentNode.insertBefore(suggestion, outputEl.nextSibling);
+            }
+        }
+
         async function testApiConnectivity(url) {
             try {
+                if (url === 'mock') {
+                    log('[TEST] Mock backend detected - skipping connectivity check');
+                    return true; // Mock backend is always available
+                }
+                
+                log(`[TEST] Testing connectivity to: ${url}`);
+                
+                // Try a simple health check first with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
+                try {
+                    const response = await fetch(`${url}/health`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: controller.signal,
+                        mode: 'cors'
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        log('[TEST] ✓ Backend health check passed');
+                        return true;
+                    }
+                } catch (healthError) {
+                    clearTimeout(timeoutId);
+                    // Health endpoint might not exist, try OPTIONS on root
+                }
+                
+                // Fallback to OPTIONS request
+                const optionsController = new AbortController();
+                const optionsTimeoutId = setTimeout(() => optionsController.abort(), 5000);
+                
                 const response = await fetch(url, {
                     method: 'OPTIONS',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: optionsController.signal,
+                    mode: 'cors'
                 });
+                clearTimeout(optionsTimeoutId);
+                
                 return response.ok || response.status === 404; // 404 is OK for OPTIONS, means server is reachable
+                
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    log(`[TEST] Connectivity test timed out after 5 seconds`);
+                } else {
+                    log(`[TEST] Connectivity test failed: ${error.message}`);
+                }
                 return false;
             }
+        }
+
+        async function mockTestLogin() {
+            // Simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return {
+                accessToken: 'mock-access-token-' + Date.now(),
+                refreshToken: 'mock-refresh-token-' + Date.now(),
+                user: {
+                    userId: 'mock-user-id',
+                    email: 'test-misra@example.com',
+                    name: 'Test User'
+                },
+                expiresIn: 3600,
+                testOtp: Math.floor(100000 + Math.random() * 900000).toString(),
+                testMode: true
+            };
         }
 
         async function runTest() {
@@ -407,12 +519,21 @@
             }
 
             // Validate URLs
-            try {
-                new URL(appUrl);
-                new URL(backendUrl);
-            } catch (e) {
-                alert('Invalid URL format. Please use complete URLs (e.g., https://example.com or http://localhost:3000)');
-                return;
+            if (backendUrl !== 'mock') {
+                try {
+                    new URL(appUrl);
+                    new URL(backendUrl);
+                } catch (e) {
+                    alert('Invalid URL format. Please use complete URLs (e.g., https://example.com or http://localhost:3000)');
+                    return;
+                }
+            } else {
+                try {
+                    new URL(appUrl);
+                } catch (e) {
+                    alert('Invalid Application URL format. Please use complete URLs (e.g., https://example.com)');
+                    return;
+                }
             }
 
             // Reset UI
@@ -437,13 +558,22 @@
                 // Step 0: Check connectivity
                 log('[TEST] Checking API connectivity...');
                 const isConnected = await testApiConnectivity(backendUrl);
-                if (!isConnected) {
+                if (!isConnected && backendUrl !== 'mock') {
                     log('[WARN] ⚠️  Backend API may not be reachable');
                     log(`[WARN] Attempted to reach: ${backendUrl}`);
                     log('[WARN] Make sure your backend is running and accessible');
                     if (environment === 'local') {
-                        log('[WARN] For local testing: npm run dev (in backend directory)');
+                        log('[WARN] For local testing: Start backend with local test server first');
+                        log('[WARN] Commands:');
+                        log('[WARN]   cd packages/backend');
+                        log('[WARN]   npm run dev');
+                        log('[WARN] Or use SAM CLI: sam local start-api --port 3001');
+                        log('[WARN] Or switch to Development/Staging/Production environment');
+                    } else {
+                        log('[WARN] Try switching to "Demo Mode" for immediate testing');
+                        log('[WARN] Or verify the backend deployment is working');
                     }
+                    log('[WARN] Continuing with test - may fail if backend is truly unreachable...');
                 }
                 log('[TEST] ✓ Connectivity check complete\n');
 
@@ -451,24 +581,48 @@
                 log('[TEST] Step 1: Getting test credentials from backend...');
                 updateStep(1, 'active');
 
-                const testLoginUrl = `${backendUrl}/auth/test-login`;
-                log(`[TEST] Calling: ${testLoginUrl}`);
+                let testData;
+                if (backendUrl === 'mock') {
+                    log('[TEST] Using mock backend for demonstration');
+                    testData = await mockTestLogin();
+                } else {
+                    const testLoginUrl = `${backendUrl}/auth/test-login`;
+                    log(`[TEST] Calling: ${testLoginUrl}`);
 
-                const testLoginResponse = await fetch(testLoginUrl, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    mode: 'cors',
-                });
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-                if (!testLoginResponse.ok) {
-                    const errorText = await testLoginResponse.text();
-                    throw new Error(`Failed to get test credentials: ${testLoginResponse.status} ${testLoginResponse.statusText}\n${errorText}`);
+                        const testLoginResponse = await fetch(testLoginUrl, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            mode: 'cors',
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+
+                        if (!testLoginResponse.ok) {
+                            const errorText = await testLoginResponse.text();
+                            throw new Error(`HTTP ${testLoginResponse.status}: ${testLoginResponse.statusText}\n${errorText}`);
+                        }
+
+                        testData = await testLoginResponse.json();
+                        
+                    } catch (fetchError) {
+                        if (fetchError.name === 'AbortError') {
+                            throw new Error('Request timed out after 10 seconds. Backend may be unreachable.');
+                        } else if (fetchError.message.includes('Failed to fetch')) {
+                            throw new Error(`Network error: Cannot reach ${backendUrl}\n\nPossible causes:\n- Backend is not running\n- CORS not configured\n- Network connectivity issues\n- Invalid URL\n\nSuggestions:\n- Try "Demo Mode" for immediate testing\n- Verify backend is deployed and accessible\n- Check browser console for CORS errors`);
+                        } else {
+                            throw fetchError;
+                        }
+                    }
                 }
 
-                const testData = await testLoginResponse.json();
                 const testOtp = testData.testOtp;
                 const accessToken = testData.accessToken;
 
@@ -517,11 +671,76 @@
             } catch (error) {
                 log('\n✗ Test failed: ' + error.message);
                 log('\n========================================');
-                log('Troubleshooting:');
-                log('1. Check that backend is running');
-                log('2. Verify TEST_MODE_ENABLED=true in environment');
-                log('3. Check CORS configuration on backend');
-                log('4. Review browser console for detailed errors');
+                log('🔧 TROUBLESHOOTING GUIDE:');
+                log('========================================');
+                
+                if (error.message.includes('Network error') || error.message.includes('Failed to fetch')) {
+                    log('❌ CONNECTIVITY ISSUE DETECTED');
+                    log('');
+                    
+                    if (environment === 'local') {
+                        log('🔧 LOCAL DEVELOPMENT SETUP REQUIRED:');
+                        log('');
+                        log('1. 🚀 START LOCAL SERVER:');
+                        log('   cd packages/backend');
+                        log('   npm run dev');
+                        log('');
+                        log('2. ✅ VERIFY SERVER IS RUNNING:');
+                        log('   Open: http://localhost:3001/health');
+                        log('   Should show: {"status":"healthy"}');
+                        log('');
+                        log('3. 🔄 THEN RETRY THE TEST');
+                        log('');
+                        log('📋 Alternative: Use Demo Mode for immediate testing');
+                    } else {
+                        log('Quick Fix Options:');
+                        log('1. 🎯 IMMEDIATE: Switch to "Demo Mode" above');
+                        log('   - Select "Demo Mode (Mock Backend)" from dropdown');
+                        log('   - Click "Run Test" - works instantly!');
+                        log('');
+                        log('2. 🔧 FOR REAL BACKEND: Check deployment status');
+                        log('   - Verify backend is deployed to AWS');
+                        log('   - Check CloudWatch logs for errors');
+                        log('   - Ensure API Gateway is configured correctly');
+                        log('');
+                        log('3. 🌐 CORS Configuration:');
+                        log('   - Backend must allow requests from this domain');
+                        log('   - Check API Gateway CORS settings');
+                        log('   - Verify preflight OPTIONS requests work');
+                    }
+                    
+                    // Suggest demo mode automatically
+                    suggestDemoMode();
+                    
+                } else if (error.message.includes('timed out')) {
+                    log('⏱️ TIMEOUT ISSUE DETECTED');
+                    log('');
+                    log('Possible causes:');
+                    log('- Backend is slow to respond (cold start?)');
+                    log('- Network latency issues');
+                    log('- Backend is overloaded');
+                    log('');
+                    log('Solutions:');
+                    log('1. Try "Demo Mode" for immediate testing');
+                    log('2. Wait a moment and try again (cold start)');
+                    log('3. Check backend CloudWatch metrics');
+                    
+                    suggestDemoMode();
+                    
+                } else {
+                    log('🔍 GENERAL TROUBLESHOOTING:');
+                    log('1. Check browser console (F12) for detailed errors');
+                    log('2. Verify backend environment variables');
+                    log('3. Check AWS CloudWatch logs');
+                    log('4. Ensure TEST_MODE_ENABLED=true in backend');
+                    log('5. Try Demo Mode to isolate the issue');
+                    
+                    suggestDemoMode();
+                }
+                
+                log('');
+                log('💡 TIP: Demo Mode works 100% offline and shows');
+                log('    the complete workflow without backend dependency');
                 log('========================================\n');
                 statusBadge.textContent = 'Error';
                 statusBadge.className = 'status-badge error';
@@ -530,8 +749,10 @@
             }
         }
 
-        // Initialize with local environment on page load
+        // Initialize with demo environment on page load
         window.addEventListener('load', () => {
+            // Ensure demo mode is selected by default
+            document.getElementById('environment').value = 'demo';
             updateUrlsForEnvironment();
         });
 
