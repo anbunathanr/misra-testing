@@ -46,7 +46,7 @@ describe('Property 2: Preservation - Authentication Flows Remain Unchanged', () 
           expect(tokenPair).toHaveProperty('expiresIn');
           expect(typeof tokenPair.accessToken).toBe('string');
           expect(typeof tokenPair.refreshToken).toBe('string');
-          expect(tokenPair.expiresIn).toBe(15 * 60); // 15 minutes in seconds
+          expect(tokenPair.expiresIn).toBe(60 * 60); // 1 hour in seconds (updated for production SaaS)
 
           // Assert: Access token is valid JWT
           const decoded = jwt.decode(tokenPair.accessToken) as any;
@@ -78,14 +78,14 @@ describe('Property 2: Preservation - Authentication Flows Remain Unchanged', () 
           const tokenPair = await jwtService.generateTokenPair(payload);
           const afterGeneration = Math.floor(Date.now() / 1000);
 
-          // Assert: Access token expires in ~15 minutes
+          // Assert: Access token expires in ~1 hour (updated for production SaaS)
           const decoded = jwt.decode(tokenPair.accessToken) as any;
           const accessTokenExpiry = decoded.exp;
-          const expectedAccessExpiry = beforeGeneration + 15 * 60;
+          const expectedAccessExpiry = beforeGeneration + 60 * 60; // 1 hour
           
           // Allow 5 second tolerance for test execution time
           expect(accessTokenExpiry).toBeGreaterThanOrEqual(expectedAccessExpiry - 5);
-          expect(accessTokenExpiry).toBeLessThanOrEqual(afterGeneration + 15 * 60 + 5);
+          expect(accessTokenExpiry).toBeLessThanOrEqual(afterGeneration + 60 * 60 + 5); // 1 hour
 
           // Assert: Refresh token expires in ~7 days
           const decodedRefresh = jwt.decode(tokenPair.refreshToken) as any;

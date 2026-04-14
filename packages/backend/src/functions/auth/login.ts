@@ -1,10 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import {
-  CognitoIdentityProviderClient,
-  InitiateAuthCommand,
-} from '@aws-sdk/client-cognito-identity-provider';
-import { JWTService } from '../../services/auth/jwt-service';
-import { UserService } from '../../services/user/user-service';
+import { UnifiedAuthService } from '../../services/auth/unified-auth-service';
 
 // Local type definitions
 interface LoginRequest {
@@ -17,11 +12,10 @@ interface LoginResponse {
   refreshToken: string;
   user: any;
   expiresIn: number;
+  message: string;
 }
 
-const jwtService = new JWTService();
-const userService = new UserService();
-const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const unifiedAuthService = new UnifiedAuthService();
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -37,76 +31,23 @@ export const handler = async (
       return errorResponse(400, 'INVALID_INPUT', 'Email and password are required');
     }
 
-    const clientId = process.env.COGNITO_CLIENT_ID;
-    if (!clientId) {
-      return errorResponse(500, 'CONFIG_ERROR', 'Cognito client not configured');
-    }
-
-    // Authenticate against Cognito
-    let cognitoSub: string;
-    try {
-      const authResult = await cognitoClient.send(new InitiateAuthCommand({
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: clientId,
-        AuthParameters: {
-          USERNAME: loginRequest.email,
-          PASSWORD: loginRequest.password,
-        },
-      }));
-
-      if (!authResult.AuthenticationResult?.IdToken) {
-        return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    // Use unified authentication service with retry capability
+    const authResult = await unifiedAuthService.login(
+      loginRequest.email, 
+      loginRequest.password,
+      {
+        maxRetries: 2, // Allow 2 retries for login attempts
+        baseDelay: 1000, // 1 second base delay
+        maxDelay: 3000   // Max 3 seconds delay
       }
-
-      // Decode Cognito ID token to get sub
-      const parts = authResult.AuthenticationResult.IdToken.split('.');
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-      cognitoSub = payload.sub;
-    } catch (cognitoError: any) {
-      console.error('Cognito auth error:', cognitoError.name, cognitoError.message);
-      if (
-        cognitoError.name === 'NotAuthorizedException' ||
-        cognitoError.name === 'UserNotFoundException'
-      ) {
-        return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
-      }
-      if (cognitoError.name === 'UserNotConfirmedException') {
-        return errorResponse(401, 'USER_NOT_CONFIRMED', 'User is not confirmed. Please verify your email.');
-      }
-      return errorResponse(500, 'AUTH_ERROR', 'Authentication service error');
-    }
-
-    // Get or create user in DynamoDB
-    let user = await userService.getUserByEmail(loginRequest.email);
-
-    if (!user) {
-      user = await userService.createUser({
-        email: loginRequest.email,
-        organizationId: cognitoSub, // use Cognito sub as org ID for new users
-        role: 'developer',
-        preferences: {
-          theme: 'light',
-          notifications: { email: true, webhook: false },
-          defaultMisraRuleSet: 'MISRA_C_2012',
-        },
-      });
-    } else {
-      await userService.updateLastLogin(user.userId);
-    }
-
-    // Generate platform JWT tokens
-    const tokenPair = await jwtService.generateTokenPair({
-      userId: user.userId,
-      email: user.email,
-      organizationId: user.organizationId,
-      role: user.role,
-    });
+    );
 
     const response: LoginResponse = {
-      accessToken: tokenPair.accessToken,
-      refreshToken: tokenPair.refreshToken,
-      user,
-      expiresIn: tokenPair.expiresIn,
+      accessToken: authResult.accessToken,
+      refreshToken: authResult.refreshToken,
+      user: authResult.user,
+      expiresIn: authResult.expiresIn,
+      message: authResult.message
     };
 
     return {
@@ -119,9 +60,23 @@ export const handler = async (
       body: JSON.stringify(response),
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
-    return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
+    
+    // Parse error message for better user experience
+    const errorMessage = error.message || 'Internal server error';
+    
+    if (errorMessage.includes('INVALID_CREDENTIALS')) {
+      return errorResponse(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    } else if (errorMessage.includes('USER_NOT_CONFIRMED')) {
+      return errorResponse(401, 'USER_NOT_CONFIRMED', 'User is not confirmed. Please verify your email.');
+    } else if (errorMessage.includes('RETRY_EXHAUSTED')) {
+      return errorResponse(503, 'SERVICE_TEMPORARILY_UNAVAILABLE', 'Authentication service is temporarily unavailable. Please try again in a few moments.');
+    } else if (errorMessage.includes('CONFIG_ERROR')) {
+      return errorResponse(500, 'CONFIG_ERROR', 'Authentication service configuration error');
+    } else {
+      return errorResponse(500, 'INTERNAL_ERROR', 'Internal server error');
+    }
   }
 };
 

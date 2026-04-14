@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 export interface JWTPayload {
@@ -22,7 +22,7 @@ let secretFetchInProgress: Promise<string> | null = null;
 
 export class JWTService {
   private secretsClient: SecretsManagerClient;
-  private readonly ACCESS_TOKEN_EXPIRES_IN = '15m';
+  private readonly ACCESS_TOKEN_EXPIRES_IN = '1h'; // Updated to 1 hour for production SaaS
   private readonly REFRESH_TOKEN_EXPIRES_IN = '7d';
 
   constructor() {
@@ -123,7 +123,7 @@ export class JWTService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 15 * 60, // 15 minutes in seconds
+      expiresIn: 60 * 60, // 1 hour in seconds
     };
   }
 
@@ -189,7 +189,7 @@ export class JWTService {
 
     return {
       accessToken,
-      expiresIn: 15 * 60, // 15 minutes in seconds
+      expiresIn: 60 * 60, // 1 hour in seconds
     };
   }
 
