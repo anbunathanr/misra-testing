@@ -80,6 +80,12 @@ export class AuthErrorHandler {
   ): AuthError {
     const message = error.message;
 
+    // Handle wrapped errors (e.g., EMAIL_VERIFICATION_ERROR: EMAIL_VERIFICATION_FAILED: ...)
+    const cleanMessage = message.replace(/^EMAIL_VERIFICATION_ERROR:\s*/, '')
+                                  .replace(/^OTP_VERIFICATION_ERROR:\s*/, '')
+                                  .replace(/^OTP_SETUP_ERROR:\s*/, '')
+                                  .replace(/^AUTH_FLOW_ERROR:\s*/, '');
+
     // Email verification errors
     if (message.includes('INVALID_EMAIL')) {
       return {
@@ -95,8 +101,8 @@ export class AuthErrorHandler {
       };
     }
 
-    if (message.includes('EMAIL_VERIFICATION_FAILED')) {
-      const details = message.split(': ')[1] || '';
+    if (message.includes('EMAIL_VERIFICATION_FAILED') || message.includes('EMAIL_VERIFICATION_ERROR')) {
+      const details = cleanMessage.split(': ')[1] || '';
       
       if (details.includes('Invalid verification code')) {
         return {
@@ -142,8 +148,8 @@ export class AuthErrorHandler {
     }
 
     // OTP errors
-    if (message.includes('OTP_VERIFICATION_FAILED')) {
-      const details = message.split(': ')[1] || '';
+    if (message.includes('OTP_VERIFICATION_FAILED') || message.includes('OTP_VERIFICATION_ERROR')) {
+      const details = cleanMessage.split(': ')[1] || '';
       
       if (details.includes('Invalid OTP code')) {
         return {

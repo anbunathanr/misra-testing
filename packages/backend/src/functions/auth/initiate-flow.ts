@@ -79,11 +79,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     console.log('Authentication flow initiated successfully:', response);
 
-    return {
+    const httpResponse = {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify(response)
     };
+
+    console.log('Returning HTTP response:', JSON.stringify(httpResponse));
+
+    return httpResponse;
 
   } catch (error: any) {
     console.error('Authentication flow initiation failed:', error);
@@ -91,7 +95,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // Use the error handler to transform and log the error
     const authError = authErrorHandler.handleError(error, {
       operation: 'initiate-flow',
-      email: request?.email,
+      email: event.body ? JSON.parse(event.body).email : undefined,
       step: 'flow_initiation'
     });
 

@@ -19,29 +19,35 @@ interface VerifyEmailWithOTPResponse {
     issuer: string;
     accountName: string;
   };
+  temporaryTokens?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    scope: 'temp_authenticated';
+  };
   nextStep: string;
 }
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Verify email with OTP request:', JSON.stringify(event, null, 2));
 
+  // Parse request body
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        error: {
+          code: 'MISSING_BODY',
+          message: 'Request body is required'
+        }
+      })
+    };
+  }
+
+  const request: VerifyEmailWithOTPRequest = JSON.parse(event.body);
+
   try {
-    // Parse request body
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: {
-            code: 'MISSING_BODY',
-            message: 'Request body is required'
-          }
-        })
-      };
-    }
-
-    const request: VerifyEmailWithOTPRequest = JSON.parse(event.body);
-
     // Validate required fields
     if (!request.email || !request.confirmationCode) {
       return {
@@ -97,6 +103,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       success: true,
       message: result.message,
       otpSetup: result.otpSetup,
+      temporaryTokens: result.temporaryTokens,
       nextStep: result.nextStep
     };
 
@@ -114,7 +121,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // Use the error handler to transform and log the error
     const authError = authErrorHandler.handleError(error, {
       operation: 'verify-email-with-otp',
-      email: request?.email,
+      email: request.email,
       step: 'email_verification'
     });
 

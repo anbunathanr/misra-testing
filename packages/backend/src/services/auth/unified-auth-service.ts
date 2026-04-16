@@ -6,9 +6,10 @@ import {
   AdminGetUserCommand,
   InitiateAuthCommand
 } from '@aws-sdk/client-cognito-identity-provider';
-import { JWTService } from './jwt-service';
+import { JWTService, TemporaryTokenPair } from './jwt-service';
 import { UserService } from '../user/user-service';
 import { EmailVerificationService } from './email-verification-service';
+import { AuthMonitoringService, authMonitoringService } from './auth-monitoring-service';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthErrorHandler } from '../../utils/auth-error-handler';
 import { createLogger } from '../../utils/logger';
@@ -27,6 +28,12 @@ export interface OTPSetupResult {
     backupCodes: string[];
     issuer: string;
     accountName: string;
+  };
+  temporaryTokens?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    scope: 'temp_authenticated';
   };
   nextStep: AuthenticationState;
   message: string;
@@ -75,6 +82,7 @@ export class UnifiedAuthService {
   private jwtService: JWTService;
   private userService: UserService;
   private emailVerificationService: EmailVerificationService;
+  private monitoringService: AuthMonitoringService;
   private errorHandler: AuthErrorHandler;
   private logger: ReturnType<typeof createLogger>;
   private defaultRetryConfig: RetryConfig = {
@@ -90,6 +98,7 @@ export class UnifiedAuthService {
     this.jwtService = new JWTService();
     this.userService = new UserService();
     this.emailVerificationService = new EmailVerificationService();
+    this.monitoringService = authMonitoringService;
     this.errorHandler = new AuthErrorHandler('UnifiedAuthService');
     this.logger = createLogger('UnifiedAuthService');
   }
@@ -144,6 +153,9 @@ export class UnifiedAuthService {
       email,
       hasName: !!name
     });
+
+    // Monitor flow initiation
+    this.monitoringService.onAuthFlowInitiated(correlationId, email);
 
     if (!this.isValidEmail(email)) {
       const error = new Error('INVALID_EMAIL: Valid email address is required');
@@ -214,6 +226,7 @@ export class UnifiedAuthService {
         message: 'User is ready for authentication.'
       };
     } catch (error: any) {
+      this.monitoringService.onError(correlationId, email, error.message, 'flow_initiation');
       this.errorHandler.handleError(error, {
         operation: 'initiateAuthenticationFlow',
         email,
@@ -234,12 +247,18 @@ export class UnifiedAuthService {
       email
     });
 
+    // Monitor email verification start
+    this.monitoringService.onEmailVerificationStarted(correlationId, email);
+    const startTime = Date.now();
+
     try {
       // Verify email using EmailVerificationService
       const verificationResult = await this.emailVerificationService.verifyEmail(email, verificationCode);
 
       if (!verificationResult.success) {
         const error = new Error(`EMAIL_VERIFICATION_FAILED: ${verificationResult.message}`);
+        const durationMs = Date.now() - startTime;
+        this.monitoringService.onEmailVerificationFailed(correlationId, email, verificationResult.message, durationMs);
         this.errorHandler.handleError(error, {
           operation: 'handleEmailVerificationComplete',
           email,
@@ -254,6 +273,10 @@ export class UnifiedAuthService {
         step: 'email_verification'
       }, true, { correlationId });
 
+      // Monitor email verification completion
+      const durationMs = Date.now() - startTime;
+      this.monitoringService.onEmailVerificationCompleted(correlationId, email, durationMs);
+
       // Email verification automatically sets up OTP, so return the setup data
       if (verificationResult.otpSecret && verificationResult.backupCodes) {
         this.logger.info('OTP setup data generated', {
@@ -263,6 +286,38 @@ export class UnifiedAuthService {
           backupCodesCount: verificationResult.backupCodes.length
         });
 
+        // Generate temporary tokens to allow file operations before OTP setup completion
+        let temporaryTokens: TemporaryTokenPair | undefined;
+        
+        try {
+          // Get user information to create token payload
+          const userInfo = await this.userService.getUserByEmail(email);
+          
+          if (userInfo) {
+            temporaryTokens = await this.jwtService.generateTemporaryTokenPair({
+              userId: userInfo.userId,
+              email: userInfo.email,
+              organizationId: userInfo.organizationId,
+              role: userInfo.role || 'developer' // Default role if not specified
+            });
+
+            this.logger.info('Temporary tokens generated for email verified user', {
+              correlationId,
+              email,
+              userId: userInfo.userId,
+              scope: temporaryTokens.scope,
+              expiresIn: temporaryTokens.expiresIn
+            });
+          }
+        } catch (tokenError: any) {
+          // Log the error but don't fail the entire flow
+          this.logger.warn('Failed to generate temporary tokens, continuing without them', {
+            correlationId,
+            email,
+            error: tokenError.message
+          });
+        }
+
         return {
           otpSetup: {
             secret: verificationResult.otpSecret,
@@ -271,6 +326,7 @@ export class UnifiedAuthService {
             issuer: 'MISRA Platform',
             accountName: email
           },
+          temporaryTokens,
           nextStep: AuthenticationState.OTP_SETUP_REQUIRED,
           message: 'Email verified successfully. Please complete OTP setup.'
         };
@@ -284,6 +340,7 @@ export class UnifiedAuthService {
       });
       throw error;
     } catch (error: any) {
+      this.monitoringService.onError(correlationId, email, error.message, 'email_verification_complete');
       this.errorHandler.handleError(error, {
         operation: 'handleEmailVerificationComplete',
         email,
@@ -304,12 +361,18 @@ export class UnifiedAuthService {
       email
     });
 
+    // Monitor OTP setup start
+    this.monitoringService.onOTPSetupStarted(correlationId, email);
+    const startTime = Date.now();
+
     try {
       // Verify OTP code
       const otpResult = await this.emailVerificationService.verifyOTP(email, otpCode);
 
       if (!otpResult.success) {
         const error = new Error(`OTP_VERIFICATION_FAILED: ${otpResult.message}`);
+        const durationMs = Date.now() - startTime;
+        this.monitoringService.onOTPSetupFailed(correlationId, email, otpResult.message, durationMs);
         this.errorHandler.handleError(error, {
           operation: 'completeOTPSetup',
           email,
@@ -323,6 +386,10 @@ export class UnifiedAuthService {
         email,
         step: 'otp_verification'
       }, true, { correlationId });
+
+      // Monitor OTP setup completion
+      const durationMs = Date.now() - startTime;
+      this.monitoringService.onOTPSetupCompleted(correlationId, email, durationMs);
 
       // Get user information
       const cognitoUser = await this.cognitoClient.send(new AdminGetUserCommand({
@@ -350,6 +417,9 @@ export class UnifiedAuthService {
         role: user.role
       });
 
+      // Monitor session creation
+      this.monitoringService.onSessionCreated(correlationId, email, user.userId, durationMs);
+
       this.errorHandler.logAuthEvent('session_created', {
         operation: 'completeOTPSetup',
         email,
@@ -372,6 +442,7 @@ export class UnifiedAuthService {
         message: 'OTP setup completed successfully. You are now logged in.'
       };
     } catch (error: any) {
+      this.monitoringService.onError(correlationId, email, error.message, 'otp_setup_complete');
       this.errorHandler.handleError(error, {
         operation: 'completeOTPSetup',
         email,
@@ -385,6 +456,13 @@ export class UnifiedAuthService {
    * Get authentication state for a user
    */
   async getAuthenticationState(email: string): Promise<AuthenticationState> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Getting authentication state', {
+      correlationId,
+      email
+    });
+
     try {
       const userExists = await this.checkUserExists(email);
       
@@ -405,6 +483,7 @@ export class UnifiedAuthService {
 
       return AuthenticationState.AUTHENTICATED;
     } catch (error) {
+      this.monitoringService.onError(correlationId, email, error.message, 'state_check');
       return AuthenticationState.ERROR;
     }
   }
@@ -413,6 +492,14 @@ export class UnifiedAuthService {
    * Validate authentication step
    */
   async validateAuthenticationStep(email: string, step: AuthenticationState): Promise<boolean> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Validating authentication step', {
+      correlationId,
+      email,
+      step
+    });
+
     try {
       const currentState = await this.getAuthenticationState(email);
       
@@ -430,6 +517,7 @@ export class UnifiedAuthService {
 
       return validTransitions[currentState]?.includes(step) || currentState === step;
     } catch (error) {
+      this.monitoringService.onError(correlationId, email, error.message, 'step_validation');
       return false;
     }
   }
@@ -726,6 +814,13 @@ export class UnifiedAuthService {
    * Check if user exists in Cognito
    */
   private async checkUserExists(email: string): Promise<boolean> {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Checking if user exists', {
+      correlationId,
+      email
+    });
+
     try {
       await this.cognitoClient.send(new AdminGetUserCommand({
         UserPoolId: process.env.COGNITO_USER_POOL_ID!,
@@ -736,6 +831,7 @@ export class UnifiedAuthService {
       if (error.name === 'UserNotFoundException') {
         return false;
       }
+      this.monitoringService.onError(correlationId, email, error.message, 'user_check');
       throw error;
     }
   }
@@ -744,6 +840,13 @@ export class UnifiedAuthService {
    * Generate QR code URL for OTP setup
    */
   private generateQRCodeUrl(email: string, secret: string): string {
+    const correlationId = uuidv4();
+    
+    this.logger.info('Generating QR code URL', {
+      correlationId,
+      email
+    });
+
     const issuer = 'MISRA Platform';
     const label = `${issuer}:${email}`;
     const otpAuthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;

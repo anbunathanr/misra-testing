@@ -29,23 +29,23 @@ interface CompleteOTPSetupResponse {
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Complete OTP setup request:', JSON.stringify(event, null, 2));
 
+  // Parse request body
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        error: {
+          code: 'MISSING_BODY',
+          message: 'Request body is required'
+        }
+      })
+    };
+  }
+
+  const request: CompleteOTPSetupRequest = JSON.parse(event.body);
+
   try {
-    // Parse request body
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: {
-            code: 'MISSING_BODY',
-            message: 'Request body is required'
-          }
-        })
-      };
-    }
-
-    const request: CompleteOTPSetupRequest = JSON.parse(event.body);
-
     // Validate required fields
     if (!request.email || !request.otpCode) {
       return {
@@ -119,7 +119,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // Use the error handler to transform and log the error
     const authError = authErrorHandler.handleError(error, {
       operation: 'complete-otp-setup',
-      email: request?.email,
+      email: request.email,
       step: 'otp_setup'
     });
 

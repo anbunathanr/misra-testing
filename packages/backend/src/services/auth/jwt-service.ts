@@ -10,10 +10,28 @@ export interface JWTPayload {
   exp?: number;
 }
 
+export interface TemporaryJWTPayload {
+  userId: string;
+  email: string;
+  organizationId: string;
+  role: 'admin' | 'developer' | 'viewer';
+  scope: 'temp_authenticated'; // Indicates temporary authentication
+  authState: 'otp_setup_required';
+  iat?: number;
+  exp?: number;
+}
+
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+}
+
+export interface TemporaryTokenPair {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  scope: 'temp_authenticated';
 }
 
 // Module-level cache for JWT secret to prevent multiple calls to Secrets Manager
@@ -24,6 +42,7 @@ export class JWTService {
   private secretsClient: SecretsManagerClient;
   private readonly ACCESS_TOKEN_EXPIRES_IN = '1h'; // Updated to 1 hour for production SaaS
   private readonly REFRESH_TOKEN_EXPIRES_IN = '7d';
+  private readonly TEMPORARY_TOKEN_EXPIRES_IN = '1h'; // Temporary tokens expire in 1 hour
 
   constructor() {
     this.secretsClient = new SecretsManagerClient({
@@ -127,6 +146,44 @@ export class JWTService {
     };
   }
 
+  async generateTemporaryTokenPair(payload: Omit<TemporaryJWTPayload, 'iat' | 'exp' | 'scope' | 'authState'>): Promise<TemporaryTokenPair> {
+    const secret = await this.getJWTSecret();
+    
+    // Create temporary token payload with limited scope
+    const tempPayload: Omit<TemporaryJWTPayload, 'iat' | 'exp'> = {
+      ...payload,
+      scope: 'temp_authenticated',
+      authState: 'otp_setup_required'
+    };
+    
+    const accessToken = jwt.sign(tempPayload, secret, {
+      expiresIn: this.TEMPORARY_TOKEN_EXPIRES_IN,
+      issuer: 'misra-platform',
+      audience: 'misra-platform-users',
+    });
+
+    const refreshToken = jwt.sign(
+      { 
+        userId: payload.userId, 
+        type: 'temp_refresh',
+        scope: 'temp_authenticated'
+      },
+      secret,
+      {
+        expiresIn: this.TEMPORARY_TOKEN_EXPIRES_IN,
+        issuer: 'misra-platform',
+        audience: 'misra-platform-users',
+      }
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: 60 * 60, // 1 hour in seconds
+      scope: 'temp_authenticated'
+    };
+  }
+
   async verifyAccessToken(token: string): Promise<JWTPayload> {
     const secret = await this.getJWTSecret();
     
@@ -148,6 +205,58 @@ export class JWTService {
     }
   }
 
+  async verifyTemporaryToken(token: string): Promise<TemporaryJWTPayload> {
+    const secret = await this.getJWTSecret();
+    
+    try {
+      const decoded = jwt.verify(token, secret, {
+        issuer: 'misra-platform',
+        audience: 'misra-platform-users',
+      }) as TemporaryJWTPayload;
+      
+      // Verify this is actually a temporary token
+      if (decoded.scope !== 'temp_authenticated') {
+        throw new Error('Invalid temporary token scope');
+      }
+      
+      return decoded;
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new Error('Temporary token expired');
+      } else if (error instanceof jwt.JsonWebTokenError) {
+        throw new Error('Invalid temporary token');
+      } else {
+        throw new Error('Temporary token verification failed');
+      }
+    }
+  }
+
+  async verifyAnyToken(token: string): Promise<JWTPayload | TemporaryJWTPayload> {
+    const secret = await this.getJWTSecret();
+    
+    try {
+      const decoded = jwt.verify(token, secret, {
+        issuer: 'misra-platform',
+        audience: 'misra-platform-users',
+      }) as any;
+      
+      // Check if this is a temporary token
+      if (decoded.scope === 'temp_authenticated') {
+        return decoded as TemporaryJWTPayload;
+      } else {
+        return decoded as JWTPayload;
+      }
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new Error('Token expired');
+      } else if (error instanceof jwt.JsonWebTokenError) {
+        throw new Error('Invalid token');
+      } else {
+        throw new Error('Token verification failed');
+      }
+    }
+  }
+
   async verifyRefreshToken(token: string): Promise<{ userId: string }> {
     const secret = await this.getJWTSecret();
     
@@ -157,7 +266,7 @@ export class JWTService {
         audience: 'misra-platform-users',
       }) as any;
       
-      if (decoded.type !== 'refresh') {
+      if (decoded.type !== 'refresh' && decoded.type !== 'temp_refresh') {
         throw new Error('Invalid refresh token');
       }
       

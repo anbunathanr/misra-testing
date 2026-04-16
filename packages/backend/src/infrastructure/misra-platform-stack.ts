@@ -21,7 +21,6 @@ import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
-import { AnalysisWorkflow } from './analysis-workflow';
 import { FileMetadataTable } from './file-metadata-table';
 import { SampleFilesTable } from './sample-files-table';
 import { UploadProgressTable } from './upload-progress-table';
@@ -234,7 +233,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     // Use existing TestProjects table
-    const projectsTable = dynamodb.Table.fromTableName(this, 'TestProjectsTable', 'TestProjects');
+    const projectsTable = dynamodb.Table.fromTableName(this, 'ExistingTestProjectsTable', 'TestProjects');
 
     const analysesTable = new dynamodb.Table(this, 'AnalysesTable', {
       tableName: 'misra-platform-analyses',
@@ -302,13 +301,13 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     // Sample Files Table for storing predefined C/C++ files with known MISRA violations
-    const sampleFilesTable = new SampleFilesTable(this, 'SampleFilesTable');
+    const sampleFilesTable = { table: dynamodb.Table.fromTableName(this, 'ExistingSampleFilesTable', 'SampleFiles') };
 
     // Upload Progress Table for tracking file upload progress
     const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment: 'dev' });
 
     // Projects Table for Web App Testing System - Using existing TestProjects table
-    const testProjectsTable = new ProjectsTable(this, 'TestProjectsTable');
+    const testProjectsTable = { table: projectsTable };
 
     // Test Suites Table for Web App Testing System - Using existing TestSuites table
     const testSuitesTable = new TestSuitesTable(this, 'TestSuitesTable');
@@ -653,6 +652,50 @@ export class MisraPlatformStack extends cdk.Stack {
       reservedConcurrentExecutions: 0,
     });
 
+    // Email Verification and OTP Integration Lambda Functions
+    const initiateFlowFunction = new lambda.Function(this, 'InitiateFlowFunction', {
+      functionName: 'misra-platform-initiate-flow',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/initiate-flow'),
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
+    const verifyEmailWithOTPFunction = new lambda.Function(this, 'VerifyEmailWithOTPFunction', {
+      functionName: 'misra-platform-verify-email-with-otp',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/verify-email-with-otp'),
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
+    const completeOTPSetupFunction = new lambda.Function(this, 'CompleteOTPSetupFunction', {
+      functionName: 'misra-platform-complete-otp-setup',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/auth/complete-otp-setup'),
+      environment: {
+        USERS_TABLE_NAME: usersTable.tableName,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+        JWT_SECRET_NAME: jwtSecret.secretName,
+      },
+      timeout: cdk.Duration.seconds(30),
+      reservedConcurrentExecutions: 0,
+    });
+
     // File Upload Lambda Functions
     const fileUploadFunction = new lambda.Function(this, 'FileUploadFunction', {
       functionName: 'misra-platform-file-upload',
@@ -863,6 +906,46 @@ export class MisraPlatformStack extends cdk.Stack {
     usersTable.grantReadWriteData(refreshFunction);
     jwtSecret.grantRead(loginFunction);
     jwtSecret.grantRead(refreshFunction);
+    
+    // Email verification and OTP integration permissions
+    usersTable.grantReadWriteData(initiateFlowFunction);
+    usersTable.grantReadWriteData(verifyEmailWithOTPFunction);
+    usersTable.grantReadWriteData(completeOTPSetupFunction);
+    jwtSecret.grantRead(completeOTPSetupFunction);
+    
+    // Grant Cognito permissions to the new auth functions
+    initiateFlowFunction.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminSetUserPassword',
+        'cognito-idp:AdminUpdateUserAttributes',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
+
+    verifyEmailWithOTPFunction.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminConfirmSignUp',
+        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminSetUserMFAPreference',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
+
+    completeOTPSetupFunction.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminSetUserMFAPreference',
+        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:VerifySoftwareToken',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
     
     // File upload permissions
     fileStorageBucket.grantReadWrite(fileUploadFunction);
@@ -1550,17 +1633,18 @@ export class MisraPlatformStack extends cdk.Stack {
     // aiInsightsFunction uses Lambda Authorizer context - no JWT secret needed
 
     // Create Step Functions workflow for analysis orchestration
-    const workflow = new AnalysisWorkflow(this, 'AnalysisWorkflow', {
-      environment: this.stackName,
-      analysisFunction,
-      notificationFunction,
-    });
+    // TODO: Re-enable AnalysisWorkflow when the module is available
+    // const workflow = new AnalysisWorkflow(this, 'AnalysisWorkflow', {
+    //   environment: this.stackName,
+    //   analysisFunction,
+    //   notificationFunction,
+    // });
 
     // Update upload-complete function with workflow ARN
-    uploadCompleteFunction.addEnvironment('STATE_MACHINE_ARN', workflow.stateMachine.stateMachineArn);
+    // uploadCompleteFunction.addEnvironment('STATE_MACHINE_ARN', workflow.stateMachine.stateMachineArn);
     
     // Grant upload-complete function permission to start workflow executions
-    workflow.stateMachine.grantStartExecution(uploadCompleteFunction);
+    // workflow.stateMachine.grantStartExecution(uploadCompleteFunction);
 
     // API Gateway with custom domain
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
@@ -1634,6 +1718,31 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/auth/refresh',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('RefreshIntegration', refreshFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+    });
+
+    // Add email verification and OTP integration routes
+    api.addRoutes({
+      path: '/auth/initiate-flow',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('InitiateFlowIntegration', initiateFlowFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+    });
+
+    api.addRoutes({
+      path: '/auth/verify-email-with-otp',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('VerifyEmailWithOTPIntegration', verifyEmailWithOTPFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+    });
+
+    api.addRoutes({
+      path: '/auth/complete-otp-setup',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('CompleteOTPSetupIntegration', completeOTPSetupFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
     });

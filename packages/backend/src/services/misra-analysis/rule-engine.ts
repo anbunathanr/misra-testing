@@ -1,6 +1,8 @@
-﻿import { Language, Violation } from '../../types/misra-analysis';
+import { Language, Violation } from '../../types/misra-analysis';
 import { AST, Token, FunctionDef } from './code-parser';
 import { RuleConfig, RuleProfile, PROFILE_SEVERITIES } from './rule-config';
+
+// ─── MISRARule interface ────────────────────────────────────────────────────
 
 export interface MISRARule {
   id: string;
@@ -10,6 +12,8 @@ export interface MISRARule {
   language: 'C' | 'CPP' | 'BOTH';
   check(ast: AST, sourceCode: string): Promise<Violation[]>;
 }
+
+// ─── createViolation helper ─────────────────────────────────────────────────
 
 export function createViolation(
   rule: MISRARule,
@@ -28,6 +32,9 @@ export function createViolation(
     codeSnippet,
   };
 }
+
+
+// ─── AST traversal utilities ────────────────────────────────────────────────
 
 export function findTokensByType(ast: AST, type: Token['type']): Token[] {
   return ast.tokens.filter(t => t.type === type);
@@ -57,6 +64,8 @@ export function getSourceLine(ast: AST, lineNumber: number): string {
   if (lineNumber < 1 || lineNumber > ast.lines.length) return '';
   return ast.lines[lineNumber - 1];
 }
+
+// ─── RuleEngine class ───────────────────────────────────────────────────────
 
 export class RuleEngine {
   private rules: Map<string, MISRARule> = new Map();
@@ -109,5 +118,6 @@ export class RuleEngine {
     return Array.from(ruleSet.values());
   }
 
+  // Placeholder – rules are loaded in tasks 5 and 6
   loadRules(): void {}
 }
