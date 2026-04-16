@@ -3,7 +3,7 @@ import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { FileUploadService, FileUploadRequest } from '../../services/file/file-upload-service';
-import { getUserFromContext } from '../../utils/auth-util';
+import { getUserFromContext, canPerformFileOperations } from '../../utils/auth-util';
 import { centralizedErrorHandler } from '../../services/error-handling/centralized-error-handler';
 import { enhancedRetryService } from '../../services/error-handling/enhanced-retry';
 import { cloudWatchMonitoringService } from '../../services/monitoring/cloudwatch-monitoring';
@@ -43,17 +43,30 @@ export const handler = centralizedErrorHandler.wrapLambdaHandler(
     try {
       logger.info('File upload request started');
       
-      // Extract user from Lambda Authorizer context
-      const user = getUserFromContext(event);
+      // Extract user from Lambda Authorizer context or JWT token
+      const user = await getUserFromContext(event);
       if (!user.userId) {
         logger.warn('Unauthorized upload attempt');
         await cloudWatchMonitoringService.recordError('UNAUTHORIZED', 'file-upload-service', 'MISSING_USER');
         throw new Error('User not authenticated');
       }
+
+      // Check if user can perform file operations (supports temporary tokens)
+      if (!canPerformFileOperations(user)) {
+        logger.warn('User cannot perform file operations', { 
+          userId: user.userId, 
+          isTemporary: user.isTemporary,
+          authState: user.authState 
+        });
+        await cloudWatchMonitoringService.recordError('FORBIDDEN', 'file-upload-service', 'INSUFFICIENT_PERMISSIONS');
+        throw new Error('You need to log in to access this resource');
+      }
       
       logger.info('User authenticated for upload', { 
         userId: user.userId, 
-        organizationId: user.organizationId 
+        organizationId: user.organizationId,
+        isTemporary: user.isTemporary,
+        authState: user.authState
       });
 
       // Parse and validate request body

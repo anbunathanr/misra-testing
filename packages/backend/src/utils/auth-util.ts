@@ -4,6 +4,7 @@
  */
 
 import { APIGatewayProxyEvent } from 'aws-lambda';
+import { JWTService } from '../services/auth/jwt-service';
 
 /**
  * User context extracted from API Gateway request context
@@ -14,7 +15,12 @@ export interface UserContext {
   email: string;
   organizationId: string;
   role: 'admin' | 'developer' | 'viewer' | '';
+  isTemporary?: boolean; // Indicates if this is from a temporary token
+  authState?: string; // Auth state for temporary tokens
 }
+
+// Initialize JWT service for token validation
+const jwtService = new JWTService();
 
 /**
  * Decode a JWT payload without verifying the signature.
@@ -35,13 +41,13 @@ function decodeJwtPayload(token: string): Record<string, string> | null {
  * Extract authenticated user information from API Gateway request context.
  *
  * First tries the Lambda Authorizer context (populated when an authorizer is
- * configured). Falls back to decoding the Bearer JWT directly from the
- * Authorization header so the function works even without an authorizer.
+ * configured). Falls back to decoding and validating JWT directly from the
+ * Authorization header, supporting both full and temporary authentication tokens.
  *
  * @param event - API Gateway proxy event
- * @returns User context object with userId, email, organizationId, and role
+ * @returns User context object with userId, email, organizationId, role, and temporary status
  */
-export function getUserFromContext(event: APIGatewayProxyEvent): UserContext {
+export async function getUserFromContext(event: APIGatewayProxyEvent): Promise<UserContext> {
   // Primary: Lambda Authorizer context
   const authorizer = event.requestContext?.authorizer;
   if (authorizer?.userId) {
@@ -50,33 +56,108 @@ export function getUserFromContext(event: APIGatewayProxyEvent): UserContext {
       email: authorizer.email || '',
       organizationId: authorizer.organizationId || '',
       role: (authorizer.role as 'admin' | 'developer' | 'viewer') || '',
+      isTemporary: authorizer.scope === 'temp_authenticated',
+      authState: authorizer.authState || undefined,
     };
   }
 
-  // Fallback: decode JWT from Authorization header
+  // Fallback: validate JWT from Authorization header
   const authHeader =
     event.headers?.Authorization || event.headers?.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    const payload = decodeJwtPayload(token);
-    if (payload?.userId) {
-      return {
-        userId: payload.userId,
-        email: payload.email || '',
-        organizationId: payload.organizationId || '',
-        role: (payload.role as 'admin' | 'developer' | 'viewer') || '',
-      };
-    }
-    // Cognito JWT: sub is the user ID
-    if (payload?.sub) {
-      return {
-        userId: payload.sub,
-        email: payload.email || '',
-        organizationId: payload['custom:organizationId'] || 'default-org',
-        role: (payload['custom:role'] as 'admin' | 'developer' | 'viewer') || 'developer',
-      };
+    
+    try {
+      // Try to verify as any token (full or temporary)
+      const payload = await jwtService.verifyAnyToken(token);
+      
+      // Check if this is a temporary token
+      if ('scope' in payload && payload.scope === 'temp_authenticated') {
+        return {
+          userId: payload.userId,
+          email: payload.email || '',
+          organizationId: payload.organizationId || '',
+          role: payload.role || 'developer',
+          isTemporary: true,
+          authState: payload.authState || 'otp_setup_required',
+        };
+      } else {
+        // Full authentication token
+        return {
+          userId: payload.userId,
+          email: payload.email || '',
+          organizationId: payload.organizationId || '',
+          role: payload.role || 'developer',
+          isTemporary: false,
+        };
+      }
+    } catch (error) {
+      console.warn('JWT validation failed, falling back to decode:', error);
+      
+      // Fallback: decode JWT payload without verification (for backward compatibility)
+      const payload = decodeJwtPayload(token);
+      if (payload?.userId) {
+        return {
+          userId: payload.userId,
+          email: payload.email || '',
+          organizationId: payload.organizationId || '',
+          role: (payload.role as 'admin' | 'developer' | 'viewer') || '',
+          isTemporary: payload.scope === 'temp_authenticated',
+          authState: payload.authState || undefined,
+        };
+      }
+      // Cognito JWT: sub is the user ID
+      if (payload?.sub) {
+        return {
+          userId: payload.sub,
+          email: payload.email || '',
+          organizationId: payload['custom:organizationId'] || 'default-org',
+          role: (payload['custom:role'] as 'admin' | 'developer' | 'viewer') || 'developer',
+          isTemporary: false,
+        };
+      }
     }
   }
 
   return { userId: '', email: '', organizationId: '', role: '' };
+}
+
+/**
+ * Check if a user context allows file operations.
+ * File operations are allowed for:
+ * - Fully authenticated users
+ * - Users with temporary authentication tokens (during OTP setup)
+ * 
+ * @param userContext - User context from getUserFromContext
+ * @returns true if file operations are allowed
+ */
+export function canPerformFileOperations(userContext: UserContext): boolean {
+  // Must have a valid user ID
+  if (!userContext.userId) {
+    return false;
+  }
+  
+  // Full authentication always allows file operations
+  if (!userContext.isTemporary) {
+    return true;
+  }
+  
+  // Temporary authentication allows file operations during OTP setup
+  if (userContext.isTemporary && userContext.authState === 'otp_setup_required') {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if a user context allows sensitive operations.
+ * Sensitive operations require full authentication (no temporary tokens).
+ * 
+ * @param userContext - User context from getUserFromContext
+ * @returns true if sensitive operations are allowed
+ */
+export function canPerformSensitiveOperations(userContext: UserContext): boolean {
+  // Must have a valid user ID and NOT be temporary
+  return !!(userContext.userId && !userContext.isTemporary);
 }

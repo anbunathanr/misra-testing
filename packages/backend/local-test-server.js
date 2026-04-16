@@ -1,7 +1,7 @@
 const http = require('http');
 const url = require('url');
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3003;
 
 // Mock test login response
 const mockTestLoginResponse = {

@@ -1,9 +1,13 @@
 /**
  * Authentication Service
  * Handles user authentication via backend API with Cognito fallback
+ * Implements retry logic, circuit breaker pattern, and proper error handling
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import apiConfig from '../config/api-config';
+import { frontendAuthMonitoringService, AuthEventType } from './auth-monitoring-service';
+
+const API_URL = apiConfig.getBaseUrl();
 
 export interface UserInfo {
   email: string;
@@ -30,72 +34,171 @@ export interface TokenData {
   expiresAt: number; // Unix timestamp
 }
 
+export interface AuthError {
+  message: string;
+  code: string;
+  retryable: boolean;
+  suggestion?: string;
+  timestamp: Date;
+  endpoint?: string;
+}
+
 export class AuthService {
   private refreshTimer: NodeJS.Timeout | null = null;
   private readonly TOKEN_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiration
+  private readonly MAX_RETRY_COUNT = 3;
+  private retryCount = 0;
 
   /**
-   * Login user via backend API
+   * Login user via backend API with retry logic
    */
   async login(email: string, password: string): Promise<{ token: string; user: UserInfo }> {
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor login start
+    frontendAuthMonitoringService.logAuthEvent(
+      AuthEventType.AUTH_FLOW_INITIATED,
+      email,
+      'login',
+      true
+    );
 
-      const data = await response.json();
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Login failed');
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const error = this.createAuthError(data.error?.message || 'Login failed', response.status);
+          frontendAuthMonitoringService.logError(email, data.error?.message || 'Login failed', 'login');
+          throw error;
+        }
+
+        const userInfo: UserInfo = {
+          email: data.user.email,
+          name: data.user.name,
+          sub: data.user.userId,
+        };
+
+        // Monitor session creation
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logSessionCreated(email, userInfo.sub, durationMs);
+
+        // Store tokens with lifecycle management
+        this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
+        
+        // Also store user info
+        localStorage.setItem('user', JSON.stringify(userInfo));
+
+        return { token: data.accessToken, user: userInfo };
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Login attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        // If API fails, fall back to Cognito
+        console.log('API login failed after retries, falling back to Cognito:', error.message);
+        return this.loginWithCognito(email, password);
       }
-
-      const userInfo: UserInfo = {
-        email: data.user.email,
-        name: data.user.name,
-        sub: data.user.userId,
-      };
-
-      // Store tokens with lifecycle management
-      this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
-      
-      // Also store user info
-      localStorage.setItem('user', JSON.stringify(userInfo));
-
-      return { token: data.accessToken, user: userInfo };
-    } catch (error: any) {
-      // If API fails, fall back to Cognito
-      console.log('API login failed, falling back to Cognito:', error.message);
-      return this.loginWithCognito(email, password);
     }
+
+    throw new Error('Login failed after all retry attempts');
   }
 
   /**
-   * Register a new user via backend API
+   * Register a new user via backend API with retry logic
    */
   async register(email: string, password: string, name: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
-      });
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor registration start
+    frontendAuthMonitoringService.logAuthEvent(
+      AuthEventType.AUTH_FLOW_INITIATED,
+      email,
+      'registration',
+      true
+    );
 
-      const data = await response.json();
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Registration failed');
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password, name }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const error = this.createAuthError(data.error?.message || 'Registration failed', response.status);
+          frontendAuthMonitoringService.logError(email, data.error?.message || 'Registration failed', 'registration');
+          throw error;
+        }
+        
+        // Monitor registration completion
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.AUTH_FLOW_INITIATED,
+          email,
+          'registration',
+          true,
+          durationMs
+        );
+        
+        return;
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Registration attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        // If API fails, fall back to Cognito
+        console.log('API register failed after retries, falling back to Cognito:', error.message);
+        return this.registerWithCognito(email, password, name);
       }
-    } catch (error: any) {
-      // If API fails, fall back to Cognito
-      console.log('API register failed, falling back to Cognito:', error.message);
-      return this.registerWithCognito(email, password, name);
     }
+
+    throw new Error('Registration failed after all retry attempts');
   }
 
   /**
@@ -124,7 +227,11 @@ export class AuthService {
   /**
    * Get current user
    */
-  getCurrentUser(): null {
+  getCurrentUser(): UserInfo | null {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      return JSON.parse(storedUser);
+    }
     return null;
   }
 
@@ -147,74 +254,229 @@ export class AuthService {
   }
 
   /**
-   * Change password via backend API
+   * Change password via backend API with retry logic
    */
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ oldPassword, newPassword }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Password change failed');
-      }
-    } catch (error: any) {
-      throw new Error(error.message || 'Password change failed');
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor password change start
+    const userInfo = this.getCurrentUser();
+    if (userInfo) {
+      frontendAuthMonitoringService.logAuthEvent(
+        AuthEventType.AUTH_FLOW_INITIATED,
+        userInfo.email,
+        'password_change',
+        true
+      );
     }
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token available');
+        }
+
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
+
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/change-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ oldPassword, newPassword }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const error = this.createAuthError(data.error?.message || 'Password change failed', response.status);
+          if (userInfo) {
+            frontendAuthMonitoringService.logError(userInfo.email, data.error?.message || 'Password change failed', 'password_change');
+          }
+          throw error;
+        }
+        
+        // Monitor password change completion
+        const durationMs = Date.now() - startTime;
+        if (userInfo) {
+          frontendAuthMonitoringService.logAuthEvent(
+            AuthEventType.AUTH_FLOW_INITIATED,
+            userInfo.email,
+            'password_change',
+            true,
+            durationMs
+          );
+        }
+        
+        return;
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Change password attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        throw new Error(error.message || 'Password change failed');
+      }
+    }
+
+    throw new Error('Password change failed after all retry attempts');
   }
 
   /**
-   * Initiate forgot password flow via backend API
+   * Initiate forgot password flow via backend API with retry logic
    */
   async forgotPassword(email: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor forgot password start
+    frontendAuthMonitoringService.logAuthEvent(
+      AuthEventType.AUTH_FLOW_INITIATED,
+      email,
+      'forgot_password',
+      true
+    );
 
-      const data = await response.json();
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Forgot password failed');
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const error = this.createAuthError(data.error?.message || 'Forgot password failed', response.status);
+          frontendAuthMonitoringService.logError(email, data.error?.message || 'Forgot password failed', 'forgot_password');
+          throw error;
+        }
+        
+        // Monitor forgot password completion
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.AUTH_FLOW_INITIATED,
+          email,
+          'forgot_password',
+          true,
+          durationMs
+        );
+        
+        return;
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Forgot password attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        throw new Error(error.message || 'Forgot password failed');
       }
-    } catch (error: any) {
-      throw new Error(error.message || 'Forgot password failed');
     }
+
+    throw new Error('Forgot password failed after all retry attempts');
   }
 
   /**
-   * Confirm forgot password with code via backend API
+   * Confirm forgot password with code via backend API with retry logic
    */
   async confirmPassword(email: string, code: string, newPassword: string): Promise<void> {
-    try {
-      const response = await fetch(`${API_URL}/auth/confirm-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code, newPassword }),
-      });
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor confirm password start
+    frontendAuthMonitoringService.logAuthEvent(
+      AuthEventType.AUTH_FLOW_INITIATED,
+      email,
+      'confirm_password',
+      true
+    );
 
-      const data = await response.json();
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Confirm password failed');
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/confirm-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, code, newPassword }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const error = this.createAuthError(data.error?.message || 'Confirm password failed', response.status);
+          frontendAuthMonitoringService.logError(email, data.error?.message || 'Confirm password failed', 'confirm_password');
+          throw error;
+        }
+        
+        // Monitor confirm password completion
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.AUTH_FLOW_INITIATED,
+          email,
+          'confirm_password',
+          true,
+          durationMs
+        );
+        
+        return;
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Confirm password attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error.message);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        throw new Error(error.message || 'Confirm password failed');
       }
-    } catch (error: any) {
-      throw new Error(error.message || 'Confirm password failed');
     }
+
+    throw new Error('Confirm password failed after all retry attempts');
   }
 
   /**
@@ -280,44 +542,101 @@ export class AuthService {
   }
 
   /**
-   * Refresh access token using refresh token
+   * Refresh access token using refresh token with retry logic
    */
   async refreshAccessToken(): Promise<string | null> {
-    try {
-      const tokenData = this.getTokenData();
-      if (!tokenData) {
-        console.log('No token data available for refresh');
-        return null;
-      }
+    const startTime = Date.now();
+    const maxRetries = apiConfig.getRetryCount();
+    
+    // Monitor token refresh start
+    const userInfo = this.getCurrentUser();
+    if (userInfo) {
+      frontendAuthMonitoringService.logAuthEvent(
+        AuthEventType.TOKEN_REFRESHED,
+        userInfo.email,
+        'token_refresh',
+        true
+      );
+    }
 
-      console.log('Refreshing access token...');
-      
-      const response = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken: tokenData.refreshToken }),
-      });
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const tokenData = this.getTokenData();
+        if (!tokenData) {
+          console.log('No token data available for refresh');
+          return null;
+        }
 
-      if (!response.ok) {
-        console.error('Token refresh failed:', response.status);
+        console.log('Refreshing access token...');
+        
+        // Check circuit breaker before making request
+        if (apiConfig.isCircuitBreakerOpen()) {
+          throw new Error('Service temporarily unavailable (circuit breaker open)');
+        }
+
+        const response = await this.fetchWithTimeout(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: tokenData.refreshToken }),
+        }, apiConfig.getTimeout());
+
+        apiConfig.recordSuccess();
+
+        if (!response.ok) {
+          console.error('Token refresh failed:', response.status);
+          if (userInfo) {
+            frontendAuthMonitoringService.logError(userInfo.email, 'Token refresh failed', 'token_refresh');
+          }
+          this.clearTokens();
+          return null;
+        }
+
+        const data = await response.json();
+        
+        // Monitor token refresh completion
+        const durationMs = Date.now() - startTime;
+        if (userInfo) {
+          frontendAuthMonitoringService.logAuthEvent(
+            AuthEventType.TOKEN_REFRESHED,
+            userInfo.email,
+            'token_refresh',
+            true,
+            durationMs
+          );
+        }
+        
+        // Store new tokens
+        this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
+        
+        console.log('Token refreshed successfully');
+        return data.accessToken;
+      } catch (error: any) {
+        // Record failure for circuit breaker
+        apiConfig.recordFailure();
+
+        // Check if we should retry
+        if (attempt < maxRetries && this.isRetryableError(error)) {
+          const delay = apiConfig.calculateRetryDelay(this.retryCount);
+          console.log(`Token refresh attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error);
+          this.retryCount++;
+          await this.sleep(delay);
+          continue;
+        }
+
+        console.error('Error refreshing token:', error);
+        if (userInfo) {
+          frontendAuthMonitoringService.logError(userInfo.email, error.message || 'Token refresh failed', 'token_refresh');
+        }
         this.clearTokens();
         return null;
       }
-
-      const data = await response.json();
-      
-      // Store new tokens
-      this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
-      
-      console.log('Token refreshed successfully');
-      return data.accessToken;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      this.clearTokens();
-      return null;
     }
+
+    console.error('Token refresh failed after all retry attempts');
+    this.clearTokens();
+    return null;
   }
 
   /**
@@ -352,12 +671,20 @@ export class AuthService {
   async restoreSession(): Promise<{ token: string; user: UserInfo } | null> {
     try {
       const tokenData = this.getTokenData();
-      const userInfo = await this.getUserInfo();
+      const userInfo = this.getCurrentUser();
       
       if (!tokenData || !userInfo) {
         console.log('No valid session to restore');
         return null;
       }
+
+      // Monitor session restoration
+      frontendAuthMonitoringService.logAuthEvent(
+        AuthEventType.AUTH_FLOW_INITIATED,
+        userInfo.email,
+        'session_restoration',
+        true
+      );
 
       // Check if token needs refresh
       if (this.needsRefresh()) {
@@ -369,12 +696,16 @@ export class AuthService {
         return { token: newToken, user: userInfo };
       }
 
-      // Schedule refresh for valid token
-      this.scheduleTokenRefresh(tokenData.expiresAt);
+      // Monitor successful session restoration
+      frontendAuthMonitoringService.logSessionCreated(
+        userInfo.email,
+        userInfo.sub,
+        0 // Session restoration is instant
+      );
       
       console.log('Session restored successfully');
       return { token: tokenData.accessToken, user: userInfo };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error restoring session:', error);
       this.clearTokens();
       return null;
@@ -413,6 +744,142 @@ export class AuthService {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
     }
+    
+    // Monitor session termination
+    const userInfo = this.getCurrentUser();
+    if (userInfo) {
+      frontendAuthMonitoringService.logSessionTerminated(userInfo.email, userInfo.sub);
+    }
+  }
+
+  // Helper methods
+
+  /**
+   * Create a standardized auth error
+   */
+  private createAuthError(message: string, statusCode: number): AuthError {
+    return {
+      message,
+      code: this.mapStatusCodeToErrorCode(statusCode),
+      retryable: this.isRetryableStatusCode(statusCode),
+      suggestion: this.getSuggestionForErrorCode(this.mapStatusCodeToErrorCode(statusCode)),
+      timestamp: new Date(),
+    };
+  }
+
+  /**
+   * Map HTTP status code to error code
+   */
+  private mapStatusCodeToErrorCode(statusCode: number): string {
+    switch (statusCode) {
+      case 400:
+        return 'BAD_REQUEST';
+      case 401:
+        return 'UNAUTHORIZED';
+      case 403:
+        return 'FORBIDDEN';
+      case 404:
+        return 'NOT_FOUND';
+      case 429:
+        return 'RATE_LIMITED';
+      case 500:
+        return 'INTERNAL_SERVER_ERROR';
+      case 503:
+        return 'SERVICE_UNAVAILABLE';
+      default:
+        return 'UNKNOWN_ERROR';
+    }
+  }
+
+  /**
+   * Check if status code is retryable
+   */
+  private isRetryableStatusCode(statusCode: number): boolean {
+    return [429, 500, 502, 503, 504].includes(statusCode);
+  }
+
+  /**
+   * Get suggestion for error code
+   */
+  private getSuggestionForErrorCode(errorCode: string): string | undefined {
+    switch (errorCode) {
+      case 'RATE_LIMITED':
+        return 'Please wait a moment and try again';
+      case 'SERVICE_UNAVAILABLE':
+        return 'Service is temporarily unavailable. Please try again later';
+      case 'INTERNAL_SERVER_ERROR':
+        return 'An unexpected error occurred. Please try again';
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Check if error is retryable
+   */
+  private isRetryableError(error: any): boolean {
+    if (!error) return false;
+    
+    // Check if error has retryable flag
+    if (error.retryable !== undefined) {
+      return error.retryable;
+    }
+
+    // Check for network errors
+    if (!navigator.onLine) {
+      return true;
+    }
+
+    // Check for timeout errors
+    if (error.message?.includes('timeout') || error.message?.includes('aborted')) {
+      return true;
+    }
+
+    // Check for network-related errors
+    const networkErrors = [
+      'NetworkError',
+      'FetchError',
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'ENOTFOUND',
+      'ETIMEDOUT',
+    ];
+
+    return networkErrors.some(err => error.message?.includes(err));
+  }
+
+  /**
+   * Fetch with timeout support
+   */
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit,
+    timeout: number
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Sleep helper for retry delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // Cognito fallback methods
@@ -422,7 +889,7 @@ export class AuthService {
     
     const poolData = {
       UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_yTX8thfy9',
-      ClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID || '7ltt7flg73m2or3lfq534fbmee',
+      ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID || '7ltt7flg73m2or3lfq534fbmee',
     };
 
     const userPool = new CognitoUserPool(poolData);
@@ -448,7 +915,7 @@ export class AuthService {
     
     const poolData = {
       UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_yTX8thfy9',
-      ClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID || '7ltt7flg73m2or3lfq534fbmee',
+      ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID || '7ltt7flg73m2or3lfq534fbmee',
     };
 
     const userPool = new CognitoUserPool(poolData);

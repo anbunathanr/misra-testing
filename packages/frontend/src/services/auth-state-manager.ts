@@ -3,6 +3,10 @@
  * Central coordinator for authentication state and component orchestration
  */
 
+import { frontendAuthMonitoringService } from './auth-monitoring-service';
+import { AuthEventType } from './auth-monitoring-service';
+import apiConfig from '../config/api-config';
+
 export enum AuthenticationState {
   INITIAL = 'initial',
   REGISTERING = 'registering',
@@ -142,6 +146,8 @@ export class AuthStateManager {
 
   // State transitions with concurrent protection
   async initiateRegistration(email: string, name?: string): Promise<void> {
+    const startTime = Date.now();
+    
     return this.withLock('registration', async () => {
       try {
         this.updateState(AuthenticationState.REGISTERING, {
@@ -149,15 +155,42 @@ export class AuthStateManager {
           progress: { currentStep: 1, totalSteps: 4, stepName: 'Registration' }
         });
 
-        const response = await fetch('/api/auth/initiate-flow', {
+        // Monitor registration start
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.AUTH_FLOW_INITIATED,
+          email,
+          'registration',
+          true
+        );
+
+        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/initiate-flow`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, name })
         });
 
-        const data = await response.json();
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/initiate-flow`, response.ok, durationMs, email);
+
+        // Check if response has content before parsing JSON
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', responseText);
+          throw new Error('Invalid JSON response from server');
+        }
 
         if (!response.ok) {
+          frontendAuthMonitoringService.logError(email, data.error?.message || 'Registration failed', 'registration');
           throw new Error(data.error?.message || 'Registration failed');
         }
 
@@ -188,13 +221,23 @@ export class AuthStateManager {
   }
 
   async handleEmailVerification(code: string): Promise<OTPSetupData> {
+    const startTime = Date.now();
+    
     return this.withLock('email-verification', async () => {
       try {
         this.updateState(AuthenticationState.EMAIL_VERIFYING, {
           progress: { currentStep: 2, totalSteps: 4, stepName: 'Verifying Email' }
         });
 
-        const response = await fetch('/api/auth/verify-email-with-otp', {
+        // Monitor email verification start
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.EMAIL_VERIFICATION_STARTED,
+          this.context.userInfo.email,
+          'email_verification',
+          true
+        );
+
+        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/verify-email-with-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -203,14 +246,51 @@ export class AuthStateManager {
           })
         });
 
-        const data = await response.json();
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/verify-email-with-otp`, response.ok, durationMs, this.context.userInfo.email);
+
+        // Check if response has content before parsing JSON
+        const responseText = await response.text();
+        console.log('Email verification raw response:', responseText);
+        
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', responseText);
+          throw new Error('Invalid JSON response from server');
+        }
 
         if (!response.ok) {
+          frontendAuthMonitoringService.logError(this.context.userInfo.email, data.error?.message || 'Email verification failed', 'email_verification');
           throw new Error(data.error?.message || 'Email verification failed');
         }
 
+        // Monitor email verification completion
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.EMAIL_VERIFICATION_COMPLETED,
+          this.context.userInfo.email,
+          'email_verification',
+          true,
+          durationMs
+        );
+
         // Store OTP setup data
         this.otpSetupData = data.otpSetup;
+
+        // Store temporary tokens if provided (for file upload access during OTP setup)
+        if (data.temporaryTokens) {
+          localStorage.setItem('tempAccessToken', data.temporaryTokens.accessToken);
+          localStorage.setItem('tempRefreshToken', data.temporaryTokens.refreshToken);
+          localStorage.setItem('tempTokenScope', data.temporaryTokens.scope);
+          localStorage.setItem('tempTokenExpiry', (Date.now() + (data.temporaryTokens.expiresIn * 1000)).toString());
+          console.log('Temporary authentication tokens stored for file operations');
+        }
 
         // Update state and show OTP setup modal
         this.updateState(AuthenticationState.OTP_SETUP_REQUIRED, {
@@ -230,13 +310,23 @@ export class AuthStateManager {
   }
 
   async completeOTPSetup(otpCode: string): Promise<void> {
+    const startTime = Date.now();
+    
     return this.withLock('otp-setup', async () => {
       try {
         this.updateState(AuthenticationState.OTP_VERIFYING, {
           progress: { currentStep: 3, totalSteps: 4, stepName: 'Verifying OTP' }
         });
 
-        const response = await fetch('/api/auth/complete-otp-setup', {
+        // Monitor OTP setup start
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.OTP_SETUP_STARTED,
+          this.context.userInfo.email,
+          'otp_setup',
+          true
+        );
+
+        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/complete-otp-setup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -245,11 +335,46 @@ export class AuthStateManager {
           })
         });
 
-        const data = await response.json();
+        const durationMs = Date.now() - startTime;
+        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/complete-otp-setup`, response.ok, durationMs, this.context.userInfo.email);
+
+        // Check if response has content before parsing JSON
+        const responseText = await response.text();
+        console.log('OTP setup raw response:', responseText);
+        
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', responseText);
+          throw new Error('Invalid JSON response from server');
+        }
 
         if (!response.ok) {
+          frontendAuthMonitoringService.logError(this.context.userInfo.email, data.error?.message || 'OTP verification failed', 'otp_verification');
           throw new Error(data.error?.message || 'OTP verification failed');
         }
+
+        // Monitor OTP setup completion
+        frontendAuthMonitoringService.logAuthEvent(
+          AuthEventType.OTP_SETUP_COMPLETED,
+          this.context.userInfo.email,
+          'otp_setup',
+          true,
+          durationMs
+        );
+
+        // Monitor session creation
+        frontendAuthMonitoringService.logSessionCreated(
+          this.context.userInfo.email,
+          data.userSession?.userId,
+          durationMs
+        );
 
         // Update user info with session data
         this.updateState(AuthenticationState.AUTHENTICATED, {
@@ -267,6 +392,13 @@ export class AuthStateManager {
         if (data.tokens) {
           localStorage.setItem('accessToken', data.tokens.accessToken);
           localStorage.setItem('refreshToken', data.tokens.refreshToken);
+          
+          // Clear temporary tokens since we now have full authentication
+          localStorage.removeItem('tempAccessToken');
+          localStorage.removeItem('tempRefreshToken');
+          localStorage.removeItem('tempTokenScope');
+          localStorage.removeItem('tempTokenExpiry');
+          console.log('Full authentication tokens stored, temporary tokens cleared');
         }
 
         this.hideModals();
@@ -701,6 +833,10 @@ export class AuthStateManager {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('token');
     localStorage.removeItem('tokenData');
+    localStorage.removeItem('tempAccessToken');
+    localStorage.removeItem('tempRefreshToken');
+    localStorage.removeItem('tempTokenScope');
+    localStorage.removeItem('tempTokenExpiry');
     console.log('Stored state cleared');
   }
 
