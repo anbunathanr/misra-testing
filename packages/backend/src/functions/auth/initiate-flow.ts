@@ -128,10 +128,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     };
 
   } catch (error: any) {
-    logger.error('Authentication flow initiation failed:', {
+    logger.error('Authentication flow initiation failed:', error, {
       correlationId,
-      error: error.message,
-      stack: error.stack
     });
 
     return {

@@ -1,10 +1,13 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import { DynamoDB, S3 } from 'aws-sdk';
+import { DynamoDB, S3, SecretsManager, CognitoIdentityServiceProvider, CloudWatch } from 'aws-sdk';
 import { CentralizedLogger, withCorrelationId } from '../../utils/centralized-logger';
 import { monitoringService, HealthCheckResult } from '../../services/monitoring-service';
 
 const dynamodb = new DynamoDB.DocumentClient();
 const s3 = new S3();
+const secretsManager = new SecretsManager();
+const cognito = new CognitoIdentityServiceProvider();
+const cloudwatch = new CloudWatch();
 
 interface HealthCheckResponse {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -160,12 +163,13 @@ async function performDetailedHealthCheck(logger: CentralizedLogger): Promise<He
     checkEnvironmentHealth(),
     checkDynamoDBHealth(),
     checkS3Health(),
+    checkCognitoHealth(),
     checkSecretsManagerHealth(),
     checkCloudWatchHealth(),
   ]);
 
   // Process results
-  const serviceNames = ['lambda', 'environment', 'dynamodb', 's3', 'secretsmanager', 'cloudwatch'];
+  const serviceNames = ['lambda', 'environment', 'dynamodb', 's3', 'cognito', 'secretsmanager', 'cloudwatch'];
   
   healthChecks.forEach((result, index) => {
     const serviceName = serviceNames[index];
@@ -204,11 +208,31 @@ async function performDetailedHealthCheck(logger: CentralizedLogger): Promise<He
   const duration = Date.now() - startTime;
   logger.logPerformanceMetric('health_check_detailed', duration);
 
-  // Record health check metrics
+  // Record health check metrics for CloudWatch alarms
   await monitoringService.recordBusinessMetric('HealthCheckCompleted', 1, {
     type: 'detailed',
     status: overallStatus,
   });
+
+  // Record health check duration
+  await monitoringService.recordBusinessMetric('HealthCheckDuration', duration, {
+    type: 'detailed',
+  });
+
+  // Record failure metric if unhealthy
+  if (overallStatus === 'unhealthy') {
+    await monitoringService.recordBusinessMetric('HealthCheckFailed', 1, {
+      type: 'detailed',
+      unhealthyServices: unhealthyCount.toString(),
+    });
+  }
+
+  // Record degradation metric if degraded
+  if (degradedCount > 0) {
+    await monitoringService.recordBusinessMetric('ServiceDegraded', degradedCount, {
+      type: 'detailed',
+    });
+  }
 
   return response;
 }
@@ -229,6 +253,9 @@ async function checkIndividualService(serviceName: string, logger: CentralizedLo
       break;
     case 's3':
       serviceResult = await checkS3Health();
+      break;
+    case 'cognito':
+      serviceResult = await checkCognitoHealth();
       break;
     case 'secretsmanager':
       serviceResult = await checkSecretsManagerHealth();
@@ -314,11 +341,15 @@ async function checkEnvironmentHealth(): Promise<HealthCheckResult> {
   try {
     const requiredEnvVars = [
       'ENVIRONMENT',
-      'FILE_STORAGE_BUCKET_NAME',
+      'FILES_BUCKET_NAME',
       'USERS_TABLE_NAME',
-      'PROJECTS_TABLE_NAME',
       'FILE_METADATA_TABLE_NAME',
       'ANALYSIS_RESULTS_TABLE_NAME',
+      'SAMPLE_FILES_TABLE_NAME',
+      'PROGRESS_TABLE_NAME',
+      'USER_POOL_ID',
+      'USER_POOL_CLIENT_ID',
+      'AWS_REGION',
     ];
 
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -330,8 +361,10 @@ async function checkEnvironmentHealth(): Promise<HealthCheckResult> {
       responseTime,
       details: {
         requiredVariables: requiredEnvVars.length,
+        configuredVariables: requiredEnvVars.length - missingVars.length,
         missingVariables: missingVars,
         environment: process.env.ENVIRONMENT,
+        region: process.env.AWS_REGION,
       },
       timestamp: new Date(),
     };
@@ -347,34 +380,69 @@ async function checkEnvironmentHealth(): Promise<HealthCheckResult> {
 }
 
 /**
- * Check DynamoDB health
+ * Check DynamoDB health - checks all critical tables
  */
 async function checkDynamoDBHealth(): Promise<HealthCheckResult> {
   const startTime = Date.now();
   
   try {
-    const tableName = process.env.USERS_TABLE_NAME;
-    if (!tableName) {
-      throw new Error('USERS_TABLE_NAME not configured');
+    const tableNames = [
+      process.env.USERS_TABLE_NAME,
+      process.env.FILE_METADATA_TABLE_NAME,
+      process.env.ANALYSIS_RESULTS_TABLE_NAME,
+      process.env.SAMPLE_FILES_TABLE_NAME,
+      process.env.PROGRESS_TABLE_NAME,
+    ].filter(Boolean) as string[];
+
+    if (tableNames.length === 0) {
+      throw new Error('No DynamoDB table names configured');
     }
 
-    // Perform a simple describe table operation
-    const result = await dynamodb.scan({
-      TableName: tableName,
-      Limit: 1,
-      Select: 'COUNT',
-    }).promise();
+    // Check all tables in parallel
+    const tableChecks = await Promise.allSettled(
+      tableNames.map(async (tableName) => {
+        const result = await dynamodb.scan({
+          TableName: tableName,
+          Limit: 1,
+          Select: 'COUNT',
+        }).promise();
+        return { tableName, count: result.ScannedCount || 0 };
+      })
+    );
 
+    const successfulChecks = tableChecks.filter(r => r.status === 'fulfilled').length;
+    const failedChecks = tableChecks.filter(r => r.status === 'rejected');
     const responseTime = Date.now() - startTime;
+
+    const tableDetails: Record<string, any> = {};
+    tableChecks.forEach((result, index) => {
+      const tableName = tableNames[index];
+      if (result.status === 'fulfilled') {
+        tableDetails[tableName] = {
+          status: 'healthy',
+          count: result.value.count,
+        };
+      } else {
+        tableDetails[tableName] = {
+          status: 'unhealthy',
+          error: result.reason?.message || 'Unknown error',
+        };
+      }
+    });
+
+    const status = failedChecks.length === 0 ? 'healthy' :
+                  failedChecks.length < tableNames.length ? 'degraded' : 'unhealthy';
 
     return {
       service: 'dynamodb',
-      status: responseTime < 1000 ? 'healthy' : 'degraded',
+      status,
       responseTime,
       details: {
-        tableName,
+        totalTables: tableNames.length,
+        healthyTables: successfulChecks,
+        unhealthyTables: failedChecks.length,
         responseTimeMs: responseTime,
-        scannedCount: result.ScannedCount,
+        tables: tableDetails,
       },
       timestamp: new Date(),
     };
@@ -433,16 +501,70 @@ async function checkSecretsManagerHealth(): Promise<HealthCheckResult> {
   const startTime = Date.now();
   
   try {
-    // This is a placeholder - in production, you'd check actual secrets
+    const secretNames = [
+      process.env.JWT_SECRET_NAME,
+      process.env.OTP_SECRET_NAME,
+      process.env.API_KEYS_SECRET_NAME,
+      process.env.DATABASE_SECRET_NAME,
+    ].filter(Boolean) as string[];
+
+    if (secretNames.length === 0) {
+      // If no secrets configured, return healthy but with note
+      return {
+        service: 'secretsmanager',
+        status: 'healthy',
+        responseTime: Date.now() - startTime,
+        details: {
+          note: 'No secrets configured for health check',
+          responseTimeMs: Date.now() - startTime,
+        },
+        timestamp: new Date(),
+      };
+    }
+
+    // Check all secrets in parallel (just describe, don't retrieve values)
+    const secretChecks = await Promise.allSettled(
+      secretNames.map(async (secretName) => {
+        const result = await secretsManager.describeSecret({
+          SecretId: secretName,
+        }).promise();
+        return { secretName, arn: result.ARN };
+      })
+    );
+
+    const successfulChecks = secretChecks.filter(r => r.status === 'fulfilled').length;
+    const failedChecks = secretChecks.filter(r => r.status === 'rejected');
     const responseTime = Date.now() - startTime;
+
+    const secretDetails: Record<string, any> = {};
+    secretChecks.forEach((result, index) => {
+      const secretName = secretNames[index];
+      if (result.status === 'fulfilled') {
+        secretDetails[secretName] = {
+          status: 'healthy',
+          exists: true,
+        };
+      } else {
+        secretDetails[secretName] = {
+          status: 'unhealthy',
+          error: result.reason?.message || 'Unknown error',
+        };
+      }
+    });
+
+    const status = failedChecks.length === 0 ? 'healthy' :
+                  failedChecks.length < secretNames.length ? 'degraded' : 'unhealthy';
 
     return {
       service: 'secretsmanager',
-      status: 'healthy',
+      status,
       responseTime,
       details: {
+        totalSecrets: secretNames.length,
+        healthySecrets: successfulChecks,
+        unhealthySecrets: failedChecks.length,
         responseTimeMs: responseTime,
-        note: 'Secrets Manager check not implemented',
+        secrets: secretDetails,
       },
       timestamp: new Date(),
     };
@@ -458,22 +580,71 @@ async function checkSecretsManagerHealth(): Promise<HealthCheckResult> {
 }
 
 /**
+ * Check Cognito User Pool health
+ */
+async function checkCognitoHealth(): Promise<HealthCheckResult> {
+  const startTime = Date.now();
+  
+  try {
+    const userPoolId = process.env.USER_POOL_ID;
+    if (!userPoolId) {
+      throw new Error('USER_POOL_ID not configured');
+    }
+
+    // Describe the user pool to check if it's accessible
+    const result = await cognito.describeUserPool({
+      UserPoolId: userPoolId,
+    }).promise();
+
+    const responseTime = Date.now() - startTime;
+
+    return {
+      service: 'cognito',
+      status: responseTime < 1000 ? 'healthy' : 'degraded',
+      responseTime,
+      details: {
+        userPoolId,
+        userPoolName: result.UserPool?.Name,
+        status: result.UserPool?.Status,
+        mfaConfiguration: result.UserPool?.MfaConfiguration,
+        responseTimeMs: responseTime,
+      },
+      timestamp: new Date(),
+    };
+  } catch (error) {
+    return {
+      service: 'cognito',
+      status: 'unhealthy',
+      responseTime: Date.now() - startTime,
+      details: { error: (error as Error).message },
+      timestamp: new Date(),
+    };
+  }
+}
+
+/**
  * Check CloudWatch health
  */
 async function checkCloudWatchHealth(): Promise<HealthCheckResult> {
   const startTime = Date.now();
   
   try {
-    // This is a placeholder - in production, you'd check CloudWatch API
+    // List metrics to verify CloudWatch API is accessible
+    const result = await cloudwatch.listMetrics({
+      Namespace: process.env.CLOUDWATCH_NAMESPACE || 'MISRA/Platform',
+    }).promise();
+
     const responseTime = Date.now() - startTime;
 
     return {
       service: 'cloudwatch',
-      status: 'healthy',
+      status: responseTime < 1000 ? 'healthy' : 'degraded',
       responseTime,
       details: {
+        namespace: process.env.CLOUDWATCH_NAMESPACE || 'MISRA/Platform',
+        accessible: true,
+        metricsCount: result.Metrics?.length || 0,
         responseTimeMs: responseTime,
-        note: 'CloudWatch check not implemented',
       },
       timestamp: new Date(),
     };

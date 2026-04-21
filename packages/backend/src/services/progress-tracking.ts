@@ -445,7 +445,7 @@ export class ProgressTrackingService {
       }).promise();
     } catch (error) {
       // Stream might already exist, which is fine
-      if (!error.code || error.code !== 'ResourceAlreadyExistsException') {
+      if (!(error as any).code || (error as any).code !== 'ResourceAlreadyExistsException') {
         console.warn('Failed to create log stream:', error);
       }
     }

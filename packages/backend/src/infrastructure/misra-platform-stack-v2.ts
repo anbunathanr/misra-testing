@@ -213,9 +213,20 @@ export class MisraPlatformStackV2 extends cdk.Stack {
       'notifications/update-template'
     );
 
+    // Create KMS key for encryption
+    const kmsKey = new cdk.aws_kms.Key(this, 'FileStorageKey', {
+      description: 'KMS key for MISRA Platform file storage encryption',
+      enableKeyRotation: true,
+      removalPolicy: environment === 'production' 
+        ? cdk.RemovalPolicy.RETAIN 
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
     // File Storage Bucket (must be defined before Lambda functions that use it)
     const fileStorageBucket = new FileStorageBucket(this, 'FileStorageBucket', {
-      environment
+      environment,
+      accountId: this.account,
+      kmsKey
     });
 
     // Analysis Lambda Function (for S3 event notifications)

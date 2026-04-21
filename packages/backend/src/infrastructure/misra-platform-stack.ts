@@ -35,9 +35,16 @@ import { NotificationHistoryTable } from './notification-history-table';
 import { AIUsageTable } from './ai-usage-table';
 import { AnalysisCacheTable } from './analysis-cache-table';
 
+export interface MisraPlatformStackProps extends cdk.StackProps {
+  environment?: string; // 'dev' | 'staging' | 'production'
+}
+
 export class MisraPlatformStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: MisraPlatformStackProps) {
     super(scope, id, props);
+
+    // Get environment from props or default to 'production'
+    const environment = props?.environment || 'production';
 
     // Production domain configuration
     const productionDomain = 'misra.digitransolutions.in';
@@ -65,7 +72,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // S3 Buckets for file storage
     const fileStorageBucket = new s3.Bucket(this, 'FileStorageBucket', {
-      bucketName: `misra-platform-files-${this.account}`,
+      bucketName: `misra-platform-files-${environment}-${this.account}`,
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -73,7 +80,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
-      bucketName: `misra-platform-frontend-${this.account}`,
+      bucketName: `misra-platform-frontend-${environment}-${this.account}`,
       websiteIndexDocument: 'index.html',
       websiteErrorDocument: 'index.html',
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
@@ -123,7 +130,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Cognito User Pool for authentication
     const userPool = new cognito.UserPool(this, 'UserPool', {
-      userPoolName: 'misra-platform-users',
+      userPoolName: `misra-platform-users-${environment}`,
       selfSignUpEnabled: true,
       signInAliases: {
         email: true,
@@ -185,7 +192,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const userPoolClient = userPool.addClient('WebClient', {
-      userPoolClientName: 'misra-platform-web-client',
+      userPoolClientName: `misra-platform-web-client-${environment}`,
       generateSecret: false,
       authFlows: {
         userPassword: true,
@@ -213,7 +220,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // DynamoDB Tables - Using existing table names from previous deployment
     const usersTable = new dynamodb.Table(this, 'UsersTable', {
-      tableName: 'misra-platform-users',
+      tableName: `misra-platform-users-${environment}`,
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
@@ -236,7 +243,7 @@ export class MisraPlatformStack extends cdk.Stack {
     const projectsTable = dynamodb.Table.fromTableName(this, 'ExistingTestProjectsTable', 'TestProjects');
 
     const analysesTable = new dynamodb.Table(this, 'AnalysesTable', {
-      tableName: 'misra-platform-analyses',
+      tableName: `misra-platform-analyses-${environment}`,
       partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -258,7 +265,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const testRunsTable = new dynamodb.Table(this, 'TestRunsTable', {
-      tableName: 'misra-platform-test-runs',
+      tableName: `misra-platform-test-runs-${environment}`,
       partitionKey: { name: 'testRunId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -268,7 +275,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Analysis Results Table for storing detailed MISRA analysis results
     const analysisResultsTable = new dynamodb.Table(this, 'AnalysisResultsTable', {
-      tableName: 'misra-platform-analysis-results',
+      tableName: `misra-platform-analysis-results-${environment}`,
       partitionKey: { name: 'analysisId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -297,77 +304,77 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // File Metadata Table for tracking uploaded files and analysis status
     const fileMetadataTable = new FileMetadataTable(this, 'FileMetadataTable', {
-      environment: 'dev'
+      environment: environment
     });
 
     // Sample Files Table for storing predefined C/C++ files with known MISRA violations
     const sampleFilesTable = { table: dynamodb.Table.fromTableName(this, 'ExistingSampleFilesTable', 'SampleFiles') };
 
     // Upload Progress Table for tracking file upload progress
-    const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment: 'dev' });
+    const uploadProgressTable = new UploadProgressTable(this, 'UploadProgressTable', { environment: environment });
 
     // Projects Table for Web App Testing System - Using existing TestProjects table
     const testProjectsTable = { table: projectsTable };
 
-    // Test Suites Table for Web App Testing System - Using existing TestSuites table
-    const testSuitesTable = new TestSuitesTable(this, 'TestSuitesTable');
+    // Test Suites Table for Web App Testing System - Import existing table
+    const testSuitesTable = { table: dynamodb.Table.fromTableName(this, 'ExistingTestSuitesTable', 'TestSuites') };
 
-    // Test Cases Table for Web App Testing System - Using existing TestCases table
-    const testCasesTable = new TestCasesTable(this, 'TestCasesTable');
+    // Test Cases Table for Web App Testing System - Import existing table
+    const testCasesTable = { table: dynamodb.Table.fromTableName(this, 'ExistingTestCasesTable', 'TestCases') };
 
-    // Test Executions Table for Web App Testing System - Using existing TestExecutions table
-    const testExecutionsTable = new TestExecutionsTable(this, 'TestExecutionsTable');
+    // Test Executions Table for Web App Testing System - Import existing table
+    const testExecutionsTable = { table: dynamodb.Table.fromTableName(this, 'ExistingTestExecutionsTable', 'TestExecutions') };
 
     // Screenshots Bucket for Test Execution Failures
     const screenshotsBucket = new ScreenshotsBucket(this, 'ScreenshotsBucket', {
-      environment: 'dev'
+      environment: environment
     });
 
     // Notification System Tables
     const notificationPreferencesTable = new NotificationPreferencesTable(this, 'NotificationPreferencesTable', {
-      environment: 'dev'
+      environment: environment
     });
 
     const notificationTemplatesTable = new NotificationTemplatesTable(this, 'NotificationTemplatesTable', {
-      environment: 'dev'
+      environment: environment
     });
 
     const notificationHistoryTable = new NotificationHistoryTable(this, 'NotificationHistoryTable', {
-      environment: 'dev'
+      environment: environment
     });
 
-    // AI Usage Table for AI Test Generation - Using existing AIUsage table
-    const aiUsageTable = new AIUsageTable(this, 'AIUsageTable');
+    // AI Usage Table for AI Test Generation - Import existing table
+    const aiUsageTable = { table: dynamodb.Table.fromTableName(this, 'ExistingAIUsageTable', 'AIUsage') };
 
     // Analysis Cache Table for MISRA analysis caching (Requirement 10.7)
     const analysisCacheTable = new AnalysisCacheTable(this, 'AnalysisCacheTable', {
-      environment: 'dev'
+      environment: environment
     });
 
     // SNS Topics for Notification Delivery
     const emailNotificationTopic = new sns.Topic(this, 'EmailNotificationTopic', {
-      topicName: 'aibts-notifications-email',
+      topicName: `aibts-notifications-email-${environment}`,
       displayName: 'AIBTS Email Notifications',
     });
 
     const smsNotificationTopic = new sns.Topic(this, 'SmsNotificationTopic', {
-      topicName: 'aibts-notifications-sms',
+      topicName: `aibts-notifications-sms-${environment}`,
       displayName: 'AIBTS SMS Notifications',
     });
 
     const webhookNotificationTopic = new sns.Topic(this, 'WebhookNotificationTopic', {
-      topicName: 'aibts-notifications-webhook',
+      topicName: `aibts-notifications-webhook-${environment}`,
       displayName: 'AIBTS Webhook Notifications',
     });
 
     // SQS Queue for notification processing
     const notificationDLQ = new sqs.Queue(this, 'NotificationDLQ', {
-      queueName: 'aibts-notification-dlq',
+      queueName: `aibts-notification-dlq-${environment}`,
       retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
     });
 
     const notificationQueue = new sqs.Queue(this, 'NotificationQueue', {
-      queueName: 'aibts-notification-queue',
+      queueName: `aibts-notification-queue-${environment}`,
       visibilityTimeout: cdk.Duration.seconds(30), // Match Lambda timeout
       receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
       retentionPeriod: cdk.Duration.days(4),
@@ -380,7 +387,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // EventBridge Rule for Test Completion Events
     // Routes test execution completion events to notification queue
     const testCompletionRule = new events.Rule(this, 'TestCompletionRule', {
-      ruleName: 'aibts-test-execution-completion',
+      ruleName: `aibts-test-execution-completion-${environment}`,
       description: 'Routes test execution completion events to notification queue',
       eventPattern: {
         source: ['aibts.test-execution'],
@@ -393,7 +400,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Scheduled Reports Lambda Function
     const scheduledReportsFunction = new lambda.Function(this, 'ScheduledReportsFunction', {
-      functionName: 'aibts-scheduled-reports',
+      functionName: `aibts-scheduled-reports-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/scheduled-reports'),
@@ -413,7 +420,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // EventBridge Cron Rules for Scheduled Reports
     // Daily Report - 09:00 UTC daily
     const dailyReportRule = new events.Rule(this, 'DailyReportRule', {
-      ruleName: 'aibts-daily-summary-report',
+      ruleName: `aibts-daily-summary-report-${environment}`,
       description: 'Triggers daily test execution summary report',
       schedule: events.Schedule.cron({
         minute: '0',
@@ -424,7 +431,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Weekly Report - 09:00 UTC every Monday
     const weeklyReportRule = new events.Rule(this, 'WeeklyReportRule', {
-      ruleName: 'aibts-weekly-summary-report',
+      ruleName: `aibts-weekly-summary-report-${environment}`,
       description: 'Triggers weekly test execution summary report',
       schedule: events.Schedule.cron({
         minute: '0',
@@ -436,7 +443,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Notification Preferences API Lambda Functions
     const getPreferencesFunction = new lambda.Function(this, 'GetPreferencesFunction', {
-      functionName: 'aibts-get-preferences',
+      functionName: `aibts-get-preferences-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/get-preferences'),
@@ -449,7 +456,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const updatePreferencesFunction = new lambda.Function(this, 'UpdatePreferencesFunction', {
-      functionName: 'aibts-update-preferences',
+      functionName: `aibts-update-preferences-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/update-preferences'),
@@ -463,7 +470,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Notification History API Lambda Functions
     const getHistoryFunction = new lambda.Function(this, 'GetHistoryFunction', {
-      functionName: 'aibts-get-history',
+      functionName: `aibts-get-history-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/get-history'),
@@ -476,7 +483,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getNotificationFunction = new lambda.Function(this, 'GetNotificationFunction', {
-      functionName: 'aibts-get-notification',
+      functionName: `aibts-get-notification-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/get-notification'),
@@ -490,7 +497,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Notification Template API Lambda Functions (Admin Only)
     const createTemplateFunction = new lambda.Function(this, 'CreateTemplateFunction', {
-      functionName: 'aibts-create-template',
+      functionName: `aibts-create-template-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/create-template'),
@@ -503,7 +510,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const updateTemplateFunction = new lambda.Function(this, 'UpdateTemplateFunction', {
-      functionName: 'aibts-update-template',
+      functionName: `aibts-update-template-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/update-template'),
@@ -516,7 +523,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getTemplatesFunction = new lambda.Function(this, 'GetTemplatesFunction', {
-      functionName: 'aibts-get-templates',
+      functionName: `aibts-get-templates-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/get-templates'),
@@ -539,11 +546,11 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // SQS Queue for async processing
     const processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
-      queueName: 'misra-platform-processing',
+      queueName: `misra-platform-processing-${environment}`,
       visibilityTimeout: cdk.Duration.minutes(15),
       deadLetterQueue: {
         queue: new sqs.Queue(this, 'ProcessingDLQ', {
-          queueName: 'misra-platform-processing-dlq',
+          queueName: `misra-platform-processing-dlq-${environment}`,
         }),
         maxReceiveCount: 3,
       },
@@ -551,12 +558,12 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // SQS Queue for MISRA analysis (Requirement 10.5)
     const analysisQueueDLQ = new sqs.Queue(this, 'AnalysisQueueDLQ', {
-      queueName: 'misra-analysis-dlq',
+      queueName: `misra-analysis-dlq-${environment}`,
       retentionPeriod: cdk.Duration.days(14),
     });
 
     const analysisQueue = new sqs.Queue(this, 'AnalysisQueue', {
-      queueName: 'misra-analysis-queue',
+      queueName: `misra-analysis-queue-${environment}`,
       visibilityTimeout: cdk.Duration.minutes(5),
       receiveMessageWaitTime: cdk.Duration.seconds(20),
       deadLetterQueue: {
@@ -567,12 +574,12 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // SQS Queue for test execution
     const testExecutionDLQ = new sqs.Queue(this, 'TestExecutionDLQ', {
-      queueName: 'misra-platform-test-execution-dlq',
+      queueName: `misra-platform-test-execution-dlq-${environment}`,
       retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
     });
 
     const testExecutionQueue = new sqs.Queue(this, 'TestExecutionQueue', {
-      queueName: 'misra-platform-test-execution',
+      queueName: `misra-platform-test-execution-${environment}`,
       visibilityTimeout: cdk.Duration.minutes(15), // Match Lambda timeout
       receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
       deadLetterQueue: {
@@ -583,7 +590,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Secrets Manager for JWT keys
     const jwtSecret = new secretsmanager.Secret(this, 'JWTSecret', {
-      secretName: 'misra-platform-jwt-secret',
+      secretName: `misra-platform-jwt-secret-${environment}`,
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'jwt' }),
         generateStringKey: 'secret',
@@ -593,7 +600,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Lambda Authorizer for JWT verification
     const authorizerFunction = new lambda.Function(this, 'AuthorizerFunction', {
-      functionName: 'misra-platform-authorizer',
+      functionName: `misra-platform-authorizer-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/authorizer'),
@@ -610,7 +617,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Authentication Lambda Functions
     const loginFunction = new lambda.Function(this, 'LoginFunction', {
-      functionName: 'misra-platform-login',
+      functionName: `misra-platform-login-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/login'),
@@ -625,7 +632,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const registerFunction = new lambda.Function(this, 'RegisterFunction', {
-      functionName: 'misra-platform-register',
+      functionName: `misra-platform-register-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/register'),
@@ -640,7 +647,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
-      functionName: 'misra-platform-refresh',
+      functionName: `misra-platform-refresh-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/refresh'),
@@ -654,7 +661,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Email Verification and OTP Integration Lambda Functions
     const initiateFlowFunction = new lambda.Function(this, 'InitiateFlowFunction', {
-      functionName: 'misra-platform-initiate-flow',
+      functionName: `misra-platform-initiate-flow-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/initiate-flow'),
@@ -668,7 +675,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const verifyEmailWithOTPFunction = new lambda.Function(this, 'VerifyEmailWithOTPFunction', {
-      functionName: 'misra-platform-verify-email-with-otp',
+      functionName: `misra-platform-verify-email-with-otp-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/verify-email-with-otp'),
@@ -682,7 +689,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const completeOTPSetupFunction = new lambda.Function(this, 'CompleteOTPSetupFunction', {
-      functionName: 'misra-platform-complete-otp-setup',
+      functionName: `misra-platform-complete-otp-setup-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/auth/complete-otp-setup'),
@@ -698,7 +705,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // File Upload Lambda Functions
     const fileUploadFunction = new lambda.Function(this, 'FileUploadFunction', {
-      functionName: 'misra-platform-file-upload',
+      functionName: `misra-platform-file-upload-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/upload'),
@@ -712,7 +719,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const uploadCompleteFunction = new lambda.Function(this, 'UploadCompleteFunction', {
-      functionName: 'misra-platform-upload-complete',
+      functionName: `misra-platform-upload-complete-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/upload-complete'),
@@ -726,7 +733,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getFilesFunction = new lambda.Function(this, 'GetFilesFunction', {
-      functionName: 'misra-platform-get-files',
+      functionName: `misra-platform-get-files-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/get-files'),
@@ -739,7 +746,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Sample File Management Lambda Functions
     const getSampleFilesFunction = new lambda.Function(this, 'GetSampleFilesFunction', {
-      functionName: 'misra-platform-get-sample-files',
+      functionName: `misra-platform-get-sample-files-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/get-sample-files'),
@@ -751,7 +758,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const uploadSampleFileFunction = new lambda.Function(this, 'UploadSampleFileFunction', {
-      functionName: 'misra-platform-upload-sample-file',
+      functionName: `misra-platform-upload-sample-file-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/upload-sample-file'),
@@ -766,7 +773,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getUploadProgressFunction = new lambda.Function(this, 'GetUploadProgressFunction', {
-      functionName: 'misra-platform-get-upload-progress',
+      functionName: `misra-platform-get-upload-progress-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/get-upload-progress'),
@@ -778,7 +785,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const initializeSampleLibraryFunction = new lambda.Function(this, 'InitializeSampleLibraryFunction', {
-      functionName: 'misra-platform-initialize-sample-library',
+      functionName: `misra-platform-initialize-sample-library-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/file/initialize-sample-library'),
@@ -792,7 +799,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Project Management Lambda Functions
     const createProjectFunction = new lambda.Function(this, 'CreateProjectFunction', {
-      functionName: 'misra-platform-create-project',
+      functionName: `misra-platform-create-project-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/projects/create-project'),
@@ -804,7 +811,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getProjectsFunction = new lambda.Function(this, 'GetProjectsFunction', {
-      functionName: 'misra-platform-get-projects',
+      functionName: `misra-platform-get-projects-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/projects/get-projects-minimal'),
@@ -816,7 +823,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const updateProjectFunction = new lambda.Function(this, 'UpdateProjectFunction', {
-      functionName: 'misra-platform-update-project',
+      functionName: `misra-platform-update-project-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/projects/update-project'),
@@ -829,7 +836,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Suite Management Lambda Functions
     const createTestSuiteFunction = new lambda.Function(this, 'CreateTestSuiteFunction', {
-      functionName: 'misra-platform-create-test-suite',
+      functionName: `misra-platform-create-test-suite-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/create-suite'),
@@ -841,7 +848,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getTestSuitesFunction = new lambda.Function(this, 'GetTestSuitesFunction', {
-      functionName: 'misra-platform-get-test-suites',
+      functionName: `misra-platform-get-test-suites-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/get-suites'),
@@ -853,7 +860,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const updateTestSuiteFunction = new lambda.Function(this, 'UpdateTestSuiteFunction', {
-      functionName: 'misra-platform-update-test-suite',
+      functionName: `misra-platform-update-test-suite-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-suites/update-suite'),
@@ -866,7 +873,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Case Management Lambda Functions
     const createTestCaseFunction = new lambda.Function(this, 'CreateTestCaseFunction', {
-      functionName: 'misra-platform-create-test-case',
+      functionName: `misra-platform-create-test-case-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/create-test-case'),
@@ -878,7 +885,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const getTestCasesFunction = new lambda.Function(this, 'GetTestCasesFunction', {
-      functionName: 'misra-platform-get-test-cases',
+      functionName: `misra-platform-get-test-cases-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/get-test-cases'),
@@ -890,7 +897,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const updateTestCaseFunction = new lambda.Function(this, 'UpdateTestCaseFunction', {
-      functionName: 'misra-platform-update-test-case',
+      functionName: `misra-platform-update-test-case-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/test-cases/update-test-case'),
@@ -986,7 +993,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // AI Test Generation Lambda Functions
     const aiAnalyzeFunction = new lambda.Function(this, 'AIAnalyzeFunction', {
-      functionName: 'aibts-ai-analyze',
+      functionName: `aibts-ai-analyze-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/analyze'),
@@ -1007,7 +1014,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const aiGenerateTestFunction = new lambda.Function(this, 'AIGenerateTestFunction', {
-      functionName: 'aibts-ai-generate',
+      functionName: `aibts-ai-generate-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/generate'),
@@ -1031,7 +1038,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const aiBatchGenerateFunction = new lambda.Function(this, 'AIBatchGenerateFunction', {
-      functionName: 'aibts-ai-batch',
+      functionName: `aibts-ai-batch-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/batch'),
@@ -1055,7 +1062,7 @@ export class MisraPlatformStack extends cdk.Stack {
     });
 
     const aiGetUsageStatsFunction = new lambda.Function(this, 'AIGetUsageStatsFunction', {
-      functionName: 'aibts-ai-usage',
+      functionName: `aibts-ai-usage-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai-test-generation/get-usage'),
@@ -1111,7 +1118,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // CloudWatch Alarm: High Error Rate (>10 errors in 5 minutes)
     const bedrockErrorAlarm = new cloudwatch.Alarm(this, 'BedrockHighErrorRateAlarm', {
-      alarmName: 'AIBTS-Bedrock-HighErrorRate',
+      alarmName: `AIBTS-Bedrock-HighErrorRate-${environment}`,
       alarmDescription: 'Alert when Bedrock error rate exceeds 10 errors in 5 minutes',
       metric: new cloudwatch.Metric({
         namespace: 'AIBTS/Bedrock',
@@ -1127,7 +1134,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // CloudWatch Alarm: High Latency (>30 seconds average)
     const bedrockLatencyAlarm = new cloudwatch.Alarm(this, 'BedrockHighLatencyAlarm', {
-      alarmName: 'AIBTS-Bedrock-HighLatency',
+      alarmName: `AIBTS-Bedrock-HighLatency-${environment}`,
       alarmDescription: 'Alert when Bedrock average latency exceeds 30 seconds',
       metric: new cloudwatch.Metric({
         namespace: 'AIBTS/Bedrock',
@@ -1144,7 +1151,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // CloudWatch Alarm: High Cost (>$100/day)
     // Note: This alarm checks if cost exceeds $100 in a 24-hour period
     const bedrockCostAlarm = new cloudwatch.Alarm(this, 'BedrockHighCostAlarm', {
-      alarmName: 'AIBTS-Bedrock-HighCost',
+      alarmName: `AIBTS-Bedrock-HighCost-${environment}`,
       alarmDescription: 'Alert when Bedrock cost exceeds $100 per day',
       metric: new cloudwatch.Metric({
         namespace: 'AIBTS/Bedrock',
@@ -1176,7 +1183,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Task 12: Create CloudWatch Dashboard for Bedrock vs OpenAI comparison
     const bedrockDashboard = new cloudwatch.Dashboard(this, 'BedrockMigrationDashboard', {
-      dashboardName: 'AIBTS-Bedrock-Migration',
+      dashboardName: `AIBTS-Bedrock-Migration-${environment}`,
     });
 
     // Add widgets to compare Bedrock vs OpenAI metrics
@@ -1327,7 +1334,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Execution Lambda Functions
     const testExecutorFunction = new lambda.Function(this, 'TestExecutorFunction', {
-      functionName: 'misra-platform-test-executor',
+      functionName: `misra-platform-test-executor-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/executor'),
@@ -1363,7 +1370,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Execution Trigger Lambda
     const triggerExecutionFunction = new lambda.Function(this, 'TriggerExecutionFunction', {
-      functionName: 'misra-platform-trigger-execution',
+      functionName: `misra-platform-trigger-execution-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/trigger'),
@@ -1385,7 +1392,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Execution Status Lambda
     const getExecutionStatusFunction = new lambda.Function(this, 'GetExecutionStatusFunction', {
-      functionName: 'misra-platform-get-execution-status',
+      functionName: `misra-platform-get-execution-status-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-status'),
@@ -1401,7 +1408,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Execution Results Lambda
     const getExecutionResultsFunction = new lambda.Function(this, 'GetExecutionResultsFunction', {
-      functionName: 'misra-platform-get-execution-results',
+      functionName: `misra-platform-get-execution-results-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-results'),
@@ -1419,7 +1426,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Execution History Lambda
     const getExecutionHistoryFunction = new lambda.Function(this, 'GetExecutionHistoryFunction', {
-      functionName: 'misra-platform-get-execution-history',
+      functionName: `misra-platform-get-execution-history-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-history'),
@@ -1435,7 +1442,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Test Suite Results Lambda
     const getSuiteResultsFunction = new lambda.Function(this, 'GetSuiteResultsFunction', {
-      functionName: 'misra-platform-get-suite-results',
+      functionName: `misra-platform-get-suite-results-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/executions/get-suite-results'),
@@ -1458,7 +1465,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Analysis and Notification Lambda Functions
     const analysisFunction = new lambda.Function(this, 'AnalysisFunction', {
-      functionName: 'misra-platform-analysis',
+      functionName: `misra-platform-analysis-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/analyze-file'),
@@ -1475,7 +1482,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Notification Processor Lambda Function
     const notificationProcessorFunction = new lambda.Function(this, 'NotificationProcessorFunction', {
-      functionName: 'aibts-notification-processor',
+      functionName: `aibts-notification-processor-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/processor'),
@@ -1513,7 +1520,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Template Seeding Lambda Function
     const seedTemplatesFunction = new lambda.Function(this, 'SeedTemplatesFunction', {
-      functionName: 'aibts-seed-templates',
+      functionName: `aibts-seed-templates-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/notifications/seed-templates'),
@@ -1529,7 +1536,7 @@ export class MisraPlatformStack extends cdk.Stack {
     notificationTemplatesTable.table.grantReadWriteData(seedTemplatesFunction);
 
     const notificationFunction = new lambda.Function(this, 'NotificationFunction', {
-      functionName: 'misra-platform-notification',
+      functionName: `misra-platform-notification-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
@@ -1568,7 +1575,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Query Results Lambda Function
     const queryResultsFunction = new lambda.Function(this, 'QueryResultsFunction', {
-      functionName: 'misra-platform-query-results',
+      functionName: `misra-platform-query-results-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/query-results'),
@@ -1581,7 +1588,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // User Stats Lambda Function
     const userStatsFunction = new lambda.Function(this, 'UserStatsFunction', {
-      functionName: 'misra-platform-user-stats',
+      functionName: `misra-platform-user-stats-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/get-user-stats'),
@@ -1594,7 +1601,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Get Report Lambda Function for PDF report generation
     const getReportFunction = new lambda.Function(this, 'GetReportFunction', {
-      functionName: 'misra-platform-get-report',
+      functionName: `misra-platform-get-report-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/get-report'),
@@ -1619,7 +1626,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Analysis Status Lambda Function (Task 5.2)
     const analysisStatusFunction = new lambda.Function(this, 'AnalysisStatusFunction', {
-      functionName: 'misra-platform-analysis-status',
+      functionName: `misra-platform-analysis-status-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/analysis/status'),
@@ -1637,7 +1644,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // AI Insights Lambda Function
     const aiInsightsFunction = new lambda.Function(this, 'AIInsightsFunction', {
-      functionName: 'misra-platform-ai-insights',
+      functionName: `misra-platform-ai-insights-${environment}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('dist-lambdas/ai/generate-insights'),
@@ -1669,7 +1676,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // API Gateway with custom domain
     const api = new apigateway.HttpApi(this, 'MisraPlatformApi', {
-      apiName: 'misra-platform-api',
+      apiName: `misra-platform-api-${environment}`,
       description: 'MISRA Platform REST API',
       corsPreflight: {
         allowOrigins: ['*'],
@@ -2126,13 +2133,13 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FrontendCustomDomain', {
       value: `https://${productionDomain}`,
       description: 'Production frontend URL with custom domain',
-      exportName: 'misra-platform-frontend-url',
+      exportName: `misra-platform-frontend-url-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'ApiCustomDomainUrl', {
       value: `https://${apiDomain}`,
       description: 'Production API URL with custom domain',
-      exportName: 'misra-platform-api-url',
+      exportName: `misra-platform-api-url-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'ProcessingQueueUrl', {
@@ -2188,7 +2195,7 @@ export class MisraPlatformStack extends cdk.Stack {
     // CloudWatch Alarms for Notification System
     // Alarm for DLQ depth > 0 (indicates failed notifications)
     const dlqAlarm = new cloudwatch.Alarm(this, 'NotificationDLQAlarm', {
-      alarmName: 'aibts-notification-dlq-depth',
+      alarmName: `aibts-notification-dlq-depth-${environment}`,
       alarmDescription: 'Alert when notification DLQ has messages (failed notifications)',
       metric: notificationDLQ.metricApproximateNumberOfMessagesVisible(),
       threshold: 0,
@@ -2199,7 +2206,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Alarm for queue depth > 1000 (indicates processing backlog)
     const queueDepthAlarm = new cloudwatch.Alarm(this, 'NotificationQueueDepthAlarm', {
-      alarmName: 'aibts-notification-queue-depth',
+      alarmName: `aibts-notification-queue-depth-${environment}`,
       alarmDescription: 'Alert when notification queue depth exceeds 1000 messages',
       metric: notificationQueue.metricApproximateNumberOfMessagesVisible(),
       threshold: 1000,
@@ -2210,7 +2217,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Alarm for notification processor Lambda errors
     const processorErrorAlarm = new cloudwatch.Alarm(this, 'NotificationProcessorErrorAlarm', {
-      alarmName: 'aibts-notification-processor-errors',
+      alarmName: `aibts-notification-processor-errors-${environment}`,
       alarmDescription: 'Alert when notification processor Lambda has errors',
       metric: notificationProcessorFunction.metricErrors({
         period: cdk.Duration.minutes(5),
@@ -2223,7 +2230,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Alarm for scheduled reports Lambda errors
     const scheduledReportsErrorAlarm = new cloudwatch.Alarm(this, 'ScheduledReportsErrorAlarm', {
-      alarmName: 'aibts-scheduled-reports-errors',
+      alarmName: `aibts-scheduled-reports-errors-${environment}`,
       alarmDescription: 'Alert when scheduled reports Lambda has errors',
       metric: scheduledReportsFunction.metricErrors({
         period: cdk.Duration.minutes(5),
@@ -2236,7 +2243,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Alarm for SNS delivery failures (email)
     const snsEmailFailureAlarm = new cloudwatch.Alarm(this, 'SNSEmailFailureAlarm', {
-      alarmName: 'aibts-sns-email-failures',
+      alarmName: `aibts-sns-email-failures-${environment}`,
       alarmDescription: 'Alert when SNS email delivery fails',
       metric: emailNotificationTopic.metricNumberOfNotificationsFailed({
         period: cdk.Duration.minutes(5),
@@ -2249,7 +2256,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // Alarm for SNS delivery failures (SMS)
     const snsSmsFailureAlarm = new cloudwatch.Alarm(this, 'SNSSmsFailureAlarm', {
-      alarmName: 'aibts-sns-sms-failures',
+      alarmName: `aibts-sns-sms-failures-${environment}`,
       alarmDescription: 'Alert when SNS SMS delivery fails',
       metric: smsNotificationTopic.metricNumberOfNotificationsFailed({
         period: cdk.Duration.minutes(5),
@@ -2262,7 +2269,7 @@ export class MisraPlatformStack extends cdk.Stack {
 
     // CloudWatch Dashboard for Notification System
     const notificationDashboard = new cloudwatch.Dashboard(this, 'NotificationDashboard', {
-      dashboardName: 'AIBTS-Notification-System',
+      dashboardName: `AIBTS-Notification-System-${environment}`,
     });
 
     // Add widgets to dashboard
@@ -2409,19 +2416,19 @@ export class MisraPlatformStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: userPool.userPoolId,
       description: 'Cognito User Pool ID',
-      exportName: 'misra-platform-user-pool-id',
+      exportName: `misra-platform-user-pool-id-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: userPoolClient.userPoolClientId,
       description: 'Cognito User Pool Client ID',
-      exportName: 'misra-platform-user-pool-client-id',
+      exportName: `misra-platform-user-pool-client-id-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'UserPoolArn', {
       value: userPool.userPoolArn,
       description: 'Cognito User Pool ARN',
-      exportName: 'misra-platform-user-pool-arn',
+      exportName: `misra-platform-user-pool-arn-${environment}`,
     });
   }
 }

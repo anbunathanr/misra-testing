@@ -1,0 +1,25 @@
+# Configuration files (may contain secrets)
+config/*.json
+!config/.gitkeep
+
+# Database backups
+backups/
+!backups/.gitkeep
+
+# Deployment history (may contain sensitive info)
+../deployments/
+!../deployments/.gitkeep
+
+# History files (contain metadata)
+migration-history.json
+rollback-history.json
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Environment files
+.env
+.env.*
+!.env.example

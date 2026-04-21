@@ -92,7 +92,8 @@ export class EmailVerificationService {
       await this.cognitoClient.send(new AdminConfirmSignUpCommand({
         UserPoolId: this.userPoolId,
         Username: email,
-        ConfirmationCode: confirmationCode
+        // Note: AdminConfirmSignUpCommand doesn't use ConfirmationCode
+        // It's used for admin-initiated confirmations
       }));
 
       this.errorHandler.logAuthEvent('email_confirmed', {

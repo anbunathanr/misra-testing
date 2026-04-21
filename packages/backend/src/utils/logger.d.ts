@@ -1,6 +1,7 @@
 /**
- * Structured Logger Utility
+ * Enhanced Structured Logger Utility
  * Provides consistent logging across all Lambda functions with CloudWatch Insights support
+ * Enhanced for production deployment with correlation IDs, performance timing, and custom metrics
  */
 export declare enum LogLevel {
     DEBUG = "DEBUG",
@@ -17,18 +18,40 @@ export interface LogEntry {
     context: string;
     message: string;
     requestId?: string;
+    correlationId?: string;
     userId?: string;
+    functionName?: string;
+    functionVersion?: string;
+    environment?: string;
+    duration?: number;
     metadata?: LogMetadata;
     error?: {
         message: string;
         stack?: string;
         name: string;
+        code?: string;
+    };
+    performance?: {
+        startTime?: number;
+        endTime?: number;
+        duration?: number;
+        memoryUsed?: number;
     };
 }
 export declare class Logger {
     private context;
     private defaultMetadata;
+    private correlationId?;
+    private performanceTimers;
     constructor(context: string, defaultMetadata?: LogMetadata);
+    /**
+     * Set correlation ID for request tracing
+     */
+    setCorrelationId(correlationId: string): void;
+    /**
+     * Get current correlation ID
+     */
+    getCorrelationId(): string | undefined;
     /**
      * Log a message with the specified level
      */
@@ -54,11 +77,49 @@ export declare class Logger {
      */
     child(additionalContext: string, additionalMetadata?: LogMetadata): Logger;
     /**
-     * Log execution timing
+     * Start a performance timer
+     */
+    startTimer(label: string): void;
+    /**
+     * End a performance timer and log the duration
+     */
+    endTimer(label: string, meta?: LogMetadata): number;
+    /**
+     * Log execution timing (legacy method for backward compatibility)
      */
     time(label: string): () => void;
+    /**
+     * Log security events
+     */
+    security(message: string, meta?: LogMetadata): void;
+    /**
+     * Log business metrics
+     */
+    metric(metricName: string, value: number, unit?: string, meta?: LogMetadata): void;
+    /**
+     * Log API request/response
+     */
+    apiCall(method: string, path: string, statusCode: number, duration: number, meta?: LogMetadata): void;
 }
 /**
  * Create a logger instance for a specific context
  */
 export declare function createLogger(context: string, metadata?: LogMetadata): Logger;
+/**
+ * Generate a correlation ID for request tracing
+ */
+export declare function generateCorrelationId(): string;
+/**
+ * Extract correlation ID from API Gateway event headers
+ */
+export declare function extractCorrelationId(event: any): string;
+/**
+ * Create a logger with correlation ID from API Gateway event
+ */
+export declare function createLoggerWithCorrelation(context: string, event: any, metadata?: LogMetadata): Logger;
+/**
+ * Utility function to record custom CloudWatch metrics
+ */
+export declare function recordCustomMetric(namespace: string, metricName: string, value: number, unit?: string, dimensions?: {
+    [key: string]: string;
+}): Promise<void>;

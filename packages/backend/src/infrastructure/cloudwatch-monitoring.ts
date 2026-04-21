@@ -164,7 +164,7 @@ export class CloudWatchMonitoring extends Construct {
         statistic: 'Average',
       }),
 
-      // Analysis metrics
+      // Analysis metrics (enhanced for business logic)
       analysisStarted: new cloudwatch.Metric({
         namespace,
         metricName: 'AnalysisStarted',
@@ -195,6 +195,16 @@ export class CloudWatchMonitoring extends Construct {
         metricName: 'ViolationsDetected',
         statistic: 'Sum',
       }),
+      rulesProcessed: new cloudwatch.Metric({
+        namespace,
+        metricName: 'RulesProcessed',
+        statistic: 'Sum',
+      }),
+      cacheHitRate: new cloudwatch.Metric({
+        namespace,
+        metricName: 'CacheHitRate',
+        statistic: 'Average',
+      }),
 
       // Authentication metrics
       authenticationAttempts: new cloudwatch.Metric({
@@ -223,7 +233,7 @@ export class CloudWatchMonitoring extends Construct {
         statistic: 'Sum',
       }),
 
-      // File operation metrics
+      // File operation metrics (enhanced)
       fileUploads: new cloudwatch.Metric({
         namespace,
         metricName: 'FileUploads',
@@ -239,6 +249,28 @@ export class CloudWatchMonitoring extends Construct {
         metricName: 'FileUploadDuration',
         statistic: 'Average',
       }),
+      fileProcessingErrors: new cloudwatch.Metric({
+        namespace,
+        metricName: 'FileProcessingErrors',
+        statistic: 'Sum',
+      }),
+
+      // DynamoDB operation metrics
+      dynamodbReadLatency: new cloudwatch.Metric({
+        namespace,
+        metricName: 'DynamoDBReadLatency',
+        statistic: 'Average',
+      }),
+      dynamodbWriteLatency: new cloudwatch.Metric({
+        namespace,
+        metricName: 'DynamoDBWriteLatency',
+        statistic: 'Average',
+      }),
+      dynamodbThrottles: new cloudwatch.Metric({
+        namespace,
+        metricName: 'DynamoDBThrottles',
+        statistic: 'Sum',
+      }),
 
       // System health metrics
       systemHealth: new cloudwatch.Metric({
@@ -250,6 +282,11 @@ export class CloudWatchMonitoring extends Construct {
         namespace,
         metricName: 'ErrorRate',
         statistic: 'Average',
+      }),
+      coldStarts: new cloudwatch.Metric({
+        namespace,
+        metricName: 'ColdStarts',
+        statistic: 'Sum',
       }),
     };
   }
@@ -297,7 +334,7 @@ export class CloudWatchMonitoring extends Construct {
       })
     );
 
-    // Analysis Performance Row
+    // Analysis Performance Row (Enhanced with business metrics)
     dashboard.addWidgets(
       new cloudwatch.GraphWidget({
         title: 'Analysis Performance',
@@ -311,10 +348,41 @@ export class CloudWatchMonitoring extends Construct {
         height: 6,
       }),
       new cloudwatch.GraphWidget({
-        title: 'Compliance Scores',
+        title: 'Compliance Scores & Violations',
         left: [this.customMetrics.complianceScore],
         right: [this.customMetrics.violationsDetected],
         width: 12,
+        height: 6,
+      })
+    );
+
+    // MISRA Business Logic Metrics Row (NEW)
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'MISRA Rules Processing',
+        left: [this.customMetrics.rulesProcessed],
+        right: [this.customMetrics.cacheHitRate],
+        width: 12,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Analysis Success Rate',
+        metrics: [
+          new cloudwatch.MathExpression({
+            expression: '(completed / started) * 100',
+            usingMetrics: {
+              started: this.customMetrics.analysisStarted,
+              completed: this.customMetrics.analysisCompleted,
+            },
+          }),
+        ],
+        width: 6,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Average Compliance Score',
+        metrics: [this.customMetrics.complianceScore],
+        width: 6,
         height: 6,
       })
     );
@@ -405,18 +473,16 @@ export class CloudWatchMonitoring extends Construct {
     });
     dashboard.addWidgets(...lambdaWidgets);
 
-    // System Health Row
+    // DynamoDB Performance Row (NEW)
     dashboard.addWidgets(
-      new cloudwatch.SingleValueWidget({
-        title: 'System Health Score',
-        metrics: [this.customMetrics.systemHealth],
-        width: 6,
-        height: 6,
-      }),
-      new cloudwatch.SingleValueWidget({
-        title: 'Error Rate',
-        metrics: [this.customMetrics.errorRate],
-        width: 6,
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Operations',
+        left: [
+          this.customMetrics.dynamodbReadLatency,
+          this.customMetrics.dynamodbWriteLatency,
+        ],
+        right: [this.customMetrics.dynamodbThrottles],
+        width: 12,
         height: 6,
       }),
       new cloudwatch.GraphWidget({
@@ -425,7 +491,42 @@ export class CloudWatchMonitoring extends Construct {
           this.customMetrics.fileUploads,
           this.customMetrics.fileUploadSize,
         ],
-        right: [this.customMetrics.fileUploadDuration],
+        right: [
+          this.customMetrics.fileUploadDuration,
+          this.customMetrics.fileProcessingErrors,
+        ],
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // System Health Row (Enhanced)
+    dashboard.addWidgets(
+      new cloudwatch.SingleValueWidget({
+        title: 'System Health Score',
+        metrics: [this.customMetrics.systemHealth],
+        width: 4,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Error Rate',
+        metrics: [this.customMetrics.errorRate],
+        width: 4,
+        height: 6,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Cold Starts',
+        metrics: [this.customMetrics.coldStarts],
+        width: 4,
+        height: 6,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'System Performance Trends',
+        left: [
+          this.customMetrics.errorRate,
+          this.customMetrics.coldStarts,
+        ],
+        right: [this.customMetrics.systemHealth],
         width: 12,
         height: 6,
       })
@@ -499,6 +600,42 @@ export class CloudWatchMonitoring extends Construct {
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
 
+    // API Gateway latency alarm (NEW)
+    new cloudwatch.Alarm(this, 'ApiGatewayHighLatencyAlarm', {
+      alarmName: `MISRA-Platform-ApiGatewayLatency-${environment}`,
+      alarmDescription: 'API Gateway experiencing high latency',
+      metric: api.metricLatency({
+        period: cdk.Duration.minutes(5),
+        statistic: 'Average',
+      }),
+      threshold: thresholds.apiLatency,
+      evaluationPeriods: alertConfig.evaluationPeriods,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // DynamoDB throttling alarm (NEW)
+    new cloudwatch.Alarm(this, 'DynamoDBThrottlingAlarm', {
+      alarmName: `MISRA-Platform-DynamoDBThrottling-${environment}`,
+      alarmDescription: 'DynamoDB operations being throttled',
+      metric: this.customMetrics.dynamodbThrottles,
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // File processing errors alarm (NEW)
+    new cloudwatch.Alarm(this, 'FileProcessingErrorsAlarm', {
+      alarmName: `MISRA-Platform-FileProcessingErrors-${environment}`,
+      alarmDescription: 'High number of file processing errors',
+      metric: this.customMetrics.fileProcessingErrors,
+      threshold: environment === 'production' ? 5 : 10,
+      evaluationPeriods: alertConfig.evaluationPeriods,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
     // Lambda function error alarms
     Object.entries(lambdaFunctions).forEach(([name, func]) => {
       new cloudwatch.Alarm(this, `${name}ErrorAlarm`, {
@@ -527,6 +664,20 @@ export class CloudWatchMonitoring extends Construct {
         comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
         treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+      // Lambda throttling alarm (NEW)
+      new cloudwatch.Alarm(this, `${name}ThrottlingAlarm`, {
+        alarmName: `MISRA-Platform-${name}-Throttling-${environment}`,
+        alarmDescription: `${name} Lambda function being throttled`,
+        metric: func.metricThrottles({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
     });
 
     // Authentication failure alarm
@@ -536,6 +687,65 @@ export class CloudWatchMonitoring extends Construct {
       metric: this.customMetrics.authenticationFailure,
       threshold: thresholds.authFailures,
       evaluationPeriods: alertConfig.evaluationPeriods,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // Compliance score degradation alarm (NEW)
+    new cloudwatch.Alarm(this, 'ComplianceScoreDegradationAlarm', {
+      alarmName: `MISRA-Platform-ComplianceScoreDegradation-${environment}`,
+      alarmDescription: 'Average compliance score is degrading',
+      metric: this.customMetrics.complianceScore,
+      threshold: 50, // Alert if average compliance drops below 50%
+      evaluationPeriods: 3,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // Health check failure alarm (NEW)
+    new cloudwatch.Alarm(this, 'HealthCheckFailureAlarm', {
+      alarmName: `MISRA-Platform-HealthCheckFailure-${environment}`,
+      alarmDescription: 'Health check endpoint reporting unhealthy status',
+      metric: new cloudwatch.Metric({
+        namespace: 'MISRA/Platform',
+        metricName: 'HealthCheckFailed',
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(1),
+      }),
+      threshold: 1,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.BREACHING, // Treat missing data as unhealthy
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // Service degradation alarm (NEW)
+    new cloudwatch.Alarm(this, 'ServiceDegradationAlarm', {
+      alarmName: `MISRA-Platform-ServiceDegradation-${environment}`,
+      alarmDescription: 'One or more services reporting degraded status',
+      metric: new cloudwatch.Metric({
+        namespace: 'MISRA/Platform',
+        metricName: 'ServiceDegraded',
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 1,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
+
+    // Health check response time alarm (NEW)
+    new cloudwatch.Alarm(this, 'HealthCheckSlowResponseAlarm', {
+      alarmName: `MISRA-Platform-HealthCheckSlowResponse-${environment}`,
+      alarmDescription: 'Health check endpoint responding slowly',
+      metric: new cloudwatch.Metric({
+        namespace: 'MISRA/Platform',
+        metricName: 'HealthCheckDuration',
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5000, // 5 seconds
+      evaluationPeriods: 3,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     }).addAlarmAction(new cdk.aws_cloudwatch_actions.SnsAction(this.alarmTopic));
@@ -581,5 +791,25 @@ export class CloudWatchMonitoring extends Construct {
       METRICS_BUFFER_SIZE: '10',
       METRICS_FLUSH_INTERVAL: '30000', // 30 seconds
     };
+  }
+
+  /**
+   * Get X-Ray tracing configuration for Lambda functions
+   */
+  public getXRayConfig(): { [key: string]: string } {
+    return {
+      AWS_XRAY_CONTEXT_MISSING: 'LOG_ERROR',
+      AWS_XRAY_TRACING_NAME: 'MISRA-Platform',
+      AWS_XRAY_DEBUG_MODE: 'false',
+    };
+  }
+
+  /**
+   * Add X-Ray tracing permissions to Lambda execution role
+   */
+  public addXRayPermissions(role: iam.IRole): void {
+    role.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess')
+    );
   }
 }

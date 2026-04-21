@@ -66,10 +66,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return await handleManualTOTPVerification(request, correlationId);
 
   } catch (error: any) {
-    logger.error('OTP verification failed', {
+    logger.error('OTP verification failed', error, {
       correlationId,
-      error: error.message,
-      stack: error.stack
     });
 
     return errorResponse(500, 'VERIFICATION_ERROR', 'OTP verification failed');
@@ -123,8 +121,8 @@ async function handleAutomaticTOTPVerification(
         secret: associateResult.SecretCode,
         encoding: 'base32',
         time: Math.floor(Date.now() / 1000),
-        window: 2, // Allow some time drift
-      });
+        step: 30, // 30 second time step
+      } as any); // Type assertion to handle library type issues
 
       logger.info('Generated TOTP code for verification', {
         correlationId,
@@ -224,10 +222,9 @@ async function handleAutomaticTOTPVerification(
     throw new Error(`Unexpected auth state: ${authResult.ChallengeName || 'unknown'}`);
 
   } catch (error: any) {
-    logger.error('Automatic TOTP verification failed', {
+    logger.error('Automatic TOTP verification failed', error, {
       correlationId,
       email: request.email,
-      error: error.message
     });
 
     return errorResponse(400, 'AUTO_TOTP_FAILED', error.message);
@@ -272,8 +269,8 @@ async function generateTOTPCodeForUser(email: string, correlationId: string): Pr
     secret: secret,
     encoding: 'base32',
     time: Math.floor(Date.now() / 1000),
-    window: 2,
-  });
+    step: 30, // 30 second time step
+  } as any); // Type assertion to handle library type issues
 
   logger.info('TOTP code generated successfully', {
     correlationId,

@@ -106,10 +106,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
   } catch (error: any) {
-    logger.error('Autonomous login failed', {
+    logger.error('Autonomous login failed', error, {
       correlationId,
-      error: error.message,
-      stack: error.stack
     });
 
     // Parse error message to provide better user feedback

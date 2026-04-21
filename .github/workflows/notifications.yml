@@ -1,0 +1,257 @@
+name: Deployment Notifications
+
+on:
+  workflow_run:
+    workflows: ["Production Deployment Pipeline"]
+    types:
+      - completed
+
+jobs:
+  notify-deployment-status:
+    name: Send Deployment Notifications
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "emoji=🚀" >> $GITHUB_OUTPUT
+            echo "color=#00FF00" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "emoji=🔧" >> $GITHUB_OUTPUT
+            echo "color=#FFA500" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=development" >> $GITHUB_OUTPUT
+            echo "emoji=🛠️" >> $GITHUB_OUTPUT
+            echo "color=#0000FF" >> $GITHUB_OUTPUT
+          else
+            echo "environment=unknown" >> $GITHUB_OUTPUT
+            echo "emoji=❓" >> $GITHUB_OUTPUT
+            echo "color=#808080" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Slack notification on success
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "${{ steps.env.outputs.emoji }} Deployment to ${{ steps.env.outputs.environment }} successful",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.env.outputs.emoji }} Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ steps.env.outputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n✅ Success"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Commit Message:*\n${{ github.event.head_commit.message }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Send Slack notification on failure
+        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment to ${{ steps.env.outputs.environment }} failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Deployment Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ steps.env.outputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n❌ Failed"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* Check logs and rollback if necessary"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "danger"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Send email notification
+        if: steps.env.outputs.environment == 'production'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "[${{ github.event.workflow_run.conclusion }}] Production Deployment - MISRA Platform"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: MISRA Platform CI/CD <noreply@misra-platform.com>
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: ${{ github.event.workflow_run.conclusion == 'success' && '#4CAF50' || '#f44336' }}; color: white; padding: 20px; text-align: center; }
+                .content { background: #f9f9f9; padding: 20px; margin-top: 20px; }
+                .info-row { margin: 10px 0; }
+                .label { font-weight: bold; }
+                .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+                .button { display: inline-block; padding: 10px 20px; background: #2196F3; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>${{ github.event.workflow_run.conclusion == 'success' && '✅ Deployment Successful' || '❌ Deployment Failed' }}</h1>
+                </div>
+                <div class="content">
+                  <div class="info-row">
+                    <span class="label">Environment:</span> Production
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Status:</span> ${{ github.event.workflow_run.conclusion }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Commit:</span> ${{ github.sha }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Author:</span> ${{ github.actor }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Branch:</span> ${{ github.ref }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Timestamp:</span> ${{ github.event.workflow_run.updated_at }}
+                  </div>
+                  <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="button">
+                    View Workflow Logs
+                  </a>
+                </div>
+                <div class="footer">
+                  <p>This is an automated notification from MISRA Platform CI/CD pipeline.</p>
+                  <p>For support, contact your DevOps team.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+      
+      - name: Create GitHub deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const environment = '${{ steps.env.outputs.environment }}';
+            const status = '${{ github.event.workflow_run.conclusion }}' === 'success' ? 'success' : 'failure';
+            
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: status,
+              log_url: `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+              description: `Deployment to ${environment} ${status}`,
+              environment: environment
+            });
+      
+      - name: Post to Microsoft Teams (Optional)
+        if: ${{ secrets.TEAMS_WEBHOOK_URL != '' }}
+        uses: aliencube/microsoft-teams-actions@v0.8.0
+        with:
+          webhook_uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          title: "${{ steps.env.outputs.emoji }} Deployment to ${{ steps.env.outputs.environment }}"
+          summary: "Deployment ${{ github.event.workflow_run.conclusion }}"
+          text: |
+            **Environment:** ${{ steps.env.outputs.environment }}
+            **Status:** ${{ github.event.workflow_run.conclusion }}
+            **Commit:** ${{ github.sha }}
+            **Author:** ${{ github.actor }}
+            
+            [View Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          theme_color: ${{ steps.env.outputs.color }}

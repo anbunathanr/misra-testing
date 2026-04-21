@@ -251,7 +251,11 @@ export class EmailVerificationServiceValidator {
 
     // Validate user exists
     const userValidation = await this.validateUserExists(email);
-    results.push({ check: 'User exists', ...userValidation });
+    results.push({ 
+      check: 'User exists', 
+      valid: userValidation.exists, 
+      message: userValidation.message 
+    });
 
     // If user exists, validate state
     if (userValidation.exists) {

@@ -1,12 +1,14 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context, ScheduledEvent } from 'aws-lambda';
 import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
-import { S3Client } from '@aws-sdk/client-s3';
+import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { CentralizedLogger, withCorrelationId } from '../../utils/centralized-logger';
 import { monitoringService } from '../../services/monitoring-service';
 
 const cloudWatch = new CloudWatchClient({});
-const dynamodb = new DynamoDBClient({});
+const dynamodbClient = new DynamoDBClient({});
+const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 const s3 = new S3Client({});
 
 interface MetricsCollectionResult {
@@ -176,10 +178,10 @@ async function collectDynamoDBMetrics(logger: CentralizedLogger): Promise<number
   for (const tableName of tables) {
     try {
       // Get table item count
-      const scanResult = await dynamodb.scan({
+      const scanResult = await dynamodb.send(new ScanCommand({
         TableName: tableName,
         Select: 'COUNT',
-      }).promise();
+      }));
 
       await monitoringService.publishMetric({
         MetricName: 'TableItemCount',
@@ -193,7 +195,7 @@ async function collectDynamoDBMetrics(logger: CentralizedLogger): Promise<number
       metricsCount++;
 
       // Get table size (approximate)
-      const describeResult = await dynamodb.send(new DescribeTableCommand({
+      const describeResult = await dynamodbClient.send(new DescribeTableCommand({
         TableName: tableName,
       }));
 
@@ -236,9 +238,9 @@ async function collectS3Metrics(logger: CentralizedLogger): Promise<number> {
 
   try {
     // Get bucket object count and total size
-    const listResult = await s3.listObjectsV2({
+    const listResult = await s3.send(new ListObjectsV2Command({
       Bucket: bucketName,
-    }).promise();
+    }));
 
     const objectCount = listResult.KeyCount || 0;
     const totalSize = listResult.Contents?.reduce((sum, obj) => sum + (obj.Size || 0), 0) || 0;
@@ -306,10 +308,10 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
   try {
     // Collect user metrics
     if (process.env.USERS_TABLE_NAME) {
-      const usersResult = await dynamodb.scan({
+      const usersResult = await dynamodb.send(new ScanCommand({
         TableName: process.env.USERS_TABLE_NAME,
         Select: 'COUNT',
-      }).promise();
+      }));
 
       await monitoringService.publishMetric({
         MetricName: 'TotalUsers',
@@ -322,10 +324,10 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
 
     // Collect project metrics
     if (process.env.PROJECTS_TABLE_NAME) {
-      const projectsResult = await dynamodb.scan({
+      const projectsResult = await dynamodb.send(new ScanCommand({
         TableName: process.env.PROJECTS_TABLE_NAME,
         Select: 'COUNT',
-      }).promise();
+      }));
 
       await monitoringService.publishMetric({
         MetricName: 'TotalProjects',
@@ -338,10 +340,10 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
 
     // Collect analysis metrics
     if (process.env.ANALYSIS_RESULTS_TABLE_NAME) {
-      const analysisResult = await dynamodb.scan({
+      const analysisResult = await dynamodb.send(new ScanCommand({
         TableName: process.env.ANALYSIS_RESULTS_TABLE_NAME,
         Select: 'COUNT',
-      }).promise();
+      }));
 
       await monitoringService.publishMetric({
         MetricName: 'TotalAnalyses',
@@ -353,7 +355,7 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
 
       // Get recent analysis success rate (last 24 hours)
       const yesterday = Date.now() - (24 * 60 * 60 * 1000);
-      const recentAnalyses = await dynamodb.scan({
+      const recentAnalyses = await dynamodb.send(new ScanCommand({
         TableName: process.env.ANALYSIS_RESULTS_TABLE_NAME,
         FilterExpression: '#timestamp > :yesterday',
         ExpressionAttributeNames: {
@@ -362,10 +364,10 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
         ExpressionAttributeValues: {
           ':yesterday': yesterday,
         },
-      }).promise();
+      }));
 
       const totalRecent = recentAnalyses.Count || 0;
-      const successfulRecent = recentAnalyses.Items?.filter(item => item.status === 'COMPLETED').length || 0;
+      const successfulRecent = recentAnalyses.Items?.filter((item: any) => item.status === 'COMPLETED').length || 0;
       const successRate = totalRecent > 0 ? (successfulRecent / totalRecent) * 100 : 100;
 
       await monitoringService.publishMetric({
@@ -379,10 +381,10 @@ async function collectBusinessMetrics(logger: CentralizedLogger): Promise<number
 
     // Collect file upload metrics
     if (process.env.FILE_METADATA_TABLE_NAME) {
-      const filesResult = await dynamodb.scan({
+      const filesResult = await dynamodb.send(new ScanCommand({
         TableName: process.env.FILE_METADATA_TABLE_NAME,
         Select: 'COUNT',
-      }).promise();
+      }));
 
       await monitoringService.publishMetric({
         MetricName: 'TotalFiles',

@@ -39,6 +39,7 @@ export class IAMRoles extends Construct {
   public readonly fileFunctionRole: iam.Role;
   public readonly analysisFunctionRole: iam.Role;
   public readonly monitoringRole: iam.Role;
+  public readonly auditRole: iam.Role;
 
   constructor(scope: Construct, id: string, props: IAMRolesProps) {
     super(scope, id);
@@ -79,6 +80,12 @@ export class IAMRoles extends Construct {
       environment, region, accountId, baseLambdaRole,
       usersTable, fileMetadataTable, analysisResultsTable, 
       sampleFilesTable, progressTable, filesBucket
+    );
+
+    this.auditRole = this.createAuditRole(
+      environment, region, accountId, baseLambdaRole,
+      usersTable, fileMetadataTable, analysisResultsTable, 
+      sampleFilesTable, progressTable, kmsKey
     );
   }
 
@@ -628,6 +635,103 @@ export class IAMRoles extends Construct {
         `arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/*`,
         `arn:aws:logs:${region}:${accountId}:log-group:/misra-platform/${environment}/*`,
       ],
+    }));
+
+    return role;
+  }
+
+  /**
+   * Create IAM role for Audit Stream Processor Lambda function
+   */
+  private createAuditRole(
+    environment: string,
+    region: string,
+    accountId: string,
+    baseLambdaRole: iam.Role,
+    usersTable: dynamodb.Table,
+    fileMetadataTable: dynamodb.Table,
+    analysisResultsTable: dynamodb.Table,
+    sampleFilesTable: dynamodb.Table,
+    progressTable: dynamodb.Table,
+    kmsKey: kms.Key
+  ): iam.Role {
+    const role = new iam.Role(this, 'AuditRole', {
+      roleName: `misra-platform-audit-${environment}`,
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: 'IAM role for Audit Stream Processor Lambda function',
+    });
+
+    // Inherit base Lambda permissions
+    this.inheritBaseLambdaPermissions(role, baseLambdaRole);
+
+    // DynamoDB Streams read permissions for all tables
+    const tableArns = [
+      usersTable.tableArn,
+      fileMetadataTable.tableArn,
+      analysisResultsTable.tableArn,
+      progressTable.tableArn,
+    ];
+
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'DynamoDBStreamsRead',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'dynamodb:DescribeStream',
+        'dynamodb:GetRecords',
+        'dynamodb:GetShardIterator',
+        'dynamodb:ListStreams',
+      ],
+      resources: [
+        ...tableArns.map(arn => `${arn}/stream/*`),
+      ],
+    }));
+
+    // CloudWatch Logs write permissions for audit logs
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'AuditLogsWrite',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'logs:CreateLogGroup',
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+        'logs:DescribeLogGroups',
+        'logs:DescribeLogStreams',
+      ],
+      resources: [
+        `arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/misra-platform-audit-${environment}*`,
+        `arn:aws:logs:${region}:${accountId}:log-group:/misra-platform/${environment}/audit*`,
+      ],
+    }));
+
+    // KMS decrypt permissions for DynamoDB streams
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'KMSDecryptForStreams',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'kms:Decrypt',
+        'kms:DescribeKey',
+      ],
+      resources: [kmsKey.keyArn],
+      conditions: {
+        StringEquals: {
+          'kms:ViaService': `dynamodb.${region}.amazonaws.com`,
+        },
+      },
+    }));
+
+    // Custom metrics for audit events
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'AuditMetrics',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cloudwatch:PutMetricData',
+      ],
+      resources: ['*'],
+      conditions: {
+        StringEquals: {
+          'cloudwatch:namespace': ['MISRA/Platform', 'MISRA/Audit'],
+        },
+      },
     }));
 
     return role;

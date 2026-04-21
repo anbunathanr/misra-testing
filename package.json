@@ -11,7 +11,16 @@
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
     "dev": "npm run dev --workspaces",
-    "deploy": "npm run deploy --workspaces"
+    "deploy": "npm run deploy --workspaces",
+    "deploy:dev": "bash scripts/deploy-env.sh dev",
+    "deploy:staging": "bash scripts/deploy-env.sh staging",
+    "deploy:production": "bash scripts/deploy-env.sh production --dry-run",
+    "deploy:production:confirm": "bash scripts/deploy-env.sh production",
+    "rollback:dev": "bash scripts/rollback.sh dev --to-previous",
+    "rollback:staging": "bash scripts/rollback.sh staging --to-previous",
+    "rollback:production": "bash scripts/rollback.sh production --to-previous --dry-run",
+    "config:list": "bash scripts/manage-config.sh list",
+    "config:sync": "bash scripts/manage-config.sh sync"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

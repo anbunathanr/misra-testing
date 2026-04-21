@@ -103,10 +103,9 @@ export class CognitoTOTPService {
       return { tempPassword };
 
     } catch (error: any) {
-      logger.error('Failed to create user with MFA', {
+      logger.error('Failed to create user with MFA', error, {
         correlationId,
         email,
-        error: error.message
       });
       throw new Error(`USER_CREATION_FAILED: ${error.message}`);
     }
@@ -172,10 +171,9 @@ export class CognitoTOTPService {
       throw new Error(`Unexpected authentication state: ${authResult.ChallengeName || 'unknown'}`);
 
     } catch (error: any) {
-      logger.error('Authentication with auto MFA failed', {
+      logger.error('Authentication with auto MFA failed', error, {
         correlationId,
         email,
-        error: error.message
       });
       throw new Error(`AUTH_FAILED: ${error.message}`);
     }
@@ -245,8 +243,8 @@ export class CognitoTOTPService {
         secret: associateResult.SecretCode,
         encoding: 'base32',
         time: Math.floor(Date.now() / 1000),
-        window: 2 // Allow some time drift
-      });
+        step: 30 // 30 second time step
+      } as any); // Type assertion to handle library type issues
 
       logger.info('TOTP code generated for verification', {
         correlationId,
@@ -310,10 +308,9 @@ export class CognitoTOTPService {
       };
 
     } catch (error: any) {
-      logger.error('Automatic TOTP setup failed', {
+      logger.error('Automatic TOTP setup failed', error, {
         correlationId,
         email,
-        error: error.message
       });
       throw new Error(`TOTP_SETUP_FAILED: ${error.message}`);
     }
@@ -394,10 +391,9 @@ export class CognitoTOTPService {
       };
 
     } catch (error: any) {
-      logger.error('SOFTWARE_TOKEN_MFA challenge failed', {
+      logger.error('SOFTWARE_TOKEN_MFA challenge failed', error, {
         correlationId,
         email,
-        error: error.message
       });
       throw new Error(`MFA_CHALLENGE_FAILED: ${error.message}`);
     }
@@ -429,10 +425,9 @@ export class CognitoTOTPService {
       return totpCode;
 
     } catch (error: any) {
-      logger.error('Failed to generate TOTP code', {
+      logger.error('Failed to generate TOTP code', error, {
         correlationId,
         email,
-        error: error.message
       });
 
       // Fallback to placeholder implementation for development
@@ -449,8 +444,8 @@ export class CognitoTOTPService {
           secret: secret,
           encoding: 'ascii',
           time: Math.floor(Date.now() / 1000),
-          window: 2
-        });
+          step: 30 // 30 second time step
+        } as any); // Type assertion to handle library type issues
 
         return totpCode;
       }

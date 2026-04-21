@@ -83,9 +83,8 @@ export class OTPSecretsService {
       });
 
     } catch (error: any) {
-      logger.error('Failed to initialize OTP Secrets Service', {
+      logger.error('Failed to initialize OTP Secrets Service', error, {
         correlationId,
-        error: error.message
       });
       throw new Error(`OTP_SERVICE_INIT_FAILED: ${error.message}`);
     }
@@ -134,10 +133,9 @@ export class OTPSecretsService {
       return secretData;
 
     } catch (error: any) {
-      logger.error('Failed to generate TOTP secret', {
+      logger.error('Failed to generate TOTP secret', error, {
         correlationId,
         userId,
-        error: error.message
       });
       throw new Error(`TOTP_GENERATION_FAILED: ${error.message}`);
     }
@@ -195,10 +193,9 @@ export class OTPSecretsService {
         return null;
       }
 
-      logger.error('Failed to retrieve TOTP secret', {
+      logger.error('Failed to retrieve TOTP secret', error, {
         correlationId,
-        userId,
-        error: error.message
+        userId
       });
       throw new Error(`TOTP_RETRIEVAL_FAILED: ${error.message}`);
     }
@@ -243,10 +240,9 @@ export class OTPSecretsService {
       return totpCode;
 
     } catch (error: any) {
-      logger.error('Failed to generate TOTP code', {
+      logger.error('Failed to generate TOTP code', error, {
         correlationId,
-        userId,
-        error: error.message
+        userId
       });
       throw new Error(`TOTP_CODE_GENERATION_FAILED: ${error.message}`);
     }
@@ -295,10 +291,9 @@ export class OTPSecretsService {
       return isValid;
 
     } catch (error: any) {
-      logger.error('Failed to verify TOTP code', {
+      logger.error('Failed to verify TOTP code', error, {
         correlationId,
-        userId,
-        error: error.message
+        userId
       });
       throw new Error(`TOTP_VERIFICATION_FAILED: ${error.message}`);
     }
@@ -336,10 +331,9 @@ export class OTPSecretsService {
       });
 
     } catch (error: any) {
-      logger.error('Failed to delete TOTP secret', {
+      logger.error('Failed to delete TOTP secret', error, {
         correlationId,
-        userId,
-        error: error.message
+        userId
       });
       throw new Error(`TOTP_DELETION_FAILED: ${error.message}`);
     }

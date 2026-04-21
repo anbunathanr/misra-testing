@@ -1,0 +1,304 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      backup_timestamp:
+        description: 'Backup timestamp (YYYYMMDD-HHMMSS) or "previous" for last backup'
+        required: true
+        type: string
+        default: 'previous'
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    name: Rollback ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ github.event.inputs.environment == 'production' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID_STAGING }}
+          aws-secret-access-key: ${{ github.event.inputs.environment == 'production' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY_STAGING }}
+          aws-region: us-east-1
+      
+      - name: Validate backup exists
+        id: validate
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          BACKUP_TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+          BUCKET="misra-platform-frontend-${ENVIRONMENT}-backup-${{ secrets.AWS_ACCOUNT_ID }}"
+          
+          if [ "$BACKUP_TIMESTAMP" == "previous" ]; then
+            # Get the most recent backup
+            LATEST_BACKUP=$(aws s3 ls s3://${BUCKET}/ | sort | tail -n 1 | awk '{print $2}' | sed 's/\///')
+            echo "backup_path=${LATEST_BACKUP}" >> $GITHUB_OUTPUT
+            echo "Using latest backup: ${LATEST_BACKUP}"
+          else
+            # Verify specified backup exists
+            if aws s3 ls s3://${BUCKET}/${BACKUP_TIMESTAMP}/ > /dev/null 2>&1; then
+              echo "backup_path=${BACKUP_TIMESTAMP}" >> $GITHUB_OUTPUT
+              echo "Using specified backup: ${BACKUP_TIMESTAMP}"
+            else
+              echo "Error: Backup ${BACKUP_TIMESTAMP} not found"
+              exit 1
+            fi
+          fi
+      
+      - name: Create pre-rollback snapshot
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          echo "Creating pre-rollback snapshot..."
+          aws s3 sync \
+            s3://misra-platform-frontend-${ENVIRONMENT}-${{ secrets.AWS_ACCOUNT_ID }} \
+            s3://misra-platform-frontend-${ENVIRONMENT}-backup-${{ secrets.AWS_ACCOUNT_ID }}/pre-rollback-${TIMESTAMP}/ \
+            --delete
+      
+      - name: Rollback frontend
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          BACKUP_PATH="${{ steps.validate.outputs.backup_path }}"
+          
+          echo "Rolling back frontend from backup: ${BACKUP_PATH}"
+          aws s3 sync \
+            s3://misra-platform-frontend-${ENVIRONMENT}-backup-${{ secrets.AWS_ACCOUNT_ID }}/${BACKUP_PATH}/ \
+            s3://misra-platform-frontend-${ENVIRONMENT}-${{ secrets.AWS_ACCOUNT_ID }} \
+            --delete
+          
+          # Invalidate CloudFront cache
+          DISTRIBUTION_ID="${{ github.event.inputs.environment == 'production' && secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD || secrets.CLOUDFRONT_DISTRIBUTION_ID_STAGING }}"
+          aws cloudfront create-invalidation \
+            --distribution-id ${DISTRIBUTION_ID} \
+            --paths "/*"
+      
+      - name: Rollback backend (CDK)
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          
+          echo "Rolling back CDK stack..."
+          cd packages/backend
+          
+          # Get previous stack version from CloudFormation
+          STACK_NAME="misra-platform-${ENVIRONMENT}"
+          
+          # List stack events to find previous successful deployment
+          aws cloudformation describe-stack-events \
+            --stack-name ${STACK_NAME} \
+            --max-items 100 \
+            --query 'StackEvents[?ResourceStatus==`UPDATE_COMPLETE`]|[0]' \
+            > previous-deployment.json
+          
+          # Note: Actual rollback would require storing previous CDK templates
+          # For now, we'll document the process
+          echo "⚠️ Backend rollback requires manual intervention"
+          echo "Please review CloudFormation console and use 'Continue update rollback' if needed"
+      
+      - name: Run health checks
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          
+          if [ "$ENVIRONMENT" == "production" ]; then
+            URL="https://misra-platform.com"
+            API_URL="https://api.misra-platform.com"
+          else
+            URL="https://staging.misra-platform.com"
+            API_URL="https://api-staging.misra-platform.com"
+          fi
+          
+          echo "Running health checks..."
+          
+          # Check frontend
+          if curl -f ${URL}/health > /dev/null 2>&1; then
+            echo "✅ Frontend health check passed"
+          else
+            echo "❌ Frontend health check failed"
+            exit 1
+          fi
+          
+          # Check API
+          if curl -f ${API_URL}/health > /dev/null 2>&1; then
+            echo "✅ API health check passed"
+          else
+            echo "⚠️ API health check failed - may require manual intervention"
+          fi
+      
+      - name: Notify rollback completion
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🔄 Rollback completed for ${{ github.event.inputs.environment }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔄 Rollback Completed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ github.event.inputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Backup:*\n${{ steps.validate.outputs.backup_path }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Initiated by:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Reason:*\n${{ github.event.inputs.reason }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ Rollback completed successfully. Please verify the application is functioning correctly."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Notify rollback failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "❌ Rollback failed for ${{ github.event.inputs.environment }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Rollback Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ github.event.inputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Initiated by:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🚨 *URGENT:* Rollback failed. Manual intervention required immediately!"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "danger"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "[${{ job.status }}] Rollback - ${{ github.event.inputs.environment }} - MISRA Platform"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: MISRA Platform CI/CD <noreply@misra-platform.com>
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #FF9800; color: white; padding: 20px; text-align: center; }
+                .content { background: #f9f9f9; padding: 20px; margin-top: 20px; }
+                .info-row { margin: 10px 0; }
+                .label { font-weight: bold; }
+                .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>🔄 Rollback ${{ job.status }}</h1>
+                </div>
+                <div class="content">
+                  <div class="info-row">
+                    <span class="label">Environment:</span> ${{ github.event.inputs.environment }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Status:</span> ${{ job.status }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Backup:</span> ${{ steps.validate.outputs.backup_path }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Initiated by:</span> ${{ github.actor }}
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Reason:</span> ${{ github.event.inputs.reason }}
+                  </div>
+                  <div class="warning">
+                    <strong>⚠️ Action Required:</strong> Please verify the application is functioning correctly after rollback.
+                  </div>
+                </div>
+              </div>
+            </body>
+            </html>

@@ -158,7 +158,7 @@ export class EnhancedRetryService {
 
     // All attempts failed
     const totalDuration = Date.now() - startTime;
-    this.logger.error(`All ${finalConfig.maxAttempts} attempts failed`, {
+    this.logger.error(`All ${finalConfig.maxAttempts} attempts failed`, lastError, {
       totalDuration,
       finalError: lastError?.message
     });

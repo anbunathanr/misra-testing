@@ -38,7 +38,16 @@ export interface AuthMetrics {
     average: number;
     min: number;
     max: number;
+    count?: number; // Add count for internal tracking
   };
+}
+
+// Internal tracking structure for step durations
+interface StepDurationStats {
+  sum: number;
+  count: number;
+  min: number;
+  max: number;
 }
 
 export enum AuthEventType {
@@ -76,6 +85,7 @@ export class AuthMonitoringService implements MonitoringHook {
   private metrics: AuthMetrics;
   private stepTimers: Map<string, number>;
   private sessionTimers: Map<string, number>;
+  private stepDurationStats: Map<string, StepDurationStats>; // Internal tracking
 
   constructor() {
     this.logger = createLogger('AuthMonitoringService');
@@ -96,6 +106,7 @@ export class AuthMonitoringService implements MonitoringHook {
     };
     this.stepTimers = new Map();
     this.sessionTimers = new Map();
+    this.stepDurationStats = new Map(); // Initialize internal tracking
   }
 
   /**
@@ -189,10 +200,8 @@ export class AuthMonitoringService implements MonitoringHook {
    * Log authentication event with full details
    */
   private logEvent(event: AuthEvent): void {
-    const logLevel = event.success ? LogLevel.INFO : LogLevel.ERROR;
     const message = `Auth event: ${event.eventType}`;
-
-    this.logger.log(logLevel, message, {
+    const logData = {
       correlationId: event.correlationId,
       eventType: event.eventType,
       email: event.email,
@@ -202,27 +211,41 @@ export class AuthMonitoringService implements MonitoringHook {
       durationMs: event.durationMs,
       error: event.error,
       metadata: event.metadata
-    });
+    };
+
+    if (event.success) {
+      this.logger.info(message, logData);
+    } else {
+      // Create an Error object from the event error data
+      const errorObj = event.error ? new Error(event.error.message) : new Error('Authentication failed');
+      if (event.error?.stack) {
+        errorObj.stack = event.error.stack;
+      }
+      this.logger.error(message, errorObj, logData);
+    }
   }
 
   /**
    * Update step duration metrics
    */
   private updateStepDuration(step: string, durationMs: number, success: boolean): void {
-    if (!this.metrics.averageStepDuration[step]) {
-      this.metrics.averageStepDuration[step] = {
+    if (!this.stepDurationStats.has(step)) {
+      this.stepDurationStats.set(step, {
         sum: 0,
         count: 0,
         min: Infinity,
         max: 0
-      };
+      });
     }
 
-    const stats = this.metrics.averageStepDuration[step];
+    const stats = this.stepDurationStats.get(step)!;
     stats.sum += durationMs;
     stats.count++;
     stats.min = Math.min(stats.min, durationMs);
     stats.max = Math.max(stats.max, durationMs);
+
+    // Update the public metrics with calculated average
+    this.metrics.averageStepDuration[step] = stats.count > 0 ? stats.sum / stats.count : 0;
 
     // Update error rates by step
     if (!success) {
@@ -272,15 +295,11 @@ export class AuthMonitoringService implements MonitoringHook {
     this.metrics.emailVerificationRate = this.metrics.successfulAuthentications / total;
     this.metrics.otpSetupRate = this.metrics.successfulAuthentications / total;
 
-    // Convert step duration stats to averages
-    const averageStepDuration: Record<string, number> = {};
-    for (const [step, stats] of Object.entries(this.metrics.averageStepDuration)) {
-      averageStepDuration[step] = stats.count > 0 ? stats.sum / stats.count : 0;
-    }
+    // The averageStepDuration is already calculated in updateStepDuration
+    // No need to recalculate here since it's already stored as averages
 
     return {
-      ...this.metrics,
-      averageStepDuration
+      ...this.metrics
     };
   }
 
