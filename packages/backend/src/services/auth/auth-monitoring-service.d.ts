@@ -33,6 +33,7 @@ export interface AuthMetrics {
         average: number;
         min: number;
         max: number;
+        count?: number;
     };
 }
 export declare enum AuthEventType {
@@ -68,6 +69,7 @@ export declare class AuthMonitoringService implements MonitoringHook {
     private metrics;
     private stepTimers;
     private sessionTimers;
+    private stepDurationStats;
     constructor();
     /**
      * Generate unique correlation ID for authentication session
