@@ -265,6 +265,13 @@ async function processAnalysisMessage(
     });
 
     console.log(`Analysis completed successfully for file ${fileId}`);
+    
+    return {
+      analysisId: analysisResult.analysisId,
+      fileId,
+      complianceScore: analysisResult.summary.compliancePercentage,
+      violationCount: analysisResult.violations.length,
+    };
   } catch (error) {
     console.error(`Error during analysis for file ${fileId}:`, error);
 

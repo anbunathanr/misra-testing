@@ -1,6 +1,8 @@
 import { Language, Violation } from '../../types/misra-analysis';
 import { AST, Token, FunctionDef } from './code-parser';
 import { RuleConfig, RuleProfile, PROFILE_SEVERITIES } from './rule-config';
+import { registerMISRACRules } from './rules/c/index';
+import { registerMISRACPPRules } from './rules/cpp/index';
 
 // ─── MISRARule interface ────────────────────────────────────────────────────
 
@@ -118,6 +120,30 @@ export class RuleEngine {
     return Array.from(ruleSet.values());
   }
 
-  // Placeholder – rules are loaded in tasks 5 and 6
-  loadRules(): void {}
+  // Load all MISRA rules for C and C++ analysis
+  loadRules(): void {
+    console.log('Loading MISRA rules...');
+    
+    const initialRuleCount = this.getRuleCount();
+    
+    // Register MISRA C rules
+    registerMISRACRules(this);
+    const cRulesCount = this.getRuleCount() - initialRuleCount;
+    console.log(`Loaded ${cRulesCount} MISRA C rules`);
+    
+    // Register MISRA C++ rules
+    registerMISRACPPRules(this);
+    const cppRulesCount = this.getRuleCount() - initialRuleCount - cRulesCount;
+    console.log(`Loaded ${cppRulesCount} MISRA C++ rules`);
+    
+    const totalRulesLoaded = this.getRuleCount();
+    console.log(`Total rules loaded: ${totalRulesLoaded}`);
+    
+    // Verify that rules were actually registered
+    if (totalRulesLoaded === 0) {
+      throw new Error('Failed to load MISRA rules: No rules were registered');
+    }
+    
+    console.log('MISRA rule loading completed successfully');
+  }
 }

@@ -241,7 +241,7 @@ describe('Authentication Flow Preservation - Property Tests', () => {
       
       // Note: We're testing the principle here - the actual file upload handler
       // would need to be mocked more extensively, but this documents the expected behavior
-      const userContext = getUserFromContext({} as any);
+      const userContext = await getUserFromContext({} as any);
       
       expect(userContext.userId).toBe('auth-user-789');
       expect(userContext.email).toBe('authenticated@example.com');
@@ -267,7 +267,7 @@ describe('Authentication Flow Preservation - Property Tests', () => {
 
       // This represents requests with no authentication whatsoever
       // These should continue to return 401 errors as before
-      const userContext = getUserFromContext({} as any);
+      const userContext = await getUserFromContext({} as any);
       
       // PRESERVATION: Completely unauthenticated requests should continue to fail
       expect(userContext.userId).toBeUndefined();

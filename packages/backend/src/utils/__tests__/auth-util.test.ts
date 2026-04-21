@@ -18,7 +18,7 @@ describe('getUserFromContext', () => {
       },
     } as unknown as APIGatewayProxyEvent;
 
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     expect(user).toEqual({
       userId: 'user-123',
@@ -40,7 +40,7 @@ describe('getUserFromContext', () => {
       },
     } as unknown as APIGatewayProxyEvent;
 
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     expect(user).toHaveProperty('userId');
     expect(user).toHaveProperty('email');
@@ -53,7 +53,7 @@ describe('getUserFromContext', () => {
       requestContext: {},
     } as unknown as APIGatewayProxyEvent;
 
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     expect(user).toEqual({
       userId: '',
@@ -66,7 +66,7 @@ describe('getUserFromContext', () => {
   it('should handle missing requestContext', () => {
     const event = {} as APIGatewayProxyEvent;
 
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     expect(user).toEqual({
       userId: '',
@@ -87,7 +87,7 @@ describe('getUserFromContext', () => {
       },
     } as unknown as APIGatewayProxyEvent;
 
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     expect(user).toEqual({
       userId: 'user-456',
@@ -109,7 +109,7 @@ describe('getUserFromContext', () => {
       },
     } as unknown as APIGatewayProxyEvent;
 
-    const user: UserContext = getUserFromContext(event);
+    const user: UserContext = await getUserFromContext(event);
 
     expect(typeof user.userId).toBe('string');
     expect(typeof user.email).toBe('string');
@@ -132,7 +132,7 @@ describe('getUserFromContext', () => {
         },
       } as unknown as APIGatewayProxyEvent;
 
-      const user = getUserFromContext(event);
+      const user = await getUserFromContext(event);
 
       expect(user.role).toBe(role);
     });

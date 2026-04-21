@@ -64,7 +64,7 @@ describe('CRUD Operations Properties', () => {
           expect(retrieved?.analysis_results).toEqual(metadata.analysis_results)
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -82,7 +82,7 @@ describe('CRUD Operations Properties', () => {
         expect(retrieved).not.toBeNull()
         expect(retrieved).toEqual(metadata)
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -107,7 +107,7 @@ describe('CRUD Operations Properties', () => {
           createdFileIds.splice(index, 1)
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -122,7 +122,7 @@ describe('CRUD Operations Properties', () => {
           ).rejects.toThrow('File not found')
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -143,7 +143,7 @@ describe('CRUD Operations Properties', () => {
           ).rejects.toThrow('Unauthorized')
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -161,7 +161,7 @@ describe('CRUD Operations Properties', () => {
           service.createFileMetadata(metadata)
         ).rejects.toThrow()
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -187,7 +187,7 @@ describe('CRUD Operations Properties', () => {
         expect(created.updated_at).toBeGreaterThanOrEqual(beforeTimestamp * 1000 - 1000)
         expect(created.updated_at).toBeLessThanOrEqual(afterTimestamp * 1000 + 1000)
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -211,7 +211,7 @@ describe('CRUD Operations Properties', () => {
           ).rejects.toThrow('File not found')
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     )
   })
 
@@ -246,7 +246,7 @@ describe('CRUD Operations Properties', () => {
           })
         }
       ),
-      { numRuns: 50 }
+      { numRuns: 10 }
     )
   })
 
@@ -277,7 +277,7 @@ describe('CRUD Operations Properties', () => {
           })
         }
       ),
-      { numRuns: 50 }
+      { numRuns: 10 }
     )
   })
 

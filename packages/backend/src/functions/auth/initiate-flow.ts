@@ -1,8 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { UnifiedAuthService } from '../../services/auth/unified-auth-service';
+import { CognitoTOTPService } from '../../services/auth/cognito-totp-service';
 import { corsHeaders } from '../../utils/cors';
 import { validateEmail } from '../../utils/validation';
-import { authErrorHandler } from '../../utils/auth-error-handler';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('InitiateFlow');
 
 interface InitiateFlowRequest {
   email: string;
@@ -11,13 +13,20 @@ interface InitiateFlowRequest {
 
 interface InitiateFlowResponse {
   state: string;
-  requiresEmailVerification: boolean;
-  requiresOTPSetup: boolean;
+  requiresRegistration: boolean;
+  requiresMFASetup: boolean;
   message: string;
+  tempPassword?: string; // For autonomous workflow
 }
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  console.log('Initiate authentication flow request:', JSON.stringify(event, null, 2));
+  const correlationId = event.headers['X-Correlation-ID'] || Math.random().toString(36).substring(7);
+  
+  logger.info('Initiate authentication flow request:', {
+    correlationId,
+    path: event.path,
+    method: event.httpMethod
+  });
 
   try {
     // Parse request body
@@ -64,42 +73,78 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    // Initialize authentication service
-    const authService = new UnifiedAuthService();
+    // Initialize Cognito TOTP service
+    const cognitoTOTPService = new CognitoTOTPService();
 
-    // Initiate authentication flow
-    const result = await authService.initiateAuthenticationFlow(request.email, request.name);
+    // Check if user exists
+    const userExists = await cognitoTOTPService.userExists(request.email);
 
-    const response: InitiateFlowResponse = {
-      state: result.state,
-      requiresEmailVerification: result.requiresEmailVerification,
-      requiresOTPSetup: result.requiresOTPSetup,
-      message: result.message
-    };
+    let response: InitiateFlowResponse;
 
-    console.log('Authentication flow initiated successfully:', response);
+    if (!userExists) {
+      // Create new user with MFA enabled for autonomous workflow
+      logger.info('Creating new user with MFA enabled', {
+        correlationId,
+        email: request.email
+      });
 
-    const httpResponse = {
+      const createResult = await cognitoTOTPService.createUserWithMFA(
+        request.email, 
+        request.name
+      );
+
+      response = {
+        state: 'user_created',
+        requiresRegistration: false, // Already created
+        requiresMFASetup: true, // Will need MFA setup
+        message: 'User created successfully. MFA setup required.',
+        tempPassword: createResult.tempPassword
+      };
+    } else {
+      // User exists, they can proceed to login
+      logger.info('User exists, ready for authentication', {
+        correlationId,
+        email: request.email
+      });
+
+      response = {
+        state: 'user_exists',
+        requiresRegistration: false,
+        requiresMFASetup: false, // Will be determined during auth
+        message: 'User exists. Ready for authentication.'
+      };
+    }
+
+    logger.info('Authentication flow initiated successfully:', {
+      correlationId,
+      email: request.email,
+      state: response.state
+    });
+
+    return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify(response)
     };
 
-    console.log('Returning HTTP response:', JSON.stringify(httpResponse));
-
-    return httpResponse;
-
   } catch (error: any) {
-    console.error('Authentication flow initiation failed:', error);
-
-    // Use the error handler to transform and log the error
-    const authError = authErrorHandler.handleError(error, {
-      operation: 'initiate-flow',
-      email: event.body ? JSON.parse(event.body).email : undefined,
-      step: 'flow_initiation'
+    logger.error('Authentication flow initiation failed:', {
+      correlationId,
+      error: error.message,
+      stack: error.stack
     });
 
-    // Return the transformed error response
-    return authErrorHandler.toAPIResponse(authError);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        error: {
+          code: 'FLOW_INITIATION_FAILED',
+          message: error.message || 'Failed to initiate authentication flow',
+          timestamp: new Date().toISOString(),
+          requestId: correlationId
+        }
+      })
+    };
   }
 };

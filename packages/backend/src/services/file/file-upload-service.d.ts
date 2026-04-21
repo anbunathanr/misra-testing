@@ -2,8 +2,9 @@ export interface FileUploadRequest {
     fileName: string;
     fileSize: number;
     contentType: string;
-    organizationId: string;
     userId: string;
+    mode?: 'manual' | 'sample';
+    sampleId?: string;
 }
 export interface FileUploadResponse {
     fileId: string;
@@ -15,35 +16,40 @@ export interface FileUploadResponse {
 export interface FileValidationResult {
     isValid: boolean;
     errors: string[];
-    fileType: 'C' | 'CPP' | 'HEADER' | 'UNKNOWN';
+    fileType: 'c' | 'cpp';
 }
 export declare class FileUploadService {
     private s3Client;
     private bucketName;
-    private maxFileSize;
-    private allowedExtensions;
-    private allowedContentTypes;
     constructor();
+    /**
+     * Generate presigned upload URL (spec requirement: presigned URL support for secure uploads)
+     */
     generatePresignedUploadUrl(request: FileUploadRequest): Promise<FileUploadResponse>;
+    /**
+     * Generate presigned URL for sample file upload
+     */
+    generateSampleUploadUrl(sampleId: string, fileName: string, contentType: string): Promise<FileUploadResponse>;
+    /**
+     * Validate file according to spec requirements
+     */
     validateFile(fileName: string, fileSize: number, contentType: string): FileValidationResult;
-    private getFileExtension;
     private sanitizeFileName;
     private containsUnsafeCharacters;
-    getFileMetadata(fileId: string): Promise<any>;
-    /**
-     * Generate a hash for file tracking and integrity
-     */
-    private generateFileHash;
     /**
      * Verify file exists in S3
      */
     verifyFileExists(s3Key: string): Promise<boolean>;
     /**
-     * Get file size limit based on file type
+     * Generate content hash for caching (spec requirement: analysis result caching)
      */
-    getMaxFileSizeForType(fileType: string): number;
+    generateContentHash(content: string): string;
     /**
-     * Check if file extension matches content type
+     * Get file content from S3
      */
-    private validateContentTypeMatch;
+    getFileContent(s3Key: string): Promise<string>;
+    /**
+     * Upload file content directly (for sample files and automatic uploads)
+     */
+    uploadFileContent(s3Key: string, content: string, contentType: string, metadata?: Record<string, string>): Promise<void>;
 }

@@ -41,7 +41,7 @@ export const handler = async (
 
   try {
     // Extract user from Lambda Authorizer context (Requirement 15.3)
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
     if (!user.userId) {
       console.error('User not authenticated');
       return {

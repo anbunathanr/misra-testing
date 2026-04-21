@@ -2,6 +2,7 @@ import { RuleEngine } from './rule-engine';
 import { CodeParser } from './code-parser';
 import { AnalysisCache } from './analysis-cache';
 import { AnalysisResult, Violation, AnalysisSummary, AnalysisStatus, Language } from '../../types/misra-analysis';
+import { progressTrackingService } from '../progress-tracking';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface AnalysisProgressCallback {
@@ -11,6 +12,8 @@ export interface AnalysisProgressCallback {
 export interface AnalysisOptions {
   progressCallback?: AnalysisProgressCallback;
   updateInterval?: number; // milliseconds between progress updates (default: 2000)
+  workflowId?: string; // For integration with progress tracking service
+  enableRealTimeProgress?: boolean; // Enable detailed rule-by-rule progress
 }
 
 export class MISRAAnalysisEngine {
@@ -23,6 +26,9 @@ export class MISRAAnalysisEngine {
     this.ruleEngine = new RuleEngine();
     this.parser = new CodeParser();
     this.cache = new AnalysisCache();
+    
+    // Load MISRA rules during initialization
+    this.ruleEngine.loadRules();
   }
 
   async analyzeFile(
@@ -36,11 +42,24 @@ export class MISRAAnalysisEngine {
     const startTime = Date.now();
     const progressCallback = options?.progressCallback;
     const updateInterval = options?.updateInterval || this.DEFAULT_UPDATE_INTERVAL;
+    const workflowId = options?.workflowId;
+    const enableRealTimeProgress = options?.enableRealTimeProgress ?? false;
 
     try {
       // Report initial progress
       if (progressCallback) {
         await progressCallback(0, 'Starting MISRA compliance analysis...');
+      }
+
+      // Update workflow progress if workflowId provided
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3, // Analysis step
+          'MISRA Analysis',
+          0,
+          'Starting MISRA compliance analysis...'
+        );
       }
 
       // Hash file content for cache key (Requirement 10.7)
@@ -51,6 +70,16 @@ export class MISRAAnalysisEngine {
         await progressCallback(5, 'Checking analysis cache...');
       }
 
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          5,
+          'Checking analysis cache...'
+        );
+      }
+
       // Check cache before analysis (Requirement 10.7)
       const cachedResult = await this.cache.getCachedResult(fileHash);
       if (cachedResult) {
@@ -59,6 +88,21 @@ export class MISRAAnalysisEngine {
         
         if (progressCallback) {
           await progressCallback(100, 'Analysis completed (from cache)');
+        }
+
+        if (workflowId) {
+          progressTrackingService.updateStepProgress(
+            workflowId,
+            3,
+            'MISRA Analysis',
+            100,
+            'Analysis completed (from cache)',
+            {
+              cached: true,
+              compliancePercentage: cachedResult.summary.compliancePercentage,
+              violationCount: cachedResult.violations.length
+            }
+          );
         }
         
         // Return cached result with new IDs for this request
@@ -77,11 +121,31 @@ export class MISRAAnalysisEngine {
         await progressCallback(10, 'Parsing source code...');
       }
 
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          10,
+          'Parsing source code...'
+        );
+      }
+
       // Parse source code once (Requirement 10.2 - optimize AST traversal)
       const ast = await this.parser.parse(fileContent, language);
 
       if (progressCallback) {
         await progressCallback(20, `Parsed ${language} source code successfully`);
+      }
+
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          20,
+          `Parsed ${language} source code successfully`
+        );
       }
 
       // Get applicable rules
@@ -92,6 +156,20 @@ export class MISRAAnalysisEngine {
         await progressCallback(25, `Evaluating ${totalRules} MISRA ${language} rules...`);
       }
 
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          25,
+          `Evaluating ${totalRules} MISRA ${language} rules...`,
+          {
+            totalRules,
+            rulesProcessed: 0
+          }
+        );
+      }
+
       // Check rules with progress tracking (Requirement 3.3 - 2-second updates)
       console.log(`[AnalysisEngine] Checking ${totalRules} rules with progress tracking`);
       const violations: Violation[] = await this.checkRulesWithProgress(
@@ -99,11 +177,23 @@ export class MISRAAnalysisEngine {
         ast,
         fileContent,
         progressCallback,
-        updateInterval
+        updateInterval,
+        workflowId,
+        enableRealTimeProgress
       );
 
       if (progressCallback) {
         await progressCallback(90, 'Generating compliance report...');
+      }
+
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          90,
+          'Generating compliance report...'
+        );
       }
 
       const summary = this.buildSummary(violations, totalRules);
@@ -123,6 +213,16 @@ export class MISRAAnalysisEngine {
         await progressCallback(95, 'Caching analysis results...');
       }
 
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          95,
+          'Caching analysis results...'
+        );
+      }
+
       // Store result in cache for future use (Requirement 10.7)
       await this.cache.setCachedResult(fileHash, result, userId, language);
 
@@ -133,12 +233,38 @@ export class MISRAAnalysisEngine {
         await progressCallback(100, `Analysis completed: ${summary.compliancePercentage.toFixed(1)}% compliance`);
       }
 
+      if (workflowId) {
+        progressTrackingService.updateStepProgress(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          100,
+          `Analysis completed: ${summary.compliancePercentage.toFixed(1)}% compliance`,
+          {
+            compliancePercentage: summary.compliancePercentage,
+            violationCount: violations.length,
+            executionTime: duration,
+            rulesProcessed: totalRules,
+            totalRules
+          }
+        );
+      }
+
       return result;
     } catch (error) {
       console.error('[AnalysisEngine] Analysis failed:', error);
       
       if (progressCallback) {
         await progressCallback(0, `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      if (workflowId) {
+        progressTrackingService.handleWorkflowError(
+          workflowId,
+          3,
+          'MISRA Analysis',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
       }
       
       return {
@@ -163,7 +289,9 @@ export class MISRAAnalysisEngine {
     ast: any,
     fileContent: string,
     progressCallback?: AnalysisProgressCallback,
-    updateInterval: number = 2000
+    updateInterval: number = 2000,
+    workflowId?: string,
+    enableRealTimeProgress: boolean = false
   ): Promise<Violation[]> {
     const totalRules = rules.length;
     const violations: Violation[] = [];
@@ -171,28 +299,65 @@ export class MISRAAnalysisEngine {
     let lastUpdateTime = Date.now();
 
     // Process rules in batches for better progress granularity
-    const batchSize = Math.max(1, Math.floor(totalRules / 10)); // 10 progress updates
+    const batchSize = enableRealTimeProgress ? 1 : Math.max(1, Math.floor(totalRules / 10)); // 10 progress updates or rule-by-rule
     
     for (let i = 0; i < totalRules; i += batchSize) {
       const batch = rules.slice(i, Math.min(i + batchSize, totalRules));
       
-      // Process batch in parallel
-      const batchViolations = await Promise.all(
-        batch.map(rule => rule.check(ast, fileContent))
-      );
+      // Process batch in parallel (or sequentially for real-time progress)
+      let batchViolations: Violation[][];
+      
+      if (enableRealTimeProgress && workflowId) {
+        // Process rules one by one for detailed progress
+        batchViolations = [];
+        for (const rule of batch) {
+          const ruleViolations = await rule.check(ast, fileContent);
+          batchViolations.push(ruleViolations);
+          
+          completedRules++;
+          
+          // Update progress for each rule when in real-time mode
+          progressTrackingService.updateAnalysisProgress(
+            workflowId,
+            completedRules,
+            totalRules,
+            rule.id || `Rule ${completedRules}`,
+            Math.max(0, Math.round((totalRules - completedRules) * 0.15))
+          );
+          
+          // Small delay to make progress visible in demonstrations
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      } else {
+        // Process batch in parallel for faster execution
+        batchViolations = await Promise.all(
+          batch.map(rule => rule.check(ast, fileContent))
+        );
+        completedRules += batch.length;
+      }
       
       // Flatten and collect violations
       violations.push(...batchViolations.flat());
       
-      completedRules += batch.length;
       const progress = 25 + Math.floor((completedRules / totalRules) * 65); // 25-90% range
       
-      // Update progress if enough time has passed (2-second intervals)
+      // Update progress if enough time has passed (2-second intervals) or in real-time mode
       const now = Date.now();
-      if (progressCallback && (now - lastUpdateTime >= updateInterval || completedRules === totalRules)) {
+      if (progressCallback && (now - lastUpdateTime >= updateInterval || completedRules === totalRules || enableRealTimeProgress)) {
         const message = `Evaluating rules: ${completedRules}/${totalRules} completed`;
         await progressCallback(progress, message);
         lastUpdateTime = now;
+      }
+
+      // Update workflow progress for non-real-time mode
+      if (workflowId && !enableRealTimeProgress && (now - lastUpdateTime >= updateInterval || completedRules === totalRules)) {
+        progressTrackingService.updateAnalysisProgress(
+          workflowId,
+          completedRules,
+          totalRules,
+          undefined,
+          Math.max(0, Math.round((totalRules - completedRules) * 0.15))
+        );
       }
     }
 
@@ -203,16 +368,34 @@ export class MISRAAnalysisEngine {
     const criticalCount = violations.filter(v => v.severity === 'mandatory').length;
     const majorCount = violations.filter(v => v.severity === 'required').length;
     const minorCount = violations.filter(v => v.severity === 'advisory').length;
-    const compliancePercentage = totalRules > 0
-      ? ((totalRules - violations.length) / totalRules) * 100
-      : 100;
+    
+    // Compliance calculation based on actual violations found:
+    // - Zero violations = 100% compliance
+    // - Violations reduce score proportionally based on severity
+    let compliancePercentage: number;
+    
+    if (violations.length === 0) {
+      // Perfect compliance when no violations found
+      compliancePercentage = 100;
+    } else {
+      // Calculate weighted penalty based on violation severity
+      // Each violation type has different impact on compliance
+      const criticalPenalty = criticalCount * 10; // Mandatory violations: 10% each
+      const majorPenalty = majorCount * 5;        // Required violations: 5% each
+      const minorPenalty = minorCount * 1;        // Advisory violations: 1% each
+      
+      const totalPenalty = criticalPenalty + majorPenalty + minorPenalty;
+      
+      // Compliance score = 100 - total penalty, with minimum of 0%
+      compliancePercentage = Math.max(0, 100 - totalPenalty);
+    }
 
     return {
       totalViolations: violations.length,
       criticalCount,
       majorCount,
       minorCount,
-      compliancePercentage: Math.max(0, compliancePercentage),
+      compliancePercentage: Math.round(compliancePercentage * 100) / 100, // Round to 2 decimal places
     };
   }
 }

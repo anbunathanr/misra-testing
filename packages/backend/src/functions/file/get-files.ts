@@ -16,7 +16,7 @@ export const handler = async (
   };
 
   try {
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
     if (!user.userId) {
       return {
         statusCode: 401,

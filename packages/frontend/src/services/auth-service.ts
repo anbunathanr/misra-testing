@@ -899,9 +899,10 @@ export class AuthService {
     return new Promise((resolve, reject) => {
       user.authenticateUser(authDetails, {
         onSuccess: (session: any) => {
-          const token = session.getIdToken().getJwtToken();
-          const payload = session.getIdToken().payload;
-          resolve({ token, user: { email: payload.email, name: payload.name || payload.email, sub: payload.sub } });
+          // Use access token instead of ID token for API calls
+          const token = session.getAccessToken().getJwtToken();
+          const idTokenPayload = session.getIdToken().payload;
+          resolve({ token, user: { email: idTokenPayload.email, name: idTokenPayload.name || idTokenPayload.email, sub: idTokenPayload.sub } });
         },
         onFailure: (err: any) => reject(err),
         newPasswordRequired: () => reject(new Error('New password required')),

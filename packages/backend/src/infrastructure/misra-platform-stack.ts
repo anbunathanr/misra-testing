@@ -1592,9 +1592,30 @@ export class MisraPlatformStack extends cdk.Stack {
       reservedConcurrentExecutions: 0,
     });
 
+    // Get Report Lambda Function for PDF report generation
+    const getReportFunction = new lambda.Function(this, 'GetReportFunction', {
+      functionName: 'misra-platform-get-report',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist-lambdas/analysis/get-report'),
+      environment: {
+        ANALYSIS_RESULTS_TABLE: analysisResultsTable.tableName,
+        FILE_METADATA_TABLE: fileMetadataTable.table.tableName,
+        FILE_STORAGE_BUCKET: fileStorageBucket.bucketName,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      reservedConcurrentExecutions: 0,
+    });
+
     // Grant query and stats functions access to analysis results
     analysisResultsTable.grantReadData(queryResultsFunction);
     analysisResultsTable.grantReadData(userStatsFunction);
+
+    // Grant get-report function permissions (Task 3.2)
+    analysisResultsTable.grantReadData(getReportFunction);
+    fileMetadataTable.grantReadData(getReportFunction);
+    fileStorageBucket.grantReadWrite(getReportFunction);
 
     // Analysis Status Lambda Function (Task 5.2)
     const analysisStatusFunction = new lambda.Function(this, 'AnalysisStatusFunction', {
@@ -1828,6 +1849,16 @@ export class MisraPlatformStack extends cdk.Stack {
       path: '/analysis/{analysisId}/status',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('AnalysisStatusIntegration', analysisStatusFunction, {
+        payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
+      }),
+      authorizer: authorizer,
+    });
+
+    // Add report download route (Task 3.3)
+    api.addRoutes({
+      path: '/reports/{fileId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetReportIntegration', getReportFunction, {
         payloadFormatVersion: apigateway.PayloadFormatVersion.VERSION_1_0,
       }),
       authorizer: authorizer,

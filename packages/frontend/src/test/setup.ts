@@ -3,6 +3,21 @@ import '@testing-library/jest-dom';
 // Set NODE_ENV for testing
 process.env.NODE_ENV = 'test';
 
+// Mock import.meta.env for Jest
+Object.defineProperty(globalThis, 'import', {
+  value: {
+    meta: {
+      env: {
+        VITE_ENVIRONMENT: 'development',
+        VITE_API_URL: 'http://localhost:3000/api',
+        VITE_USE_MOCK_BACKEND: 'true',
+        VITE_ENABLE_FIRE_AND_FORGET: 'true',
+        VITE_ENABLE_CLOUDWATCH_LOGGING: 'true'
+      }
+    }
+  }
+});
+
 // Mock fetch globally
 global.fetch = jest.fn();
 

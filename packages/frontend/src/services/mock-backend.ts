@@ -155,20 +155,76 @@ export class MockBackendService {
   }
 
   // Helper method to check if we should use mock backend
-  shouldUseMock(apiUrl: string): boolean {
-    if (!this.isEnabled) return false;
+  shouldUseMock(apiUrl?: string): boolean {
+    // Check for explicit environment variable to control mock mode
+    const explicitMockSetting = import.meta.env.VITE_USE_MOCK_BACKEND;
     
-    // Use mock if API URL is not reachable or in development
+    // If explicitly set, use that value (string 'true'/'false' from env vars)
+    if (explicitMockSetting !== undefined) {
+      const shouldMock = explicitMockSetting === 'true';
+      console.log(`🎭 Mock Backend: Explicit setting VITE_USE_MOCK_BACKEND=${explicitMockSetting}, using mock: ${shouldMock}`);
+      return shouldMock;
+    }
+    
+    // If not explicitly set, check if manually enabled
+    if (this.isEnabled) {
+      console.log('🎭 Mock Backend: Manually enabled via enable() method');
+      return true;
+    }
+    
+    // Default behavior: disable mock mode when real backend is available and configured
     const isDevelopment = import.meta.env.MODE === 'development';
-    const isLocalhost = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+    const isProduction = import.meta.env.MODE === 'production';
     
-    return isDevelopment || isLocalhost || this.isEnabled;
+    // In production, default to false (use real backend)
+    if (isProduction) {
+      console.log('🎭 Mock Backend: Production mode detected, using real backend');
+      return false;
+    }
+    
+    // In development, check if real backend is available and configured
+    if (isDevelopment && apiUrl) {
+      const hasRealBackend = apiUrl && 
+                           !apiUrl.includes('localhost') && 
+                           !apiUrl.includes('127.0.0.1') &&
+                           !apiUrl.includes('mock') &&
+                           apiUrl.startsWith('http');
+      
+      if (hasRealBackend) {
+        console.log(`🎭 Mock Backend: Real backend available at ${apiUrl}, using real backend`);
+        return false;
+      } else {
+        console.log(`🎭 Mock Backend: No real backend configured (${apiUrl}), using mock backend`);
+        return true;
+      }
+    }
+    
+    // Fallback: use mock in development if no API URL provided
+    const shouldUseMockFallback = isDevelopment;
+    console.log(`🎭 Mock Backend: Fallback decision - development: ${isDevelopment}, using mock: ${shouldUseMockFallback}`);
+    return shouldUseMockFallback;
   }
 }
 
 export const mockBackend = MockBackendService.getInstance();
 
-// Auto-enable in development mode
-if (import.meta.env.MODE === 'development') {
+// Auto-enable based on environment configuration
+// Only auto-enable if VITE_USE_MOCK_BACKEND is explicitly set to 'true'
+// or if in development mode with no explicit setting and no real backend configured
+const explicitMockSetting = import.meta.env.VITE_USE_MOCK_BACKEND;
+const isDevelopment = import.meta.env.MODE === 'development';
+const apiUrl = import.meta.env.VITE_API_URL;
+
+if (explicitMockSetting === 'true') {
+  console.log('🎭 Auto-enabling mock backend due to VITE_USE_MOCK_BACKEND=true');
   mockBackend.enable();
+} else if (explicitMockSetting === 'false') {
+  console.log('🎭 Mock backend explicitly disabled via VITE_USE_MOCK_BACKEND=false');
+  mockBackend.disable();
+} else if (isDevelopment && (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1'))) {
+  // Only auto-enable in development if no real backend is configured
+  console.log('🎭 Auto-enabling mock backend in development mode (no real backend configured)');
+  mockBackend.enable();
+} else {
+  console.log('🎭 Mock backend not auto-enabled - using real backend configuration');
 }

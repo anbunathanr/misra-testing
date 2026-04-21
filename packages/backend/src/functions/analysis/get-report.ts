@@ -39,7 +39,7 @@ export const handler = async (
 
   try {
     // Extract user from Lambda Authorizer context
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
     if (!user.userId) {
       console.error('User not authenticated');
       return {

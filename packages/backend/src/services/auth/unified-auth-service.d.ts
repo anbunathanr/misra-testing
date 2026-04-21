@@ -12,6 +12,12 @@ export interface OTPSetupResult {
         issuer: string;
         accountName: string;
     };
+    temporaryTokens?: {
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+        scope: 'temp_authenticated';
+    };
     nextStep: AuthenticationState;
     message: string;
 }

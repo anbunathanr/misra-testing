@@ -328,13 +328,14 @@ const MISRAResultsDisplay: React.FC<MISRAResultsDisplayProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {violations.map((violation) => {
+                    {violations.map((violation, violationIndex) => {
                       const globalIndex = results.violations.indexOf(violation);
                       const isExpanded = expandedViolations.has(globalIndex);
+                      const uniqueKey = `${severity}-${violationIndex}-${violation.ruleId}-${violation.line}`;
 
                       return (
-                        <>
-                          <TableRow hover key={`row-${globalIndex}`}>
+                        <React.Fragment key={uniqueKey}>
+                          <TableRow hover>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
                                 {violation.ruleId}
@@ -361,7 +362,7 @@ const MISRAResultsDisplay: React.FC<MISRAResultsDisplayProps> = ({
                           </TableRow>
                           
                           {/* Expanded Details */}
-                          <TableRow key={`details-${globalIndex}`}>
+                          <TableRow>
                             <TableCell colSpan={4} sx={{ p: 0, border: 0 }}>
                               <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                 <Box sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
@@ -407,7 +408,7 @@ const MISRAResultsDisplay: React.FC<MISRAResultsDisplayProps> = ({
                               </Collapse>
                             </TableCell>
                           </TableRow>
-                        </>
+                        </React.Fragment>
                       );
                     })}
                   </TableBody>

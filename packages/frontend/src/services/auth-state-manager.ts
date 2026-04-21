@@ -6,6 +6,7 @@
 import { frontendAuthMonitoringService } from './auth-monitoring-service';
 import { AuthEventType } from './auth-monitoring-service';
 import apiConfig from '../config/api-config';
+import { mockBackend } from './mock-backend';
 
 export enum AuthenticationState {
   INITIAL = 'initial',
@@ -163,35 +164,53 @@ export class AuthStateManager {
           true
         );
 
-        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/initiate-flow`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name })
-        });
-
-        const durationMs = Date.now() - startTime;
-        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/initiate-flow`, response.ok, durationMs, email);
-
-        // Check if response has content before parsing JSON
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-        
-        if (!responseText) {
-          throw new Error('Empty response from server');
-        }
-
+        // Check if mock backend should be used
+        const apiUrl = apiConfig.getBaseUrl();
         let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('JSON parse error:', parseError);
-          console.error('Response text:', responseText);
-          throw new Error('Invalid JSON response from server');
-        }
 
-        if (!response.ok) {
-          frontendAuthMonitoringService.logError(email, data.error?.message || 'Registration failed', 'registration');
-          throw new Error(data.error?.message || 'Registration failed');
+        if (mockBackend.shouldUseMock(apiUrl)) {
+          console.log('🎭 Using mock backend for registration');
+          const mockResult = await mockBackend.mockQuickRegister(email, name);
+          data = {
+            state: 'authenticated',
+            requiresEmailVerification: false,
+            requiresOTPSetup: false,
+            message: 'Mock registration successful',
+            accessToken: mockResult.accessToken,
+            refreshToken: mockResult.refreshToken,
+            user: mockResult.user,
+            expiresIn: mockResult.expiresIn
+          };
+        } else {
+          const response = await fetch(`${apiUrl}/auth/initiate-flow`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name })
+          });
+
+          const durationMs = Date.now() - startTime;
+          frontendAuthMonitoringService.logAPICall(`${apiUrl}/auth/initiate-flow`, response.ok, durationMs, email);
+
+          // Check if response has content before parsing JSON
+          const responseText = await response.text();
+          console.log('Raw response:', responseText);
+          
+          if (!responseText) {
+            throw new Error('Empty response from server');
+          }
+
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Response text:', responseText);
+            throw new Error('Invalid JSON response from server');
+          }
+
+          if (!response.ok) {
+            frontendAuthMonitoringService.logError(email, data.error?.message || 'Registration failed', 'registration');
+            throw new Error(data.error?.message || 'Registration failed');
+          }
         }
 
         // Handle different registration outcomes

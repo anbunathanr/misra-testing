@@ -78,7 +78,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }
 
       // Get user ID from context
-      const user = getUserFromContext(event);
+      const user = await getUserFromContext(event);
       const userId = user.userId || 'anonymous';
 
       // Check queue URL

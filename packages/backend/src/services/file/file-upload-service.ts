@@ -2,13 +2,15 @@ import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
+import { S3_CONFIG, getUserFileKey, getSampleFileKey, isValidFileExtension, isValidFileSize, getPresignedUrlExpiration } from '../../config/s3-config';
 
 export interface FileUploadRequest {
   fileName: string;
   fileSize: number;
   contentType: string;
-  organizationId: string;
   userId: string;
+  mode?: 'manual' | 'sample';
+  sampleId?: string;
 }
 
 export interface FileUploadResponse {
@@ -22,30 +24,25 @@ export interface FileUploadResponse {
 export interface FileValidationResult {
   isValid: boolean;
   errors: string[];
-  fileType: 'C' | 'CPP' | 'HEADER' | 'UNKNOWN';
+  fileType: 'c' | 'cpp';
 }
 
 export class FileUploadService {
   private s3Client: S3Client;
   private bucketName: string;
-  private maxFileSize: number = 50 * 1024 * 1024; // 50MB
-  private allowedExtensions: string[] = ['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx'];
-  private allowedContentTypes: string[] = [
-    'text/plain',
-    'text/x-c',
-    'text/x-c++',
-    'application/octet-stream'
-  ];
 
   constructor() {
-    this.bucketName = process.env.FILE_STORAGE_BUCKET_NAME || 'misra-platform-files-dev';
+    this.bucketName = process.env.FILE_STORAGE_BUCKET_NAME || S3_CONFIG.bucketName;
     
     // Initialize S3 client
     this.s3Client = new S3Client({
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env.AWS_REGION || S3_CONFIG.region,
     });
   }
 
+  /**
+   * Generate presigned upload URL (spec requirement: presigned URL support for secure uploads)
+   */
   async generatePresignedUploadUrl(request: FileUploadRequest): Promise<FileUploadResponse> {
     // Validate file
     const validation = this.validateFile(request.fileName, request.fileSize, request.contentType);
@@ -53,32 +50,30 @@ export class FileUploadService {
       throw new Error(`File validation failed: ${validation.errors.join(', ')}`);
     }
 
-    // Generate unique file ID and S3 key
+    // Generate unique file ID and S3 key (spec requirement: userId/fileId folder structure)
     const fileId = uuidv4();
-    const timestamp = Date.now();
     const sanitizedFileName = this.sanitizeFileName(request.fileName);
-    const fileHash = this.generateFileHash(request.fileName, request.userId, timestamp);
-    const s3Key = `uploads/${request.organizationId}/${request.userId}/${timestamp}-${fileId}-${sanitizedFileName}`;
+    const s3Key = getUserFileKey(request.userId, fileId, sanitizedFileName);
 
     try {
-      // Generate presigned URL for upload
+      // Generate presigned URL for upload (spec requirement: 15-minute expiration for security)
       const putCommand = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
         ContentType: request.contentType,
+        ServerSideEncryption: 'aws:kms', // Use KMS encryption (spec requirement)
         Metadata: {
           'original-filename': request.fileName,
           'user-id': request.userId,
-          'organization-id': request.organizationId,
           'file-id': fileId,
-          'upload-timestamp': timestamp.toString(),
-          'file-hash': fileHash,
-          'file-type': validation.fileType
+          'upload-timestamp': Date.now().toString(),
+          'file-type': validation.fileType,
+          'language': validation.fileType,
         }
       });
 
       const uploadUrl = await getSignedUrl(this.s3Client, putCommand, {
-        expiresIn: 3600, // 1 hour
+        expiresIn: getPresignedUrlExpiration('upload'), // 15 minutes for security
       });
 
       // Generate presigned URL for download
@@ -89,7 +84,7 @@ export class FileUploadService {
       });
 
       const downloadUrl = await getSignedUrl(this.s3Client, getCommand, {
-        expiresIn: 3600, // 1 hour
+        expiresIn: getPresignedUrlExpiration('download'), // 1 hour
       });
 
       return {
@@ -97,7 +92,7 @@ export class FileUploadService {
         s3Key,
         uploadUrl,
         downloadUrl,
-        expiresIn: 3600,
+        expiresIn: getPresignedUrlExpiration('upload'),
       };
     } catch (error) {
       console.error('Error generating presigned URLs:', error);
@@ -105,37 +100,95 @@ export class FileUploadService {
     }
   }
 
+  /**
+   * Generate presigned URL for sample file upload
+   */
+  async generateSampleUploadUrl(sampleId: string, fileName: string, contentType: string): Promise<FileUploadResponse> {
+    // Validate file
+    const validation = this.validateFile(fileName, 0, contentType); // Size validation skipped for samples
+    if (!validation.isValid) {
+      throw new Error(`File validation failed: ${validation.errors.join(', ')}`);
+    }
+
+    const sanitizedFileName = this.sanitizeFileName(fileName);
+    const s3Key = getSampleFileKey(sampleId, sanitizedFileName);
+
+    try {
+      const putCommand = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+        ContentType: contentType,
+        ServerSideEncryption: 'aws:kms',
+        Metadata: {
+          'sample-id': sampleId,
+          'original-filename': fileName,
+          'file-type': validation.fileType,
+          'language': validation.fileType,
+          'is-sample': 'true',
+        }
+      });
+
+      const uploadUrl = await getSignedUrl(this.s3Client, putCommand, {
+        expiresIn: getPresignedUrlExpiration('upload'),
+      });
+
+      const getCommand = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+        ResponseContentDisposition: `attachment; filename="${sanitizedFileName}"`,
+      });
+
+      const downloadUrl = await getSignedUrl(this.s3Client, getCommand, {
+        expiresIn: getPresignedUrlExpiration('download'),
+      });
+
+      return {
+        fileId: sampleId,
+        s3Key,
+        uploadUrl,
+        downloadUrl,
+        expiresIn: getPresignedUrlExpiration('upload'),
+      };
+    } catch (error) {
+      console.error('Error generating sample presigned URLs:', error);
+      throw new Error('Failed to generate sample upload URL');
+    }
+  }
+
+  /**
+   * Validate file according to spec requirements
+   */
   validateFile(fileName: string, fileSize: number, contentType: string): FileValidationResult {
     const errors: string[] = [];
-    let fileType: 'C' | 'CPP' | 'HEADER' | 'UNKNOWN' = 'UNKNOWN';
+    let fileType: 'c' | 'cpp' = 'c';
 
-    // Check file size
-    if (fileSize > this.maxFileSize) {
-      errors.push(`File size ${fileSize} bytes exceeds maximum allowed size of ${this.maxFileSize} bytes`);
+    // Check file size (only for non-sample files)
+    if (fileSize > 0 && !isValidFileSize(fileSize, fileName)) {
+      const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+      const maxSize = S3_CONFIG.maxFileSize.c; // Default to C file size
+      errors.push(`File size ${fileSize} bytes exceeds maximum allowed size of ${maxSize} bytes for ${extension} files`);
     }
 
-    if (fileSize <= 0) {
-      errors.push('File size must be greater than 0');
+    if (fileSize < 0) {
+      errors.push('File size must be greater than or equal to 0');
     }
 
-    // Check file extension
-    const extension = this.getFileExtension(fileName).toLowerCase();
-    if (!this.allowedExtensions.includes(extension)) {
-      errors.push(`File extension '${extension}' is not allowed. Allowed extensions: ${this.allowedExtensions.join(', ')}`);
+    // Check file extension (spec requirement: C/C++ files only)
+    if (!isValidFileExtension(fileName)) {
+      errors.push(`File extension is not allowed. Allowed extensions: ${S3_CONFIG.allowedExtensions.join(', ')}`);
     } else {
-      // Determine file type based on extension
-      if (['.c'].includes(extension)) {
-        fileType = 'C';
-      } else if (['.cpp', '.cc', '.cxx'].includes(extension)) {
-        fileType = 'CPP';
-      } else if (['.h', '.hpp', '.hxx'].includes(extension)) {
-        fileType = 'HEADER';
+      // Determine file type based on extension (spec requirement: language detection)
+      const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+      if (['.c', '.h'].includes(extension)) {
+        fileType = 'c';
+      } else if (['.cpp', '.cc', '.cxx', '.hpp', '.hxx'].includes(extension)) {
+        fileType = 'cpp';
       }
     }
 
     // Check content type
-    if (!this.allowedContentTypes.includes(contentType)) {
-      errors.push(`Content type '${contentType}' is not allowed. Allowed types: ${this.allowedContentTypes.join(', ')}`);
+    if (!S3_CONFIG.allowedContentTypes.includes(contentType as typeof S3_CONFIG.allowedContentTypes[number])) {
+      errors.push(`Content type '${contentType}' is not allowed. Allowed types: ${S3_CONFIG.allowedContentTypes.join(', ')}`);
     }
 
     // Check filename for security
@@ -152,11 +205,6 @@ export class FileUploadService {
       errors,
       fileType,
     };
-  }
-
-  private getFileExtension(fileName: string): string {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    return lastDotIndex === -1 ? '' : fileName.substring(lastDotIndex);
   }
 
   private sanitizeFileName(fileName: string): string {
@@ -180,27 +228,6 @@ export class FileUploadService {
     return unsafePatterns.some(pattern => pattern.test(fileName));
   }
 
-  async getFileMetadata(fileId: string): Promise<any> {
-    // This would typically query DynamoDB for file metadata
-    // For now, return mock data
-    return {
-      fileId,
-      fileName: 'example.c',
-      fileSize: 1024,
-      contentType: 'text/x-c',
-      uploadedAt: new Date().toISOString(),
-      status: 'uploaded',
-    };
-  }
-
-  /**
-   * Generate a hash for file tracking and integrity
-   */
-  private generateFileHash(fileName: string, userId: string, timestamp: number): string {
-    const data = `${fileName}-${userId}-${timestamp}`;
-    return crypto.createHash('sha256').update(data).digest('hex').substring(0, 16);
-  }
-
   /**
    * Verify file exists in S3
    */
@@ -218,34 +245,54 @@ export class FileUploadService {
   }
 
   /**
-   * Get file size limit based on file type
+   * Generate content hash for caching (spec requirement: analysis result caching)
    */
-  getMaxFileSizeForType(fileType: string): number {
-    // Different limits for different file types
-    const limits: Record<string, number> = {
-      'C': 10 * 1024 * 1024,      // 10MB for C files
-      'CPP': 10 * 1024 * 1024,    // 10MB for C++ files
-      'HEADER': 5 * 1024 * 1024,  // 5MB for header files
-    };
-    return limits[fileType] || this.maxFileSize;
+  generateContentHash(content: string): string {
+    return crypto.createHash('sha256').update(content).digest('hex');
   }
 
   /**
-   * Check if file extension matches content type
+   * Get file content from S3
    */
-  private validateContentTypeMatch(fileName: string, contentType: string): boolean {
-    const extension = this.getFileExtension(fileName).toLowerCase();
-    const validMappings: Record<string, string[]> = {
-      '.c': ['text/plain', 'text/x-c', 'application/octet-stream'],
-      '.cpp': ['text/plain', 'text/x-c++', 'application/octet-stream'],
-      '.cc': ['text/plain', 'text/x-c++', 'application/octet-stream'],
-      '.cxx': ['text/plain', 'text/x-c++', 'application/octet-stream'],
-      '.h': ['text/plain', 'text/x-c', 'application/octet-stream'],
-      '.hpp': ['text/plain', 'text/x-c++', 'application/octet-stream'],
-      '.hxx': ['text/plain', 'text/x-c++', 'application/octet-stream'],
-    };
+  async getFileContent(s3Key: string): Promise<string> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+      });
+      
+      const response = await this.s3Client.send(command);
+      const content = await response.Body?.transformToString();
+      
+      if (!content) {
+        throw new Error('File content is empty');
+      }
+      
+      return content;
+    } catch (error) {
+      console.error('Error getting file content:', error);
+      throw new Error('Failed to retrieve file content');
+    }
+  }
 
-    const validTypes = validMappings[extension];
-    return validTypes ? validTypes.includes(contentType) : false;
+  /**
+   * Upload file content directly (for sample files and automatic uploads)
+   */
+  async uploadFileContent(s3Key: string, content: string, contentType: string, metadata: Record<string, string> = {}): Promise<void> {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+        Body: content,
+        ContentType: contentType,
+        ServerSideEncryption: 'aws:kms',
+        Metadata: metadata,
+      });
+
+      await this.s3Client.send(command);
+    } catch (error) {
+      console.error('Error uploading file content:', error);
+      throw new Error('Failed to upload file content');
+    }
   }
 }

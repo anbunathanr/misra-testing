@@ -19,7 +19,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
   try {
     // Extract user from request context (populated by Lambda Authorizer)
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
 
     if (!user.userId) {
       return {

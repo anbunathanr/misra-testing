@@ -48,7 +48,7 @@ export const handler = async (
 
   try {
     // Get user ID from authorizer context
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
     const userId = user.userId;
     if (!userId) {
       return {

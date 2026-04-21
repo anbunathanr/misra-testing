@@ -1,1 +1,0 @@
-﻿{"httpMethod":"POST","headers":{"Authorization":"Bearer test"},"body":"{\"fileName\":\"test.c\",\"fileSize\":100,\"contentType\":\"text/plain\"}"}

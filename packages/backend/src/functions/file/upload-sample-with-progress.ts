@@ -39,7 +39,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
 
     // Extract user from Lambda Authorizer context
-    const user = getUserFromContext(event);
+    const user = await getUserFromContext(event);
     if (!user.userId) {
       console.warn('[SAMPLE-UPLOAD] ✗ Unauthorized: No user in context');
       return errorResponse(401, 'UNAUTHORIZED', 'User not authenticated');

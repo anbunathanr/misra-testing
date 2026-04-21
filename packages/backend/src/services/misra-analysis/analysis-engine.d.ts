@@ -5,6 +5,8 @@ export interface AnalysisProgressCallback {
 export interface AnalysisOptions {
     progressCallback?: AnalysisProgressCallback;
     updateInterval?: number;
+    workflowId?: string;
+    enableRealTimeProgress?: boolean;
 }
 export declare class MISRAAnalysisEngine {
     private ruleEngine;

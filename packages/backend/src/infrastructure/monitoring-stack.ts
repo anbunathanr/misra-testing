@@ -1,5 +1,6 @@
 import { Construct } from 'constructs';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -414,7 +415,7 @@ export class MonitoringStack extends Construct {
       threshold: 5,
       evaluationPeriods: 2,
       datapointsToAlarm: 2,
-    }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+    }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
 
     // API Gateway High Latency Alarm
     new cloudwatch.Alarm(this, 'APIGatewayHighLatency', {
@@ -430,7 +431,7 @@ export class MonitoringStack extends Construct {
       threshold: 2000, // 2 seconds in milliseconds
       evaluationPeriods: 3,
       datapointsToAlarm: 2,
-    }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+    }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
 
     // Lambda Function Error Rate Alarms
     Object.entries(props.lambdaFunctions).forEach(([name, func]) => {
@@ -448,7 +449,7 @@ export class MonitoringStack extends Construct {
         evaluationPeriods: 2,
         datapointsToAlarm: 2,
         treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-      }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+      }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
 
       // Lambda Duration Alarm for critical functions
       if (name.includes('analyze-file')) {
@@ -459,7 +460,7 @@ export class MonitoringStack extends Construct {
           threshold: 240000, // 4 minutes in milliseconds
           evaluationPeriods: 2,
           datapointsToAlarm: 1,
-        }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+        }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
       }
     });
 
@@ -478,7 +479,7 @@ export class MonitoringStack extends Construct {
         threshold: 1,
         evaluationPeriods: 1,
         datapointsToAlarm: 1,
-      }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+      }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
 
       new cloudwatch.Alarm(this, `DynamoDB${name}WriteThrottles`, {
         alarmName: `MISRA-${props.environment}-DynamoDB-${name}-WriteThrottles`,
@@ -493,7 +494,7 @@ export class MonitoringStack extends Construct {
         threshold: 1,
         evaluationPeriods: 1,
         datapointsToAlarm: 1,
-      }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+      }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
     });
 
     // S3 Error Rate Alarm
@@ -530,7 +531,7 @@ export class MonitoringStack extends Construct {
       evaluationPeriods: 2,
       datapointsToAlarm: 2,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-    }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+    }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
 
     // Business Metrics Alarms
     new cloudwatch.Alarm(this, 'AnalysisFailureRate', {
@@ -557,7 +558,7 @@ export class MonitoringStack extends Construct {
       evaluationPeriods: 2,
       datapointsToAlarm: 2,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-    }).addAlarmAction(new cloudwatch.SnsAction(this.alertTopic));
+    }).addAlarmAction(new cloudwatchActions.SnsAction(this.alertTopic));
   }
 
   private createCustomMetrics(props: MonitoringStackProps): void {

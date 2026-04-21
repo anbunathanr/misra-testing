@@ -95,7 +95,6 @@ export const handler = centralizedErrorHandler.wrapLambdaHandler(
         fileName: uploadRequest.fileName,
         fileSize: uploadRequest.fileSize,
         contentType: uploadRequest.contentType,
-        organizationId: user.organizationId,
         userId: user.userId,
       };
 

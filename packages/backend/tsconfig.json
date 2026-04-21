@@ -23,7 +23,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "downlevelIteration": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.d.ts", "dist", "**/__tests__/**/*", "**/*.test.ts", "**/*.spec.ts", "src/test-setup.ts"]

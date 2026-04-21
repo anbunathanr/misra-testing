@@ -1,11 +1,13 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context, ScheduledEvent } from 'aws-lambda';
-import { CloudWatch, DynamoDB, S3 } from 'aws-sdk';
+import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
+import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
+import { S3Client } from '@aws-sdk/client-s3';
 import { CentralizedLogger, withCorrelationId } from '../../utils/centralized-logger';
 import { monitoringService } from '../../services/monitoring-service';
 
-const cloudWatch = new CloudWatch();
-const dynamodb = new DynamoDB.DocumentClient();
-const s3 = new S3();
+const cloudWatch = new CloudWatchClient({});
+const dynamodb = new DynamoDBClient({});
+const s3 = new S3Client({});
 
 interface MetricsCollectionResult {
   timestamp: string;
@@ -191,9 +193,9 @@ async function collectDynamoDBMetrics(logger: CentralizedLogger): Promise<number
       metricsCount++;
 
       // Get table size (approximate)
-      const describeResult = await dynamodb.describe({
+      const describeResult = await dynamodb.send(new DescribeTableCommand({
         TableName: tableName,
-      }).promise();
+      }));
 
       if (describeResult.Table?.TableSizeBytes) {
         await monitoringService.publishMetric({
