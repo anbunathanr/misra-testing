@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SampleFileService_export = exports.SampleFileService = void 0;
+class SampleFileService {
+    async getSampleFiles() {
+        return [];
+    }
+    async getSampleFile(id) {
+        return null;
+    }
+    async addSampleFile(file) {
+        // Stub implementation
+    }
+}
+exports.SampleFileService = SampleFileService;
+exports.SampleFileService_export = SampleFileService;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoic2FtcGxlLWZpbGUtc2VydmljZS5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbInNhbXBsZS1maWxlLXNlcnZpY2UudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7O0FBQUEsTUFBYSxpQkFBaUI7SUFDNUIsS0FBSyxDQUFDLGNBQWM7UUFDbEIsT0FBTyxFQUFFLENBQUM7SUFDWixDQUFDO0lBRUQsS0FBSyxDQUFDLGFBQWEsQ0FBQyxFQUFVO1FBQzVCLE9BQU8sSUFBSSxDQUFDO0lBQ2QsQ0FBQztJQUVELEtBQUssQ0FBQyxhQUFhLENBQUMsSUFBUztRQUMzQixzQkFBc0I7SUFDeEIsQ0FBQztDQUNGO0FBWkQsOENBWUM7QUFFWSxRQUFBLHdCQUF3QixHQUFHLGlCQUFpQixDQUFDIiwic291cmNlc0NvbnRlbnQiOlsiZXhwb3J0IGNsYXNzIFNhbXBsZUZpbGVTZXJ2aWNlIHtcclxuICBhc3luYyBnZXRTYW1wbGVGaWxlcygpOiBQcm9taXNlPGFueVtdPiB7XHJcbiAgICByZXR1cm4gW107XHJcbiAgfVxyXG5cclxuICBhc3luYyBnZXRTYW1wbGVGaWxlKGlkOiBzdHJpbmcpOiBQcm9taXNlPGFueT4ge1xyXG4gICAgcmV0dXJuIG51bGw7XHJcbiAgfVxyXG5cclxuICBhc3luYyBhZGRTYW1wbGVGaWxlKGZpbGU6IGFueSk6IFByb21pc2U8dm9pZD4ge1xyXG4gICAgLy8gU3R1YiBpbXBsZW1lbnRhdGlvblxyXG4gIH1cclxufVxyXG5cclxuZXhwb3J0IGNvbnN0IFNhbXBsZUZpbGVTZXJ2aWNlX2V4cG9ydCA9IFNhbXBsZUZpbGVTZXJ2aWNlO1xyXG4iXX0=

@@ -18,7 +18,7 @@
  * - TTL configuration where appropriate
  */
 
-import { ProductionMisraStack } from '../infrastructure/production-misra-stack';
+import { MisraPlatformMVPStack } from '../infrastructure/app';
 import * as cdk from 'aws-cdk-lib';
 
 interface TableValidationResult {
@@ -46,12 +46,11 @@ interface ValidationReport {
 
 class DynamoDBTableValidator {
   private app: cdk.App;
-  private stack: ProductionMisraStack;
+  private stack: MisraPlatformMVPStack;
 
   constructor(environment: 'dev' | 'staging' | 'production' = 'dev') {
     this.app = new cdk.App();
-    this.stack = new ProductionMisraStack(this.app, 'ValidationStack', {
-      environment,
+    this.stack = new MisraPlatformMVPStack(this.app, 'ValidationStack', {
       env: {
         account: '123456789012', // Dummy account for validation
         region: 'us-east-1',
@@ -89,7 +88,7 @@ class DynamoDBTableValidator {
    * Validate Users Table configuration
    */
   private validateUsersTable(): TableValidationResult {
-    const table = this.stack.usersTable;
+    const table = (this.stack as any).usersTable;
     const issues: string[] = [];
     const requirements = {
       hasKmsEncryption: false,
@@ -166,7 +165,7 @@ class DynamoDBTableValidator {
    * Validate File Metadata Table configuration
    */
   private validateFileMetadataTable(): TableValidationResult {
-    const table = this.stack.fileMetadataTable;
+    const table = (this.stack as any).fileMetadataTable;
     const issues: string[] = [];
     const requirements = {
       hasKmsEncryption: false,
@@ -243,7 +242,7 @@ class DynamoDBTableValidator {
    * Validate Analysis Results Table configuration
    */
   private validateAnalysisResultsTable(): TableValidationResult {
-    const table = this.stack.analysisResultsTable;
+    const table = (this.stack as any).analysisResultsTable;
     const issues: string[] = [];
     const requirements = {
       hasKmsEncryption: false,
@@ -342,7 +341,7 @@ class DynamoDBTableValidator {
    * Validate Sample Files Table configuration
    */
   private validateSampleFilesTable(): TableValidationResult {
-    const table = this.stack.sampleFilesTable;
+    const table = (this.stack as any).sampleFilesTable;
     const issues: string[] = [];
     const requirements = {
       hasKmsEncryption: false,
@@ -411,7 +410,7 @@ class DynamoDBTableValidator {
    * Validate Progress Table configuration
    */
   private validateProgressTable(): TableValidationResult {
-    const table = this.stack.progressTable;
+    const table = (this.stack as any).progressTable;
     const issues: string[] = [];
     const requirements = {
       hasKmsEncryption: false,

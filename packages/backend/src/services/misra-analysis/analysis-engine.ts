@@ -355,7 +355,7 @@ export class MISRAAnalysisEngine {
           workflowId,
           completedRules,
           totalRules,
-          undefined,
+          '',
           Math.max(0, Math.round((totalRules - completedRules) * 0.15))
         );
       }

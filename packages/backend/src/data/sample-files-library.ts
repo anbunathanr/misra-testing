@@ -338,7 +338,7 @@ int main() {
  * Initialize the sample files library in DynamoDB
  */
 export async function initializeSampleFilesLibrary(): Promise<void> {
-  const { SampleFileService } = await import('../services/sample-file-service');
+  const { SampleFileService_export: SampleFileService } = await import('../services/sample-file-service');
   const sampleFileService = new SampleFileService();
   
   console.log('Initializing sample files library...');

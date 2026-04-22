@@ -26,13 +26,19 @@ export interface AuthMetrics {
     failedAuthentications: number;
     emailVerificationRate: number;
     otpSetupRate: number;
-    averageStepDuration: Record<string, number>;
+    averageStepDuration: Record<string, number | {
+        sum: number;
+        count: number;
+        min: number;
+        max: number;
+    }>;
     errorRatesByStep: Record<string, number>;
     errorRatesByType: Record<string, number>;
     sessionDuration: {
         average: number;
         min: number;
         max: number;
+        count?: number;
     };
 }
 export declare enum AuthEventType {

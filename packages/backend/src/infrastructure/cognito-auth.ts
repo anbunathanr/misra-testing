@@ -141,7 +141,7 @@ export class CognitoAuth extends Construct {
         userPassword: true,
         userSrp: true,
         custom: false,
-        adminUserPassword: false,
+        adminUserPassword: true,
       },
       preventUserExistenceErrors: true,
       refreshTokenValidity: cdk.Duration.days(30),

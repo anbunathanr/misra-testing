@@ -41,10 +41,17 @@ export const handler = centralizedErrorHandler.wrapLambdaHandler(
     const startTime = Date.now();
     
     try {
-      logger.info('File upload request started');
+      logger.info('File upload request started', { 
+        path: event.path,
+        hasBody: !!event.body,
+        bucketName: process.env.FILE_STORAGE_BUCKET_NAME,
+        fileMetadataTable: process.env.FILE_METADATA_TABLE
+      });
       
       // Extract user from Lambda Authorizer context or JWT token
       const user = await getUserFromContext(event);
+      logger.info('User extraction result', { userId: user.userId, email: user.email });
+      
       if (!user.userId) {
         logger.warn('Unauthorized upload attempt');
         await cloudWatchMonitoringService.recordError('UNAUTHORIZED', 'file-upload-service', 'MISSING_USER');
@@ -241,16 +248,16 @@ async function createFileMetadata(
     await dynamoClient.send(new PutItemCommand({
       TableName: FILE_METADATA_TABLE,
       Item: marshall({
-        file_id: uploadResponse.fileId,
+        fileId: uploadResponse.fileId,
+        userId: user.userId,
         filename: uploadRequest.fileName,
-        file_type: fileType,
-        file_size: uploadRequest.fileSize,
-        user_id: user.userId,
-        upload_timestamp: now,
-        analysis_status: 'pending',
-        s3_key: uploadResponse.s3Key,
-        created_at: now,
-        updated_at: now,
+        fileType: fileType,
+        fileSize: uploadRequest.fileSize,
+        uploadTimestamp: now,
+        analysisStatus: 'pending',
+        s3Key: uploadResponse.s3Key,
+        createdAt: now,
+        updatedAt: now,
       }),
     }));
 

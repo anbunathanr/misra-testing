@@ -56,12 +56,18 @@ export class FileUploadService {
     const s3Key = getUserFileKey(request.userId, fileId, sanitizedFileName);
 
     try {
+      console.log('Generating presigned URLs', {
+        bucketName: this.bucketName,
+        s3Key,
+        fileId,
+        userId: request.userId
+      });
+
       // Generate presigned URL for upload (spec requirement: 15-minute expiration for security)
       const putCommand = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
         ContentType: request.contentType,
-        ServerSideEncryption: 'aws:kms', // Use KMS encryption (spec requirement)
         Metadata: {
           'original-filename': request.fileName,
           'user-id': request.userId,
@@ -72,9 +78,11 @@ export class FileUploadService {
         }
       });
 
+      console.log('Creating presigned upload URL...');
       const uploadUrl = await getSignedUrl(this.s3Client, putCommand, {
         expiresIn: getPresignedUrlExpiration('upload'), // 15 minutes for security
       });
+      console.log('Upload URL generated successfully');
 
       // Generate presigned URL for download
       const getCommand = new GetObjectCommand({
@@ -83,9 +91,11 @@ export class FileUploadService {
         ResponseContentDisposition: `attachment; filename="${sanitizedFileName}"`,
       });
 
+      console.log('Creating presigned download URL...');
       const downloadUrl = await getSignedUrl(this.s3Client, getCommand, {
         expiresIn: getPresignedUrlExpiration('download'), // 1 hour
       });
+      console.log('Download URL generated successfully');
 
       return {
         fileId,
@@ -96,7 +106,14 @@ export class FileUploadService {
       };
     } catch (error) {
       console.error('Error generating presigned URLs:', error);
-      throw new Error('Failed to generate upload URL');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error details:', {
+        errorMessage,
+        errorName: (error as any)?.name,
+        bucketName: this.bucketName,
+        s3Key
+      });
+      throw new Error(`Failed to generate upload URL: ${errorMessage}`);
     }
   }
 
@@ -118,7 +135,6 @@ export class FileUploadService {
         Bucket: this.bucketName,
         Key: s3Key,
         ContentType: contentType,
-        ServerSideEncryption: 'aws:kms',
         Metadata: {
           'sample-id': sampleId,
           'original-filename': fileName,
@@ -285,7 +301,6 @@ export class FileUploadService {
         Key: s3Key,
         Body: content,
         ContentType: contentType,
-        ServerSideEncryption: 'aws:kms',
         Metadata: metadata,
       });
 

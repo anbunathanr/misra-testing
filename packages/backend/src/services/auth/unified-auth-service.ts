@@ -483,7 +483,8 @@ export class UnifiedAuthService {
 
       return AuthenticationState.AUTHENTICATED;
     } catch (error) {
-      this.monitoringService.onError(correlationId, email, error.message, 'state_check');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.monitoringService.onError(correlationId, email, errorMessage, 'state_check');
       return AuthenticationState.ERROR;
     }
   }
@@ -517,7 +518,8 @@ export class UnifiedAuthService {
 
       return validTransitions[currentState]?.includes(step) || currentState === step;
     } catch (error) {
-      this.monitoringService.onError(correlationId, email, error.message, 'step_validation');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.monitoringService.onError(correlationId, email, errorMessage, 'step_validation');
       return false;
     }
   }

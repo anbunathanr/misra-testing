@@ -69,7 +69,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const userPoolId = process.env.COGNITO_USER_POOL_ID;
     if (!userPoolId) {
-      logger.error('COGNITO_USER_POOL_ID not configured', { correlationId });
+      logger.error('COGNITO_USER_POOL_ID not configured', { correlationId } as any);
       return errorResponse(500, 'CONFIG_ERROR', 'Authentication service configuration error', correlationId);
     }
 

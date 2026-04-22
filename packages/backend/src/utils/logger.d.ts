@@ -10,6 +10,7 @@ export declare enum LogLevel {
 }
 export interface LogMetadata {
     [key: string]: any;
+    correlationId?: string;
 }
 export interface LogEntry {
     timestamp: string;
@@ -48,7 +49,7 @@ export declare class Logger {
     /**
      * Log error message (error events that might still allow the application to continue)
      */
-    error(message: string, error?: Error, meta?: LogMetadata): void;
+    error(message: string, errorOrMeta?: Error | LogMetadata, meta?: LogMetadata): void;
     /**
      * Create a child logger with additional context
      */

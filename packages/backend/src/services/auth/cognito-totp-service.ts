@@ -244,8 +244,7 @@ export class CognitoTOTPService {
       const totpCode = speakeasy.totp({
         secret: associateResult.SecretCode,
         encoding: 'base32',
-        time: Math.floor(Date.now() / 1000),
-        window: 2 // Allow some time drift
+        time: Math.floor(Date.now() / 1000)
       });
 
       logger.info('TOTP code generated for verification', {
@@ -448,8 +447,7 @@ export class CognitoTOTPService {
         const totpCode = speakeasy.totp({
           secret: secret,
           encoding: 'ascii',
-          time: Math.floor(Date.now() / 1000),
-          window: 2
+          time: Math.floor(Date.now() / 1000)
         });
 
         return totpCode;

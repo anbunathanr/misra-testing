@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>CORS Test</h1>
+    <button onclick="testCORS()">Test CORS</button>
+    <pre id="result"></pre>
+    
+    <script>
+        async function testCORS() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Testing CORS...\n';
+            
+            try {
+                const response = await fetch('https://pkgjbizs63.execute-api.us-east-1.amazonaws.com/dev/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'Test123!',
+                        name: 'Test User'
+                    })
+                });
+                
+                resultDiv.textContent += `Status: ${response.status}\n`;
+                resultDiv.textContent += `Headers:\n`;
+                for (const [key, value] of response.headers) {
+                    if (key.toLowerCase().includes('access-control')) {
+                        resultDiv.textContent += `  ${key}: ${value}\n`;
+                    }
+                }
+                
+                const data = await response.json();
+                resultDiv.textContent += `\nResponse:\n${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent += `Error: ${error.message}\n`;
+                resultDiv.textContent += `${error.stack}`;
+            }
+        }
+    </script>
+</body>
+</html>

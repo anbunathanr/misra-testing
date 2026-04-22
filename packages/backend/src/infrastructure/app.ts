@@ -21,7 +21,7 @@ import { CognitoAuth } from './cognito-auth';
  * - MISRA analysis (Lambda)
  * - Results storage (DynamoDB)
  */
-class MisraPlatformMVPStack extends cdk.Stack {
+export class MisraPlatformMVPStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -176,6 +176,21 @@ class MisraPlatformMVPStack extends cdk.Stack {
       },
     });
 
+    // Auth: OPTIONS (CORS preflight handler)
+    const optionsFunction = new lambdaNodejs.NodejsFunction(this, 'OptionsFunction', {
+      functionName: 'misra-auth-options',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/auth/options.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(5),
+      memorySize: 128,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+    });
+
     // File: Upload
     const uploadFunction = new lambdaNodejs.NodejsFunction(this, 'UploadFunction', {
       functionName: 'misra-file-upload',
@@ -269,28 +284,22 @@ class MisraPlatformMVPStack extends cdk.Stack {
     const api = new apigateway.HttpApi(this, 'MisraAPI', {
       apiName: 'misra-platform-api',
       description: 'MISRA Platform API',
-      corsPreflight: {
-        allowOrigins: ['*'],
-        allowMethods: [
-          apigateway.CorsHttpMethod.GET,
-          apigateway.CorsHttpMethod.POST,
-          apigateway.CorsHttpMethod.PUT,
-          apigateway.CorsHttpMethod.DELETE,
-          apigateway.CorsHttpMethod.OPTIONS,
-        ],
-        allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-        allowCredentials: true,
-        maxAge: cdk.Duration.days(1),
-      },
     });
 
     // Create JWT Authorizer
     const jwtAuthorizer = new authorizers.HttpJwtAuthorizer('JwtAuthorizer', `https://cognito-idp.${this.region}.amazonaws.com/${cognitoAuth.userPool.userPoolId}`, {
-      audience: [cognitoAuth.userPoolClient.userPoolClientId],
-    });
+      jwtAudience: [cognitoAuth.userPoolClient.userPoolClientId]
+    } as any);
 
     // ============ API ROUTES ============
     
+    // Catch-all OPTIONS route for CORS preflight
+    api.addRoutes({
+      path: '/{proxy+}',
+      methods: [apigateway.HttpMethod.OPTIONS],
+      integration: new integrations.HttpLambdaIntegration('CatchAllOptionsIntegration', optionsFunction),
+    });
+
     // Auth routes (no authorization required)
     api.addRoutes({
       path: '/auth/register',

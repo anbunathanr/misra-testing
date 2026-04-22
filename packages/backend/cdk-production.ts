@@ -38,9 +38,6 @@ new ProductionMisraStack(app, `MisraPlatform-${environment}`, {
     account,
     region,
   },
-  environment: environment as 'dev' | 'staging' | 'production',
-  domainName: config.domainName,
-  certificateArn: config.certificateArn,
   description: `MISRA Compliance Platform - ${environment} environment`,
   tags: {
     Environment: environment,

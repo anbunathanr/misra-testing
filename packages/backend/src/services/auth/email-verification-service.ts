@@ -91,8 +91,7 @@ export class EmailVerificationService {
       // Confirm the user in Cognito
       await this.cognitoClient.send(new AdminConfirmSignUpCommand({
         UserPoolId: this.userPoolId,
-        Username: email,
-        ConfirmationCode: confirmationCode
+        Username: email
       }));
 
       this.errorHandler.logAuthEvent('email_confirmed', {

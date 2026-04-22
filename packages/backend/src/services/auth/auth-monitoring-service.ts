@@ -31,13 +31,14 @@ export interface AuthMetrics {
   failedAuthentications: number;
   emailVerificationRate: number;
   otpSetupRate: number;
-  averageStepDuration: Record<string, number>;
+  averageStepDuration: Record<string, number | { sum: number; count: number; min: number; max: number }>;
   errorRatesByStep: Record<string, number>;
   errorRatesByType: Record<string, number>;
   sessionDuration: {
     average: number;
     min: number;
     max: number;
+    count?: number;
   };
 }
 
@@ -192,17 +193,31 @@ export class AuthMonitoringService implements MonitoringHook {
     const logLevel = event.success ? LogLevel.INFO : LogLevel.ERROR;
     const message = `Auth event: ${event.eventType}`;
 
-    this.logger.log(logLevel, message, {
-      correlationId: event.correlationId,
-      eventType: event.eventType,
-      email: event.email,
-      userId: event.userId,
-      step: event.step,
-      success: event.success,
-      durationMs: event.durationMs,
-      error: event.error,
-      metadata: event.metadata
-    });
+    if (logLevel === LogLevel.ERROR) {
+      this.logger.error(message, undefined, {
+        correlationId: event.correlationId,
+        eventType: event.eventType,
+        email: event.email,
+        userId: event.userId,
+        step: event.step,
+        success: event.success,
+        durationMs: event.durationMs,
+        error: event.error,
+        metadata: event.metadata
+      });
+    } else if (logLevel === LogLevel.INFO) {
+      this.logger.info(message, {
+        correlationId: event.correlationId,
+        eventType: event.eventType,
+        email: event.email,
+        userId: event.userId,
+        step: event.step,
+        success: event.success,
+        durationMs: event.durationMs,
+        error: event.error,
+        metadata: event.metadata
+      });
+    }
   }
 
   /**
@@ -218,7 +233,7 @@ export class AuthMonitoringService implements MonitoringHook {
       };
     }
 
-    const stats = this.metrics.averageStepDuration[step];
+    const stats = this.metrics.averageStepDuration[step] as any;
     stats.sum += durationMs;
     stats.count++;
     stats.min = Math.min(stats.min, durationMs);
@@ -275,7 +290,8 @@ export class AuthMonitoringService implements MonitoringHook {
     // Convert step duration stats to averages
     const averageStepDuration: Record<string, number> = {};
     for (const [step, stats] of Object.entries(this.metrics.averageStepDuration)) {
-      averageStepDuration[step] = stats.count > 0 ? stats.sum / stats.count : 0;
+      const s = stats as any;
+      averageStepDuration[step] = s.count > 0 ? s.sum / s.count : 0;
     }
 
     return {

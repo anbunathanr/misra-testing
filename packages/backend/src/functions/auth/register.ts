@@ -21,17 +21,17 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import * as AWS from 'aws-sdk';
+import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { validateEmail, validatePassword } from '../../utils/validation';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('Register');
-const cognito = new AWS.CognitoIdentityServiceProvider();
+const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 interface RegisterRequest {
   email: string;
-  password: string;
+  password?: string; // Optional for passwordless flow
   name?: string;
 }
 
@@ -45,13 +45,13 @@ interface RegisterResponse {
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const correlationId = event.headers['X-Correlation-ID'] || Math.random().toString(36).substring(7);
   
-  logger.info('User registration request received', {
-    correlationId,
-    path: event.path,
-    method: event.httpMethod
-  });
-
   try {
+    logger.info('User registration request received', {
+      correlationId,
+      path: event.path,
+      method: event.httpMethod
+    });
+
     // Parse request body
     if (!event.body) {
       return errorResponse(400, 'MISSING_BODY', 'Request body is required', correlationId);
@@ -60,8 +60,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const request: RegisterRequest = JSON.parse(event.body);
 
     // Validate required fields
-    if (!request.email || !request.password) {
-      return errorResponse(400, 'MISSING_FIELDS', 'Email and password are required', correlationId);
+    if (!request.email) {
+      return errorResponse(400, 'MISSING_EMAIL', 'Email is required', correlationId);
     }
 
     // Validate email format
@@ -69,15 +69,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'INVALID_EMAIL', 'Please provide a valid email address', correlationId);
     }
 
-    // Validate password strength
-    const passwordValidation = validatePassword(request.password);
-    if (!passwordValidation.isValid) {
-      return errorResponse(400, 'WEAK_PASSWORD', passwordValidation.message, correlationId);
+    // If password is provided, validate it
+    if (request.password) {
+      const passwordValidation = validatePassword(request.password);
+      if (!passwordValidation.isValid) {
+        return errorResponse(400, 'WEAK_PASSWORD', passwordValidation.message, correlationId);
+      }
     }
 
     const userPoolId = process.env.COGNITO_USER_POOL_ID;
     if (!userPoolId) {
-      logger.error('COGNITO_USER_POOL_ID not configured', { correlationId });
+      logger.error('COGNITO_USER_POOL_ID not configured', { correlationId } as any);
       return errorResponse(500, 'CONFIG_ERROR', 'Authentication service configuration error', correlationId);
     }
 
@@ -89,10 +91,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     // Check if user already exists
     try {
-      await cognito.adminGetUser({
+      await cognito.send(new AdminGetUserCommand({
         UserPoolId: userPoolId,
         Username: request.email
-      }).promise();
+      }));
 
       // User exists
       logger.warn('User already exists', {
@@ -102,7 +104,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
       return errorResponse(409, 'USER_EXISTS', 'User with this email already exists', correlationId);
     } catch (error: any) {
-      if (error.code !== 'UserNotFoundException') {
+      if (error.name !== 'UserNotFoundException') {
         throw error;
       }
       // User doesn't exist, continue with registration
@@ -113,10 +115,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     
     logger.info('Creating Cognito user', {
       correlationId,
-      email: request.email
+      email: request.email,
+      passwordProvided: !!request.password
     });
 
-    const createUserResponse = await cognito.adminCreateUser({
+    const createUserResponse = await cognito.send(new AdminCreateUserCommand({
       UserPoolId: userPoolId,
       Username: request.email,
       TemporaryPassword: tempPassword,
@@ -139,7 +142,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         }
       ],
       MessageAction: 'SUPPRESS' // Don't send welcome email yet
-    }).promise();
+    }));
 
     const userId = createUserResponse.User?.Username;
     if (!userId) {
@@ -152,42 +155,35 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       email: request.email
     });
 
-    // Set permanent password
+    // Set permanent password if provided, otherwise use temporary password
+    const finalPassword = request.password || tempPassword;
+    
     logger.info('Setting permanent password', {
       correlationId,
-      userId
+      userId,
+      isCustomPassword: !!request.password
     });
 
-    await cognito.adminSetUserPassword({
+    await cognito.send(new AdminSetUserPasswordCommand({
       UserPoolId: userPoolId,
       Username: request.email,
-      Password: request.password,
+      Password: finalPassword,
       Permanent: true
-    }).promise();
+    }));
 
     logger.info('Permanent password set', {
       correlationId,
       userId
     });
 
-    // Enable SOFTWARE_TOKEN_MFA for TOTP support
-    logger.info('Enabling SOFTWARE_TOKEN_MFA', {
-      correlationId,
-      userId
-    });
+    // Note: SOFTWARE_TOKEN_MFA will be set up during the login/OTP verification flow
+    // The user needs to associate a software token first before we can set MFA preference
+    // This is handled in the verify-otp Lambda function
 
-    await cognito.adminSetUserMFAPreference({
-      UserPoolId: userPoolId,
-      Username: request.email,
-      SoftwareTokenMfaSettings: {
-        Enabled: true,
-        PreferredMfa: false // Not preferred yet, will be set after setup
-      }
-    }).promise();
-
-    logger.info('SOFTWARE_TOKEN_MFA enabled', {
+    logger.info('User registration completed successfully', {
       correlationId,
-      userId
+      userId,
+      email: request.email
     });
 
     const response: RegisterResponse = {
@@ -213,20 +209,20 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     logger.error('User registration failed', {
       correlationId,
       error: error.message,
-      code: error.code,
+      name: error.name,
       stack: error.stack
     });
 
     // Handle specific Cognito errors
-    if (error.code === 'UsernameExistsException') {
+    if (error.name === 'UsernameExistsException') {
       return errorResponse(409, 'USER_EXISTS', 'User with this email already exists', correlationId);
-    } else if (error.code === 'InvalidPasswordException') {
+    } else if (error.name === 'InvalidPasswordException') {
       return errorResponse(400, 'INVALID_PASSWORD', error.message, correlationId);
-    } else if (error.code === 'TooManyRequestsException') {
+    } else if (error.name === 'TooManyRequestsException') {
       return errorResponse(429, 'TOO_MANY_REQUESTS', 'Too many registration attempts. Please try again later.', correlationId);
     }
 
-    return errorResponse(500, 'REGISTRATION_FAILED', 'Failed to register user', correlationId);
+    return errorResponse(500, 'REGISTRATION_FAILED', error.message || 'Failed to register user', correlationId);
   }
 };
 

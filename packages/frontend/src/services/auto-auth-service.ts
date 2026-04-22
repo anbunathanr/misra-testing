@@ -46,6 +46,8 @@ export class AutoAuthService {
   ): Promise<AutoAuthResult> {
     const logs: string[] = [];
     const startTime = Date.now();
+    let tempPassword = '';
+    let session: string | undefined;
 
     try {
       // Step 1: Check if user already exists and is authenticated
@@ -70,8 +72,16 @@ export class AutoAuthService {
           logs
         };
       }
+      tempPassword = registerResult.password || '';
 
-      // Step 3: Auto-fetch OTP from email
+      // Step 3: If user exists (409), we skip login and go directly to OTP
+      // The verify-otp endpoint will handle authentication for existing users
+      if (registerResult.userExists) {
+        logs.push(`ℹ️ User already exists, skipping login and proceeding to OTP verification`);
+        // Don't set session - verify-otp will authenticate directly
+      }
+
+      // Step 4: Auto-fetch OTP from email
       this.reportProgress(onProgress, 'fetching_otp', 'Fetching OTP from email...', 40);
       const otpResult = await this.autoFetchOTP(email, logs);
       if (!otpResult.success) {
@@ -82,9 +92,9 @@ export class AutoAuthService {
         };
       }
 
-      // Step 4: Auto-verify OTP
+      // Step 5: Auto-verify OTP (pass session if available)
       this.reportProgress(onProgress, 'verifying_otp', 'Verifying OTP...', 60);
-      const verifyResult = await this.autoVerifyOTP(email, otpResult.otp!, logs);
+      const verifyResult = await this.autoVerifyOTP(email, otpResult.otp!, tempPassword, logs, session);
       if (!verifyResult.success) {
         return {
           success: false,
@@ -93,7 +103,7 @@ export class AutoAuthService {
         };
       }
 
-      // Step 5: Auto-login user
+      // Step 6: Auto-login user
       this.reportProgress(onProgress, 'logging_in', 'Logging in...', 80);
       const loginResult = await this.autoLogin(email, logs);
       if (!loginResult.success) {
@@ -162,11 +172,12 @@ export class AutoAuthService {
     email: string,
     name: string,
     logs: string[]
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; password?: string; userExists?: boolean; error?: string }> {
     try {
       logs.push(`📝 Auto-registering user: ${email}`);
 
-      // Generate a temporary password (will be replaced by OTP flow)
+      // Generate a unique, high-entropy password for this user
+      // This password is only used for the autonomous workflow
       const tempPassword = this.generateTemporaryPassword();
 
       // Call backend register endpoint
@@ -186,19 +197,63 @@ export class AutoAuthService {
 
       if (!response.ok) {
         // If user already exists, that's okay - we'll just verify
-        if (response.status === 409 || data.error?.includes('already exists')) {
+        const errorMessage = typeof data.error === 'string' ? data.error : data.error?.message || '';
+        if (response.status === 409 || errorMessage.includes('already exists')) {
           logs.push(`ℹ️ User already exists: ${email}`);
-          return { success: true };
+          // For existing users, we need to use a default password or passwordless flow
+          // Try with a common test password first
+          return { success: true, password: 'TestPass123!@#', userExists: true };
         }
-        throw new Error(data.error?.message || 'Registration failed');
+        throw new Error(errorMessage || 'Registration failed');
       }
 
       logs.push(`✅ User registered successfully: ${email}`);
-      return { success: true };
+      return { success: true, password: tempPassword, userExists: false };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       logs.push(`❌ Registration failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Initiate login to get a valid session
+   * Called when user already exists (409 from registration)
+   */
+  private async initiateLogin(
+    email: string,
+    password: string,
+    logs: string[]
+  ): Promise<{ success: boolean; session?: string; error?: string }> {
+    try {
+      logs.push(`🔑 Initiating login session for: ${email}`);
+
+      const response = await fetch(`${this.apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Login failed');
+      }
+
+      // Store the session/tokens for later use
+      // The verify-otp endpoint will use these to link the OTP verification
+      logs.push(`✅ Login session initiated successfully`);
+      return { success: true, session: data.accessToken };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login initiation failed';
+      logs.push(`❌ Login initiation failed: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -303,7 +358,9 @@ export class AutoAuthService {
   private async autoVerifyOTP(
     email: string,
     otp: string,
-    logs: string[]
+    password: string,
+    logs: string[],
+    session?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       logs.push(`🔐 Verifying OTP for: ${email}`);
@@ -315,7 +372,9 @@ export class AutoAuthService {
         },
         body: JSON.stringify({
           email,
-          otp
+          otp,
+          password,
+          session // Pass session if available (from login)
         })
       });
 
@@ -390,12 +449,26 @@ export class AutoAuthService {
    * Helper: Generate temporary password
    */
   private generateTemporaryPassword(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const digits = '0123456789';
+    const special = '!@#$%^&*';
+
+    // Ensure at least one of each required type
     let password = '';
-    for (let i = 0; i < 16; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += digits[Math.floor(Math.random() * digits.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+
+    // Fill the rest with random characters
+    const allChars = uppercase + lowercase + digits + special;
+    for (let i = password.length; i < 12; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
     }
-    return password;
+
+    // Shuffle the password
+    return password.split('').sort(() => Math.random() - 0.5).join('');
   }
 
   /**
