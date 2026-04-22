@@ -35,6 +35,10 @@ export declare class CognitoTOTPService {
      */
     private setupTOTPAutomatically;
     /**
+     * Generate backup codes for TOTP
+     */
+    private generateBackupCodes;
+    /**
      * Handle SOFTWARE_TOKEN_MFA challenge for existing TOTP users
      */
     private handleSoftwareTokenMFA;

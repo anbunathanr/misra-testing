@@ -29,6 +29,6 @@ export declare function validateUUID(uuid: string): boolean;
  * Validate password strength (basic requirements)
  */
 export declare function validatePassword(password: string): {
-    valid: boolean;
-    errors: string[];
+    isValid: boolean;
+    message: string;
 };

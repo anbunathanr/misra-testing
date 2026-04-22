@@ -70,12 +70,12 @@ export function validateUUID(uuid: string): boolean {
 /**
  * Validate password strength (basic requirements)
  */
-export function validatePassword(password: string): { valid: boolean; errors: string[] } {
+export function validatePassword(password: string): { isValid: boolean; message: string } {
   const errors: string[] = [];
 
   if (!password || typeof password !== 'string') {
     errors.push('Password is required');
-    return { valid: false, errors };
+    return { isValid: false, message: errors.join('; ') };
   }
 
   if (password.length < 8) {
@@ -98,5 +98,5 @@ export function validatePassword(password: string): { valid: boolean; errors: st
     errors.push('Password must contain at least one special character');
   }
 
-  return { valid: errors.length === 0, errors };
+  return { isValid: errors.length === 0, message: errors.join('; ') };
 }

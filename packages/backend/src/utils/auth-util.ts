@@ -161,3 +161,38 @@ export function canPerformSensitiveOperations(userContext: UserContext): boolean
   // Must have a valid user ID and NOT be temporary
   return !!(userContext.userId && !userContext.isTemporary);
 }
+
+/**
+ * Extract user information from JWT token
+ * Used for direct token validation without Lambda Authorizer
+ * 
+ * @param token - JWT token string
+ * @returns User info object or null if invalid
+ */
+export function extractUserFromToken(token: string): Record<string, any> | null {
+  try {
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
+    
+    // Support both custom JWT format and Cognito JWT format
+    if (payload.sub) {
+      // Cognito JWT
+      return {
+        sub: payload.sub,
+        email: payload.email,
+        email_verified: payload.email_verified,
+        name: payload.name,
+        'custom:organizationId': payload['custom:organizationId'],
+        'custom:role': payload['custom:role']
+      };
+    } else if (payload.userId) {
+      // Custom JWT format
+      return payload;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to extract user from token:', error);
+    return null;
+  }
+}

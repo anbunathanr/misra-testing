@@ -44,3 +44,11 @@ export declare function canPerformFileOperations(userContext: UserContext): bool
  * @returns true if sensitive operations are allowed
  */
 export declare function canPerformSensitiveOperations(userContext: UserContext): boolean;
+/**
+ * Extract user information from JWT token
+ * Used for direct token validation without Lambda Authorizer
+ *
+ * @param token - JWT token string
+ * @returns User info object or null if invalid
+ */
+export declare function extractUserFromToken(token: string): Record<string, any> | null;

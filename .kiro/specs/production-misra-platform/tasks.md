@@ -15,12 +15,12 @@
 - [ ] 1.10 Create deployment scripts for dev/staging/production environments
 
 ### Task 2: Backend Lambda Functions - Authentication
-- [ ] 2.1 Implement Initiate Flow Lambda (check user existence)
+- [x] 2.1 Implement Initiate Flow Lambda (check user existence)
 - [ ] 2.2 Implement Register Lambda (create Cognito user with SOFTWARE_TOKEN_MFA enabled)
 - [ ] 2.3 Implement Login Lambda (authenticate and handle MFA_SETUP challenge)
 - [ ] 2.4 Implement OTP Verify Lambda (automatic TOTP verification using Cognito's SOFTWARE_TOKEN_MFA challenge flow with server-side TOTP generation)
 - [ ] 2.5 Implement Lambda Authorizer (JWT validation)
-- [ ] 2.6 Implement Get Profile Lambda
+- [x] 2.6 Implement Get Profile Lambda
 - [ ] 2.7 Implement Token Refresh Lambda
 - [ ] 2.8 Add CloudWatch logging to all auth functions
 - [ ] 2.9 Write unit tests for auth functions
