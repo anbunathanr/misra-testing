@@ -5,7 +5,7 @@
 
 import { frontendAuthMonitoringService } from './auth-monitoring-service';
 import { AuthEventType } from './auth-monitoring-service';
-import apiConfig from '../config/api-config';
+import { API_URL } from '../config/api-config';
 import { mockBackend } from './mock-backend';
 
 export enum AuthenticationState {
@@ -165,7 +165,7 @@ export class AuthStateManager {
         );
 
         // Check if mock backend should be used
-        const apiUrl = apiConfig.getBaseUrl();
+        const apiUrl = API_URL;
         let data;
 
         if (mockBackend.shouldUseMock(apiUrl)) {
@@ -256,7 +256,7 @@ export class AuthStateManager {
           true
         );
 
-        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/verify-email-with-otp`, {
+        const response = await fetch(`${API_URL}/auth/verify-email-with-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -266,7 +266,7 @@ export class AuthStateManager {
         });
 
         const durationMs = Date.now() - startTime;
-        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/verify-email-with-otp`, response.ok, durationMs, this.context.userInfo.email);
+        frontendAuthMonitoringService.logAPICall(`${API_URL}/auth/verify-email-with-otp`, response.ok, durationMs, this.context.userInfo.email);
 
         // Check if response has content before parsing JSON
         const responseText = await response.text();
@@ -345,7 +345,7 @@ export class AuthStateManager {
           true
         );
 
-        const response = await fetch(`${apiConfig.getBaseUrl()}/auth/complete-otp-setup`, {
+        const response = await fetch(`${API_URL}/auth/complete-otp-setup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -355,7 +355,7 @@ export class AuthStateManager {
         });
 
         const durationMs = Date.now() - startTime;
-        frontendAuthMonitoringService.logAPICall(`${apiConfig.getBaseUrl()}/auth/complete-otp-setup`, response.ok, durationMs, this.context.userInfo.email);
+        frontendAuthMonitoringService.logAPICall(`${API_URL}/auth/complete-otp-setup`, response.ok, durationMs, this.context.userInfo.email);
 
         // Check if response has content before parsing JSON
         const responseText = await response.text();

@@ -127,7 +127,7 @@ export class ProductionMisraStack extends cdk.Stack {
     
     // Auth: Register
     const registerFunction = new lambdaNodejs.NodejsFunction(this, 'RegisterFunction', {
-      functionName: 'misra-auth-register',
+      functionName: 'misra-platform-auth-register',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/register.ts'),
       handler: 'handler',
@@ -147,7 +147,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Login
     const loginFunction = new lambdaNodejs.NodejsFunction(this, 'LoginFunction', {
-      functionName: 'misra-auth-login',
+      functionName: 'misra-platform-auth-login',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/login.ts'),
       handler: 'handler',
@@ -166,7 +166,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Verify OTP (Cognito)
     const verifyOtpFunction = new lambdaNodejs.NodejsFunction(this, 'VerifyOtpFunction', {
-      functionName: 'misra-auth-verify-otp',
+      functionName: 'misra-platform-auth-verify-otp',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/verify-otp-cognito.ts'),
       handler: 'handler',
@@ -185,7 +185,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Get Profile
     const getProfileFunction = new lambdaNodejs.NodejsFunction(this, 'GetProfileFunction', {
-      functionName: 'misra-auth-get-profile',
+      functionName: 'misra-platform-auth-get-profile',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/get-profile.ts'),
       handler: 'handler',
@@ -203,7 +203,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Authorizer
     const authorizerFunction = new lambdaNodejs.NodejsFunction(this, 'AuthorizerFunction', {
-      functionName: 'misra-auth-authorizer',
+      functionName: 'misra-platform-auth-authorizer',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/authorizer.ts'),
       handler: 'handler',
@@ -221,7 +221,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: OPTIONS (CORS preflight handler)
     const optionsFunction = new lambdaNodejs.NodejsFunction(this, 'OptionsFunction', {
-      functionName: 'misra-auth-options',
+      functionName: 'misra-platform-auth-options',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/options.ts'),
       handler: 'handler',
@@ -236,7 +236,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Fetch OTP
     const fetchOtpFunction = new lambdaNodejs.NodejsFunction(this, 'FetchOtpFunction', {
-      functionName: 'misra-auth-fetch-otp',
+      functionName: 'misra-platform-auth-fetch-otp',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/fetch-otp.ts'),
       handler: 'handler',
@@ -251,7 +251,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: Auto-Login
     const autoLoginFunction = new lambdaNodejs.NodejsFunction(this, 'AutoLoginFunction', {
-      functionName: 'misra-auth-auto-login',
+      functionName: 'misra-platform-auth-auto-login',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/auto-login.ts'),
       handler: 'handler',
@@ -270,7 +270,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Auth: OTP Webhook (receives OTP emails from SES)
     const otpWebhookFunction = new lambdaNodejs.NodejsFunction(this, 'OTPWebhookFunction', {
-      functionName: 'misra-auth-otp-webhook',
+      functionName: 'misra-platform-auth-otp-webhook',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/auth/otp-webhook.ts'),
       handler: 'handler',
@@ -288,7 +288,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // File: Upload
     const uploadFunction = new lambdaNodejs.NodejsFunction(this, 'UploadFunction', {
-      functionName: 'misra-file-upload',
+      functionName: 'misra-platform-file-upload',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/file/upload.ts'),
       handler: 'handler',
@@ -307,7 +307,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // File: Get Files
     const getFilesFunction = new lambdaNodejs.NodejsFunction(this, 'GetFilesFunction', {
-      functionName: 'misra-file-get-files',
+      functionName: 'misra-platform-file-get-files',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/file/get-files.ts'),
       handler: 'handler',
@@ -326,7 +326,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Analysis: Analyze File
     const analyzeFileFunction = new lambdaNodejs.NodejsFunction(this, 'AnalyzeFileFunction', {
-      functionName: 'misra-analysis-analyze-file',
+      functionName: 'misra-platform-analysis-analyze-file',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/analysis/analyze-file.ts'),
       handler: 'handler',
@@ -345,7 +345,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Analysis: Get Results
     const getAnalysisResultsFunction = new lambdaNodejs.NodejsFunction(this, 'GetAnalysisResultsFunction', {
-      functionName: 'misra-analysis-get-results',
+      functionName: 'misra-platform-analysis-get-results',
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, '../functions/analysis/get-analysis-results.ts'),
       handler: 'handler',
@@ -358,6 +358,42 @@ export class ProductionMisraStack extends cdk.Stack {
       },
       environment: {
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
+      },
+    });
+
+    // Workflow: Start Workflow
+    const startWorkflowFunction = new lambdaNodejs.NodejsFunction(this, 'StartWorkflowFunction', {
+      functionName: 'misra-platform-workflow-start',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/workflow/start-workflow.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
+        COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
+        FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
+        ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
+      },
+    });
+
+    // Workflow: Get Progress
+    const getProgressFunction = new lambdaNodejs.NodejsFunction(this, 'GetProgressFunction', {
+      functionName: 'misra-platform-workflow-get-progress',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/workflow/get-progress.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
       },
     });
 
@@ -383,6 +419,24 @@ export class ProductionMisraStack extends cdk.Stack {
         'cognito-idp:AssociateSoftwareToken'
       ],
       resources: [cognitoAuth.userPool.userPoolArn]
+    }));
+
+    startWorkflowFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminSetUserPassword',
+        'cognito-idp:AdminInitiateAuth',
+        'cognito-idp:AdminRespondToAuthChallenge',
+        'cognito-idp:AssociateSoftwareToken'
+      ],
+      resources: [cognitoAuth.userPool.userPoolArn]
+    }));
+
+    startWorkflowFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'lambda:InvokeFunction'
+      ],
+      resources: [analyzeFileFunction.functionArn]
     }));
 
     verifyOtpFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
@@ -412,6 +466,10 @@ export class ProductionMisraStack extends cdk.Stack {
     
     otpStorageTable.grantReadWriteData(otpWebhookFunction);
     otpStorageTable.grantReadData(fetchOtpFunction);
+    
+    // Grant progress table permissions
+    this.progressTable.grantReadWriteData(startWorkflowFunction);
+    this.progressTable.grantReadData(getProgressFunction);
     
     // Grant S3 permissions to Lambda functions
     fileStorageBucket.grantReadWrite(uploadFunction);
@@ -520,6 +578,19 @@ export class ProductionMisraStack extends cdk.Stack {
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('GetResultsIntegration', getAnalysisResultsFunction),
       authorizer: jwtAuthorizer,
+    });
+
+    // Workflow routes (no authorization required for start, but get-progress is public)
+    api.addRoutes({
+      path: '/workflow/start',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('StartWorkflowIntegration', startWorkflowFunction),
+    });
+
+    api.addRoutes({
+      path: '/workflow/progress/{workflowId}',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetProgressIntegration', getProgressFunction),
     });
 
     // ============ OUTPUTS ============
