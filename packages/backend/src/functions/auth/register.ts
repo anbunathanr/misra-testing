@@ -22,7 +22,8 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
-import { DynamoDBClient, PutCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import { validateEmail, validatePassword } from '../../utils/validation';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
@@ -184,11 +185,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       await dynamoClient.send(new PutCommand({
         TableName: usersTableName,
         Item: {
-          email: { S: request.email },
-          userId: { S: userId },
-          tempPassword: { S: finalPassword },
-          createdAt: { N: Date.now().toString() },
-          name: { S: request.name || request.email }
+          email: request.email,
+          userId: userId,
+          tempPassword: finalPassword,
+          createdAt: Date.now(),
+          name: request.name || request.email
         }
       }));
       logger.info('Stored user credentials in DynamoDB', {

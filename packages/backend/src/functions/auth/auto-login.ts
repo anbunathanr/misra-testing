@@ -32,7 +32,8 @@ import {
   AuthFlowType,
   AdminGetUserCommand
 } from '@aws-sdk/client-cognito-identity-provider';
-import { DynamoDBClient, GetCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
 
@@ -94,12 +95,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       const userRecord = await dynamoClient.send(new GetCommand({
         TableName: usersTableName,
         Key: {
-          email: { S: request.email }
+          email: request.email
         }
       }));
 
-      if (userRecord.Item?.tempPassword?.S) {
-        tempPassword = userRecord.Item.tempPassword.S;
+      if (userRecord.Item?.tempPassword) {
+        tempPassword = userRecord.Item.tempPassword;
         logger.info('Retrieved temporary password from DynamoDB', { correlationId });
       }
     } catch (dbError) {
