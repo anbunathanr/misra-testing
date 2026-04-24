@@ -10,12 +10,17 @@ import {
   ChallengeNameType,
   AuthFlowType
 } from '@aws-sdk/client-cognito-identity-provider';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import * as speakeasy from 'speakeasy';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('VerifyOTPCognito');
 const cognitoClient = new CognitoIdentityProviderClient({ 
+  region: process.env.AWS_REGION || 'us-east-1' 
+});
+const dynamoClient = new DynamoDBClient({ 
   region: process.env.AWS_REGION || 'us-east-1' 
 });
 
@@ -468,9 +473,28 @@ async function getStoredTOTPSecret(email: string): Promise<string> {
  * Generate temporary password for user (used in autonomous workflow)
  */
 async function generateTemporaryPassword(email: string): Promise<string> {
-  // This would retrieve or generate a temporary password for the user
-  // In the autonomous workflow, users are created with known temporary passwords
-  return 'TempPass123!'; // Placeholder - should be retrieved from secure storage
+  // Retrieve the temporary password from DynamoDB that was stored during registration
+  try {
+    const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
+    const userRecord = await dynamoClient.send(new GetCommand({
+      TableName: usersTableName,
+      Key: {
+        email: email
+      }
+    }));
+
+    if (userRecord.Item?.tempPassword) {
+      return userRecord.Item.tempPassword;
+    }
+  } catch (error) {
+    logger.warn('Could not retrieve password from DynamoDB', {
+      email,
+      error: (error as any).message
+    });
+  }
+
+  // Fallback to a default password if retrieval fails
+  return 'TempPass123!';
 }
 
 function successResponse(data: VerifyOTPResponse): APIGatewayProxyResult {
