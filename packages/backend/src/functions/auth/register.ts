@@ -22,12 +22,14 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { DynamoDBClient, PutCommand } from '@aws-sdk/client-dynamodb';
 import { validateEmail, validatePassword } from '../../utils/validation';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('Register');
 const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 interface RegisterRequest {
   email: string;
@@ -175,6 +177,31 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       correlationId,
       userId
     });
+
+    // Store temporary password in DynamoDB for auto-login
+    try {
+      const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
+      await dynamoClient.send(new PutCommand({
+        TableName: usersTableName,
+        Item: {
+          email: { S: request.email },
+          userId: { S: userId },
+          tempPassword: { S: finalPassword },
+          createdAt: { N: Date.now().toString() },
+          name: { S: request.name || request.email }
+        }
+      }));
+      logger.info('Stored user credentials in DynamoDB', {
+        correlationId,
+        email: request.email
+      });
+    } catch (dbError) {
+      logger.warn('Failed to store credentials in DynamoDB', {
+        correlationId,
+        error: (dbError as any).message
+      });
+      // Continue anyway - DynamoDB storage is optional for auto-login fallback
+    }
 
     // Note: SOFTWARE_TOKEN_MFA will be set up during the login/OTP verification flow
     // The user needs to associate a software token first before we can set MFA preference

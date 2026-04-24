@@ -4,6 +4,9 @@
  * Logs in user after OTP verification without requiring password
  * This is used in the automated authentication flow
  *
+ * For existing users: Uses the temporary password set during registration
+ * For new users: Uses the temporary password generated during registration
+ *
  * Request:
  * {
  *   "email": "user@example.com"

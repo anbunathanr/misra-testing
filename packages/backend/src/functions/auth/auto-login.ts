@@ -4,6 +4,9 @@
  * Logs in user after OTP verification without requiring password
  * This is used in the automated authentication flow
  * 
+ * For existing users: Uses the temporary password set during registration
+ * For new users: Uses the temporary password generated during registration
+ * 
  * Request:
  * {
  *   "email": "user@example.com"
@@ -26,13 +29,18 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { 
   CognitoIdentityProviderClient,
   AdminInitiateAuthCommand,
-  AuthFlowType
+  AuthFlowType,
+  AdminGetUserCommand
 } from '@aws-sdk/client-cognito-identity-provider';
+import { DynamoDBClient, GetCommand } from '@aws-sdk/client-dynamodb';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('AutoLogin');
 const cognitoClient = new CognitoIdentityProviderClient({ 
+  region: process.env.AWS_REGION || 'us-east-1' 
+});
+const dynamoClient = new DynamoDBClient({ 
   region: process.env.AWS_REGION || 'us-east-1' 
 });
 
@@ -78,10 +86,31 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       email: request.email
     });
 
-    // Authenticate with Cognito using the fixed test password
-    // This password was used during registration and OTP verification
-    const tempPassword = 'TestPass123!@#';
+    // Try to get the temporary password from DynamoDB (stored during registration)
+    let tempPassword = 'TestPass123!@#'; // Fallback for existing users
+    
+    try {
+      const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
+      const userRecord = await dynamoClient.send(new GetCommand({
+        TableName: usersTableName,
+        Key: {
+          email: { S: request.email }
+        }
+      }));
 
+      if (userRecord.Item?.tempPassword?.S) {
+        tempPassword = userRecord.Item.tempPassword.S;
+        logger.info('Retrieved temporary password from DynamoDB', { correlationId });
+      }
+    } catch (dbError) {
+      logger.warn('Could not retrieve temp password from DynamoDB, using fallback', {
+        correlationId,
+        error: (dbError as any).message
+      });
+      // Continue with fallback password
+    }
+
+    // Authenticate with Cognito using the temporary password
     const authResult = await cognitoClient.send(new AdminInitiateAuthCommand({
       UserPoolId: process.env.COGNITO_USER_POOL_ID!,
       ClientId: process.env.COGNITO_CLIENT_ID!,
@@ -105,12 +134,28 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // Extract user ID from the access token (sub claim)
     const accessTokenParts = authResult.AuthenticationResult.AccessToken!.split('.');
     let userId = request.email.split('@')[0];
+    let userName = 'User';
     
     try {
       const payload = JSON.parse(Buffer.from(accessTokenParts[1], 'base64').toString());
       userId = payload.sub || userId;
     } catch (e) {
       logger.warn('Could not extract userId from token', { correlationId });
+    }
+
+    // Try to get user name from Cognito
+    try {
+      const userInfo = await cognitoClient.send(new AdminGetUserCommand({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+        Username: request.email
+      }));
+
+      const nameAttr = userInfo.UserAttributes?.find(attr => attr.Name === 'name');
+      if (nameAttr?.Value) {
+        userName = nameAttr.Value;
+      }
+    } catch (e) {
+      logger.warn('Could not retrieve user name from Cognito', { correlationId });
     }
 
     const response: AutoLoginResponse = {
@@ -120,7 +165,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       user: {
         userId,
         email: request.email,
-        name: 'User'
+        name: userName
       }
     };
 
@@ -136,6 +181,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       error: error.message,
       stack: error.stack
     });
+
+    // Check if it's an authentication error
+    if (error.message?.includes('Incorrect username or password') || 
+        error.name === 'NotAuthorizedException') {
+      return errorResponse(401, 'INVALID_CREDENTIALS', 'Incorrect username or password', correlationId);
+    }
 
     return errorResponse(500, 'AUTO_LOGIN_FAILED', error.message || 'Failed to auto-login', correlationId);
   }
