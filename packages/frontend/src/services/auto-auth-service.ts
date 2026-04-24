@@ -181,6 +181,11 @@ export class AutoAuthService {
         };
       }
 
+      // Always logout before starting new authentication to allow email reuse
+      // This ensures clean state for repeated testing with same email
+      logs.push(`🔄 Clearing previous session to allow email reuse...`);
+      await authService.logout();
+
       return { success: false };
     } catch (error) {
       logs.push(`⚠️ Error checking existing auth: ${error}`);
@@ -198,6 +203,9 @@ export class AutoAuthService {
   ): Promise<{ success: boolean; password?: string; userExists?: boolean; error?: string }> {
     try {
       logs.push(`📝 Auto-registering user: ${email}`);
+      
+      // Use consistent demo password for all users
+      const DEMO_PASSWORD = 'DemoPass123!@#';
 
       // Call backend register endpoint with demo password
       const response = await fetch(`${this.apiUrl}/auth/register`, {
