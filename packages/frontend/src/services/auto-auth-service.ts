@@ -74,14 +74,35 @@ export class AutoAuthService {
       }
       tempPassword = registerResult.password || '';
 
-      // Step 3: If user exists (409), we skip login and go directly to OTP
-      // The verify-otp endpoint will handle authentication for existing users
+      // Step 3: If user already exists (409), skip OTP and go directly to login
       if (registerResult.userExists) {
-        logs.push(`ℹ️ User already exists, skipping login and proceeding to OTP verification`);
-        // Don't set session - verify-otp will authenticate directly
+        logs.push(`ℹ️ User already exists, skipping OTP verification and proceeding directly to login`);
+        
+        // Step 3a: Auto-login user directly (no OTP for existing users)
+        this.reportProgress(onProgress, 'logging_in', 'Logging in...', 80);
+        const loginResult = await this.autoLogin(email, logs);
+        if (!loginResult.success) {
+          return {
+            success: false,
+            error: loginResult.error,
+            logs
+          };
+        }
+
+        // Complete
+        this.reportProgress(onProgress, 'complete', 'Authentication complete', 100);
+        const executionTime = Date.now() - startTime;
+        logs.push(`✅ Full authentication completed in ${executionTime}ms`);
+
+        return {
+          success: true,
+          token: loginResult.token,
+          user: loginResult.user,
+          logs
+        };
       }
 
-      // Step 4: Auto-fetch OTP from email
+      // Step 4: For NEW users, auto-fetch OTP from email
       this.reportProgress(onProgress, 'fetching_otp', 'Fetching OTP from email...', 40);
       const otpResult = await this.autoFetchOTP(email, logs);
       if (!otpResult.success) {
