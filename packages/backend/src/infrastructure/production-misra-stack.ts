@@ -602,7 +602,7 @@ export class ProductionMisraStack extends cdk.Stack {
     });
 
     api.addRoutes({
-      path: '/analysis/results',
+      path: '/analysis/results/{fileId}',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('GetResultsIntegration', getAnalysisResultsFunction),
       authorizer: jwtAuthorizer,

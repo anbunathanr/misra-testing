@@ -31,6 +31,10 @@ const dynamoClient = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1' 
 });
 
+// Default table names for development
+const DEFAULT_FILE_METADATA_TABLE = 'FileMetadata';
+const DEFAULT_ANALYSIS_RESULTS_TABLE = 'AnalysisResults';
+
 interface FileStatusResponse {
   fileId: string;
   fileName: string;
@@ -49,7 +53,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     logger.info('Get file status request received', {
       correlationId,
       path: event.path,
-      method: event.httpMethod
+      method: event.httpMethod,
+      pathParameters: event.pathParameters
     });
 
     // Extract fileId from path
@@ -58,19 +63,28 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'MISSING_FILE_ID', 'File ID is required', correlationId);
     }
 
+    // Extract userId from authorizer context
+    const userId = event.requestContext?.authorizer?.claims?.sub || event.requestContext?.authorizer?.principalId;
+    if (!userId) {
+      logger.warn('Missing userId in authorizer context', { correlationId, fileId });
+      return errorResponse(401, 'UNAUTHORIZED', 'User authentication required', correlationId);
+    }
+
     logger.info('Fetching file status', {
       correlationId,
-      fileId
+      fileId,
+      userId
     });
 
-    // Get file metadata
-    const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'FileMetadata';
+    // Get file metadata - need both fileId (partition key) and userId (sort key)
+    const fileMetadataTable = process.env.FILE_METADATA_TABLE || DEFAULT_FILE_METADATA_TABLE;
     const fileMetadata = await dynamoClient.send(new GetCommand({
       TableName: fileMetadataTable,
-      Key: { fileId }
+      Key: { fileId, userId }
     }));
 
     if (!fileMetadata.Item) {
+      logger.warn('File not found', { correlationId, fileId, userId });
       return errorResponse(404, 'FILE_NOT_FOUND', 'File not found', correlationId);
     }
 
@@ -78,7 +92,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     logger.info('File metadata retrieved', {
       correlationId,
       fileId,
-      fileName: file.fileName
+      userId,
+      fileName: file.fileName,
+      hasAnalysisId: !!file.analysisId
     });
 
     // Get analysis status if analysisId exists
@@ -88,7 +104,14 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     let errorMessage: string | undefined;
 
     if (file.analysisId) {
-      const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults';
+      const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || DEFAULT_ANALYSIS_RESULTS_TABLE;
+      logger.info('Checking analysis results', {
+        correlationId,
+        fileId,
+        analysisId: file.analysisId,
+        analysisResultsTable
+      });
+      
       const analysisResult = await dynamoClient.send(new GetCommand({
         TableName: analysisResultsTable,
         Key: { analysisId: file.analysisId }
@@ -141,7 +164,19 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       stack: error.stack
     });
 
-    return errorResponse(500, 'GET_STATUS_FAILED', error.message || 'Failed to get file status', correlationId);
+    // Return proper CORS headers even on error
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        error: {
+          code: 'GET_STATUS_FAILED',
+          message: error.message || 'Failed to get file status',
+          timestamp: new Date().toISOString(),
+          requestId: correlationId
+        }
+      })
+    };
   }
 };
 
