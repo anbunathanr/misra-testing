@@ -295,7 +295,6 @@ export class ProductionWorkflowService {
    * Poll for analysis results with progress updates
    */
   private async pollForAnalysisResults(fileId: string, logs: string[]): Promise<any> {
-    const token = await authService.getToken();
     const maxAttempts = 60; // 5 minutes max (5 second intervals)
     let attempts = 0;
 
@@ -304,10 +303,18 @@ export class ProductionWorkflowService {
         attempts++;
 
         try {
+          // Get fresh token on each poll attempt
+          const token = await authService.getToken();
+          if (!token) {
+            throw new Error('No authentication token available - user may have been logged out');
+          }
+
           // Check file metadata for analysis status
           const response = await fetch(`${this.apiUrl}/files/${fileId}/status`, {
+            method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
           });
 
@@ -334,10 +341,18 @@ export class ProductionWorkflowService {
               clearInterval(this.pollingInterval);
             }
 
+            // Get fresh token for results fetch
+            const resultsToken = await authService.getToken();
+            if (!resultsToken) {
+              throw new Error('No authentication token available for results fetch');
+            }
+
             // Fetch full analysis results
             const resultsResponse = await fetch(`${this.apiUrl}/analysis/results/${data.analysisId}`, {
+              method: 'GET',
               headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${resultsToken}`,
+                'Content-Type': 'application/json'
               }
             });
 
