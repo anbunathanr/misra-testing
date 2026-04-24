@@ -30,6 +30,8 @@ export type AutoAuthProgressCallback = (progress: AutoAuthProgress) => void;
 
 export class AutoAuthService {
   private apiUrl: string;
+  // Standard demo password for all test accounts
+  private readonly DEMO_PASSWORD = 'DemoPass123!@#';
 
   constructor() {
     this.apiUrl = import.meta.env.VITE_API_URL || '';
@@ -197,11 +199,7 @@ export class AutoAuthService {
     try {
       logs.push(`📝 Auto-registering user: ${email}`);
 
-      // Generate a unique, high-entropy password for this user
-      // This password is only used for the autonomous workflow
-      const tempPassword = this.generateTemporaryPassword();
-
-      // Call backend register endpoint
+      // Call backend register endpoint with demo password
       const response = await fetch(`${this.apiUrl}/auth/register`, {
         method: 'POST',
         headers: {
@@ -209,7 +207,7 @@ export class AutoAuthService {
         },
         body: JSON.stringify({
           email,
-          password: tempPassword,
+          password: this.DEMO_PASSWORD,
           name
         })
       });
@@ -221,15 +219,14 @@ export class AutoAuthService {
         const errorMessage = typeof data.error === 'string' ? data.error : data.error?.message || '';
         if (response.status === 409 || errorMessage.includes('already exists')) {
           logs.push(`ℹ️ User already exists: ${email}`);
-          // For existing users, we need to use a default password or passwordless flow
-          // Try with a common test password first
-          return { success: true, password: 'TestPass123!@#', userExists: true };
+          // For existing users, use the same demo password
+          return { success: true, password: this.DEMO_PASSWORD, userExists: true };
         }
         throw new Error(errorMessage || 'Registration failed');
       }
 
       logs.push(`✅ User registered successfully: ${email}`);
-      return { success: true, password: tempPassword, userExists: false };
+      return { success: true, password: this.DEMO_PASSWORD, userExists: false };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
@@ -464,32 +461,6 @@ export class AutoAuthService {
       logs.push(`❌ Auto-login failed: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
-  }
-
-  /**
-   * Helper: Generate temporary password
-   */
-  private generateTemporaryPassword(): string {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const digits = '0123456789';
-    const special = '!@#$%^&*';
-
-    // Ensure at least one of each required type
-    let password = '';
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += digits[Math.floor(Math.random() * digits.length)];
-    password += special[Math.floor(Math.random() * special.length)];
-
-    // Fill the rest with random characters
-    const allChars = uppercase + lowercase + digits + special;
-    for (let i = password.length; i < 12; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
-    }
-
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
   }
 
   /**

@@ -45,6 +45,9 @@ const dynamoClient = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1' 
 });
 
+// Standard demo password for all test accounts
+const DEMO_PASSWORD = 'DemoPass123!@#';
+
 interface AutoLoginRequest {
   email: string;
 }
@@ -88,7 +91,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     });
 
     // Try to get the temporary password from DynamoDB (stored during registration)
-    let tempPassword = 'TestPass123!@#'; // Fallback for existing users
+    let tempPassword = DEMO_PASSWORD; // Use demo password as fallback for existing users
     
     try {
       const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
@@ -104,11 +107,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         logger.info('Retrieved temporary password from DynamoDB', { correlationId });
       }
     } catch (dbError) {
-      logger.warn('Could not retrieve temp password from DynamoDB, using fallback', {
+      logger.warn('Could not retrieve temp password from DynamoDB, using demo password fallback', {
         correlationId,
         error: (dbError as any).message
       });
-      // Continue with fallback password
+      // Continue with demo password fallback
     }
 
     // Authenticate with Cognito using the temporary password

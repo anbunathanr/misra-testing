@@ -24,6 +24,9 @@ const dynamoClient = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1' 
 });
 
+// Standard demo password for all test accounts
+const DEMO_PASSWORD = 'DemoPass123!@#';
+
 interface VerifyOTPRequest {
   email: string;
   otp?: string; // OTP code from frontend
@@ -493,8 +496,8 @@ async function generateTemporaryPassword(email: string): Promise<string> {
     });
   }
 
-  // Fallback to a default password if retrieval fails
-  return 'TempPass123!';
+  // Fallback to demo password if retrieval fails
+  return DEMO_PASSWORD;
 }
 
 function successResponse(data: VerifyOTPResponse): APIGatewayProxyResult {
