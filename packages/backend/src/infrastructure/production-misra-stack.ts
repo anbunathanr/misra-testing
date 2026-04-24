@@ -324,6 +324,25 @@ export class ProductionMisraStack extends cdk.Stack {
       },
     });
 
+    // File: Get File Status
+    const getFileStatusFunction = new lambdaNodejs.NodejsFunction(this, 'GetFileStatusFunction', {
+      functionName: 'misra-platform-file-get-status',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/file/get-file-status.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
+        ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
+      },
+    });
+
     // Analysis: Analyze File
     const analyzeFileFunction = new lambdaNodejs.NodejsFunction(this, 'AnalyzeFileFunction', {
       functionName: 'misra-platform-analysis-analyze-file',
@@ -460,9 +479,11 @@ export class ProductionMisraStack extends cdk.Stack {
     
     this.fileMetadataTable.grantReadWriteData(uploadFunction);
     this.fileMetadataTable.grantReadData(getFilesFunction);
+    this.fileMetadataTable.grantReadData(getFileStatusFunction);
     
     this.analysisResultsTable.grantReadWriteData(analyzeFileFunction);
     this.analysisResultsTable.grantReadData(getAnalysisResultsFunction);
+    this.analysisResultsTable.grantReadData(getFileStatusFunction);
     
     otpStorageTable.grantReadWriteData(otpWebhookFunction);
     otpStorageTable.grantReadData(fetchOtpFunction);
@@ -563,6 +584,13 @@ export class ProductionMisraStack extends cdk.Stack {
       path: '/files',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('GetFilesIntegration', getFilesFunction),
+      authorizer: jwtAuthorizer,
+    });
+
+    api.addRoutes({
+      path: '/files/{fileId}/status',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('GetFileStatusIntegration', getFileStatusFunction),
       authorizer: jwtAuthorizer,
     });
 
