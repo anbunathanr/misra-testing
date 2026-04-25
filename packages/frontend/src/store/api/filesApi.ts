@@ -8,6 +8,7 @@ interface UploadUrlRequest {
 
 interface UploadUrlResponse {
   fileId: string
+  s3Key: string
   uploadUrl: string
   downloadUrl: string
   expiresIn: number
@@ -39,7 +40,12 @@ export const filesApi = api.injectEndpoints({
     uploadToS3: builder.mutation<void, { url: string; file: File; contentType: string }>({
       queryFn: async ({ url, file, contentType }) => {
         try {
-          console.log('Uploading to S3:', { url: url.substring(0, 100), fileSize: file.size, contentType })
+          console.log('🚀 Starting S3 upload:', { 
+            urlPrefix: url.substring(0, 100), 
+            fileSize: file.size, 
+            fileName: file.name,
+            contentType 
+          })
           
           const response = await fetch(url, {
             method: 'PUT',
@@ -49,17 +55,28 @@ export const filesApi = api.injectEndpoints({
             }
           })
 
-          console.log('S3 upload response:', { status: response.status, statusText: response.statusText })
+          console.log('📡 S3 upload response:', { 
+            status: response.status, 
+            statusText: response.statusText,
+            contentLength: response.headers.get('content-length'),
+            etag: response.headers.get('etag')
+          })
 
           if (!response.ok) {
             const errorText = await response.text()
-            console.error('S3 upload error:', errorText)
-            throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+            console.error('❌ S3 upload error:', { 
+              status: response.status,
+              statusText: response.statusText,
+              errorText,
+              url: url.substring(0, 100)
+            })
+            throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`)
           }
 
+          console.log('✅ S3 upload successful for file:', file.name)
           return { data: undefined }
         } catch (error) {
-          console.error('Upload exception:', error)
+          console.error('❌ Upload exception:', error)
           return { error: { status: 'CUSTOM_ERROR', error: String(error) } }
         }
       }

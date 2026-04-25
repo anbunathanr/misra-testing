@@ -27,6 +27,7 @@ interface UploadRequestBody {
 
 interface UploadResponse {
   fileId: string;
+  s3Key: string;
   uploadUrl: string;
   downloadUrl: string;
   expiresIn: number;
@@ -143,6 +144,7 @@ export const handler = centralizedErrorHandler.wrapLambdaHandler(
 
       const response: UploadResponse = {
         fileId: uploadResponse.fileId,
+        s3Key: uploadResponse.s3Key,
         uploadUrl: uploadResponse.uploadUrl,
         downloadUrl: uploadResponse.downloadUrl,
         expiresIn: uploadResponse.expiresIn,

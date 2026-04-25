@@ -177,7 +177,7 @@ export class ProductionWorkflowService {
   private async executeFileUploadStep(
     options: ProductionWorkflowOptions,
     logs: string[]
-  ): Promise<{ success: boolean; fileId?: string; file?: any; error?: string }> {
+  ): Promise<{ success: boolean; fileId?: string; s3Key?: string; file?: any; error?: string }> {
     this.setStepActive(2, 'Uploading file to S3...');
     logs.push(`📁 Step 2: Uploading file to S3`);
 
@@ -217,7 +217,13 @@ export class ProductionWorkflowService {
       }
 
       const uploadData = await uploadUrlResponse.json();
+      console.log(`✅ Upload response received:`, {
+        fileId: uploadData.fileId,
+        s3Key: uploadData.s3Key,
+        uploadUrlPrefix: uploadData.uploadUrl.substring(0, 100)
+      });
       logs.push(`✅ Presigned URL obtained: ${uploadData.fileId}`);
+      logs.push(`🔑 S3 Key: ${uploadData.s3Key}`);
 
       // Upload file to S3 using presigned URL
       logs.push(`☁️ Uploading file to S3...`);
@@ -240,6 +246,7 @@ export class ProductionWorkflowService {
       return {
         success: true,
         fileId: uploadData.fileId,
+        s3Key: uploadData.s3Key,
         file: {
           name: fileName,
           size: fileSize,

@@ -104,18 +104,28 @@ function FileUpload() {
 
     try {
       // Get presigned URL
+      console.log(`📋 Getting presigned URL for file: ${fileItem.file.name}`)
       const urlResponse = await getUploadUrl({
         fileName: fileItem.file.name,
         fileSize: fileItem.file.size,
         contentType: fileItem.file.type || 'application/octet-stream'
       }).unwrap()
 
+      console.log(`✅ Presigned URL received:`, {
+        fileId: urlResponse.fileId,
+        uploadUrlPrefix: urlResponse.uploadUrl.substring(0, 100),
+        expiresIn: urlResponse.expiresIn
+      })
+
       // Upload to S3
+      console.log(`📤 Uploading file to S3: ${fileItem.file.name}`)
       await uploadToS3({
         url: urlResponse.uploadUrl,
         file: fileItem.file,
         contentType: fileItem.file.type || 'application/octet-stream'
       }).unwrap()
+
+      console.log(`✅ File uploaded successfully to S3: ${fileItem.file.name}`)
 
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -126,8 +136,10 @@ function FileUpload() {
       )
 
       // Refresh backend file list after successful upload
+      console.log(`🔄 Refreshing file list from backend`)
       await refetchFiles()
     } catch (error) {
+      console.error(`❌ Upload failed for file: ${fileItem.file.name}`, error)
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index
