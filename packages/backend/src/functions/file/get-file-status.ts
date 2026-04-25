@@ -25,6 +25,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
+import { getUserFromContext } from '../../utils/auth-util';
 
 const logger = createLogger('GetFileStatus');
 const dynamoClient = new DynamoDBClient({ 
@@ -63,12 +64,19 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return errorResponse(400, 'MISSING_FILE_ID', 'File ID is required', correlationId);
     }
 
-    // Extract userId from authorizer context
-    const userId = event.requestContext?.authorizer?.claims?.sub || event.requestContext?.authorizer?.principalId;
-    if (!userId) {
-      logger.warn('Missing userId in authorizer context', { correlationId, fileId });
+    // Extract userId from authorizer context using the same utility as upload
+    const user = await getUserFromContext(event);
+    
+    if (!user.userId) {
+      logger.error('Missing userId in user context', { 
+        correlationId, 
+        fileId,
+        authorizerContext: JSON.stringify(event.requestContext?.authorizer || {})
+      });
       return errorResponse(401, 'UNAUTHORIZED', 'User authentication required', correlationId);
     }
+    
+    const userId = user.userId;
 
     logger.info('Fetching file status', {
       correlationId,
