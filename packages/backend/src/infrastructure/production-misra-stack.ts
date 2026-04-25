@@ -6,6 +6,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as authorizers from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import { CognitoAuth } from './cognito-auth';
@@ -121,6 +123,14 @@ export class ProductionMisraStack extends cdk.Stack {
           maxAge: 86400, // 24 hours in seconds
         }
       ]
+    });
+
+    // ============ SQS QUEUE FOR ANALYSIS ============
+    const analysisQueue = new sqs.Queue(this, 'AnalysisQueue', {
+      queueName: 'misra-analysis-queue',
+      visibilityTimeout: cdk.Duration.minutes(15),
+      retentionPeriod: cdk.Duration.hours(1),
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // ============ LAMBDA FUNCTIONS ============
@@ -302,6 +312,7 @@ export class ProductionMisraStack extends cdk.Stack {
       environment: {
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
         FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
+        ANALYSIS_QUEUE_URL: analysisQueue.queueUrl,
       },
     });
 
@@ -361,6 +372,12 @@ export class ProductionMisraStack extends cdk.Stack {
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
       },
     });
+
+    // Connect SQS queue to analyze function
+    analyzeFileFunction.addEventSource(new lambdaEventSources.SqsEventSource(analysisQueue, {
+      batchSize: 1,
+      maxConcurrency: 10,
+    }));
 
     // Analysis: Get Results
     const getAnalysisResultsFunction = new lambdaNodejs.NodejsFunction(this, 'GetAnalysisResultsFunction', {
@@ -507,6 +524,10 @@ export class ProductionMisraStack extends cdk.Stack {
       ],
       resources: [`${fileStorageBucket.bucketArn}/*`]
     }));
+
+    // Grant SQS permissions to Lambda functions
+    analysisQueue.grantSendMessages(uploadFunction);
+    analysisQueue.grantConsumeMessages(analyzeFileFunction);
 
     // ============ API GATEWAY ============
     const api = new apigateway.HttpApi(this, 'MisraAPI', {
