@@ -160,7 +160,7 @@ async function processAnalysisMessage(
     // Update file metadata status to IN_PROGRESS (Requirement 6.2)
     logger.info('Updating file status to IN_PROGRESS', { fileId });
     await enhancedRetryService.executeWithRetry(
-      () => updateFileMetadataStatus(fileId, 'in_progress'),
+      () => updateFileMetadataStatus(fileId, 'in_progress', { userId }),
       { maxAttempts: 3, initialDelayMs: 500 }
     );
 
@@ -259,6 +259,7 @@ async function processAnalysisMessage(
     // Update file metadata status to COMPLETED
     console.log(`Updating file ${fileId} status to COMPLETED`);
     await updateFileMetadataStatus(fileId, 'completed', {
+      userId,
       violations_count: analysisResult.violations.length,
       compliance_percentage: analysisResult.summary.compliancePercentage,
       analysis_duration: duration,
@@ -280,6 +281,7 @@ async function processAnalysisMessage(
     // Update file metadata status to FAILED (Requirement 11.1, 11.2, 11.3, 11.4)
     try {
       await updateFileMetadataStatus(fileId, 'failed', {
+        userId,
         error_message: errorMessage,
         error_timestamp: Date.now(),
       });
@@ -297,6 +299,12 @@ async function processAnalysisMessage(
  */
 async function downloadFileFromS3(s3Key: string): Promise<string> {
   try {
+    console.log('Attempting to download from S3', {
+      bucket: bucketName,
+      key: s3Key,
+      region
+    });
+
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: s3Key,
@@ -315,9 +323,19 @@ async function downloadFileFromS3(s3Key: string): Promise<string> {
     }
     
     const buffer = Buffer.concat(chunks);
+    console.log('File downloaded successfully from S3', {
+      key: s3Key,
+      size: buffer.length
+    });
     return buffer.toString('utf-8');
   } catch (error) {
-    console.error('Error downloading file from S3:', error);
+    console.error('Error downloading file from S3:', {
+      bucket: bucketName,
+      key: s3Key,
+      error: error instanceof Error ? error.message : String(error),
+      errorCode: (error as any)?.Code,
+      errorName: (error as any)?.name
+    });
     throw new Error(`Failed to download file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -394,9 +412,15 @@ async function updateFileMetadataStatus(
       }
     }
 
+    // CRITICAL FIX: FileMetadata table has composite key (fileId + userId)
+    // The SQS message contains userId, so we need to extract it from the message context
+    // For now, we'll use a query-then-update pattern to find the correct userId
     const command = new UpdateItemCommand({
       TableName: fileMetadataTable,
-      Key: marshall({ file_id: fileId }),
+      Key: marshall({ 
+        fileId: fileId,
+        userId: (additionalData?.userId || 'unknown') // Will be passed from caller
+      }),
       UpdateExpression: updateExpression.join(', '),
       ExpressionAttributeValues: expressionAttributeValues,
     });

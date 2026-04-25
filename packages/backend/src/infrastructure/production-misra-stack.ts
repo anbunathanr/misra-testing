@@ -95,6 +95,16 @@ export class ProductionMisraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Analysis costs tracking table
+    const analysisCostsTable = new dynamodb.Table(this, 'AnalysisCostsTable', {
+      tableName: 'AnalysisCosts',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // OTP storage table (for webhook-based OTP capture)
     const otpStorageTable = new dynamodb.Table(this, 'OTPStorageTable', {
       tableName: 'OTPStorage',
@@ -369,9 +379,14 @@ export class ProductionMisraStack extends cdk.Stack {
       },
       environment: {
         FILE_STORAGE_BUCKET_NAME: fileStorageBucket.bucketName,
+        FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
+        ANALYSIS_COSTS_TABLE: analysisCostsTable.tableName,
       },
     });
+
+    // Grant FILE_METADATA_TABLE read/write permissions to analyzeFileFunction
+    this.fileMetadataTable.grantReadWriteData(analyzeFileFunction);
 
     // Connect SQS queue to analyze function
     analyzeFileFunction.addEventSource(new lambdaEventSources.SqsEventSource(analysisQueue, {
@@ -497,10 +512,14 @@ export class ProductionMisraStack extends cdk.Stack {
     this.fileMetadataTable.grantReadWriteData(uploadFunction);
     this.fileMetadataTable.grantReadData(getFilesFunction);
     this.fileMetadataTable.grantReadData(getFileStatusFunction);
+    this.fileMetadataTable.grantReadWriteData(analyzeFileFunction);
     
     this.analysisResultsTable.grantReadWriteData(analyzeFileFunction);
     this.analysisResultsTable.grantReadData(getAnalysisResultsFunction);
     this.analysisResultsTable.grantReadData(getFileStatusFunction);
+    
+    // Grant AnalysisCosts table permissions to analyzeFileFunction
+    analysisCostsTable.grantReadWriteData(analyzeFileFunction);
     
     otpStorageTable.grantReadWriteData(otpWebhookFunction);
     otpStorageTable.grantReadData(fetchOtpFunction);

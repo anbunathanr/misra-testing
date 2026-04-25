@@ -241,7 +241,8 @@ async function createFileMetadata(
     fileId: uploadResponse.fileId,
     fileName: uploadRequest.fileName,
     fileType,
-    userId: user.userId
+    userId: user.userId,
+    s3Key: uploadResponse.s3Key
   });
 
   try {
@@ -262,7 +263,8 @@ async function createFileMetadata(
     }));
 
     logger.info('FileMetadata record created successfully', { 
-      fileId: uploadResponse.fileId 
+      fileId: uploadResponse.fileId,
+      s3Key: uploadResponse.s3Key
     });
 
   } catch (error) {
@@ -326,7 +328,8 @@ async function queueAnalysisWithRetry(
       async () => {
         logger.info('Queuing analysis', { 
           fileId: uploadResponse.fileId, 
-          language 
+          language,
+          s3Key: uploadResponse.s3Key
         });
 
         await sqsClient.send(new SendMessageCommand({
@@ -342,7 +345,8 @@ async function queueAnalysisWithRetry(
         }));
 
         logger.info('Analysis queued successfully', { 
-          fileId: uploadResponse.fileId 
+          fileId: uploadResponse.fileId,
+          s3Key: uploadResponse.s3Key
         });
       },
       { 

@@ -101,52 +101,66 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       correlationId,
       fileId,
       userId,
-      fileName: file.fileName,
-      hasAnalysisId: !!file.analysisId
+      fileName: file.filename || file.fileName,
+      analysisStatus: file.analysis_status || file.analysisStatus
     });
 
-    // Get analysis status if analysisId exists
-    let analysisStatus = 'pending';
-    let analysisProgress = 0;
-    let analysisMessage = 'Waiting for analysis to start...';
-    let errorMessage: string | undefined;
+    // Get analysis status from file metadata
+    let analysisStatus = file.analysis_status || file.analysisStatus || 'pending';
+    let analysisProgress = file.analysis_progress || file.analysisProgress || 0;
+    let analysisMessage = file.analysis_message || file.analysisMessage || getDefaultMessage(analysisStatus);
+    let errorMessage = file.error_message || file.errorMessage;
+    let analysisId = file.analysisId;
 
-    if (file.analysisId) {
+    // If analysis is completed, try to get full results from AnalysisResults table
+    if (analysisStatus === 'completed' && !analysisId) {
+      // Query AnalysisResults table by fileId to find the analysis
       const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || DEFAULT_ANALYSIS_RESULTS_TABLE;
-      logger.info('Checking analysis results', {
+      logger.info('Querying analysis results by fileId', {
         correlationId,
         fileId,
-        analysisId: file.analysisId,
         analysisResultsTable
       });
       
-      const analysisResult = await dynamoClient.send(new GetCommand({
-        TableName: analysisResultsTable,
-        Key: { analysisId: file.analysisId }
-      }));
+      try {
+        const analysisResults = await dynamoClient.send(new QueryCommand({
+          TableName: analysisResultsTable,
+          IndexName: 'FileIndex',
+          KeyConditionExpression: 'fileId = :fileId',
+          ExpressionAttributeValues: {
+            ':fileId': fileId
+          },
+          ScanIndexForward: false,
+          Limit: 1
+        }));
 
-      if (analysisResult.Item) {
-        const analysis = analysisResult.Item;
-        analysisStatus = analysis.status || 'pending';
-        analysisProgress = analysis.progress || 0;
-        analysisMessage = analysis.message || getDefaultMessage(analysisStatus);
-        errorMessage = analysis.error;
+        if (analysisResults.Items && analysisResults.Items.length > 0) {
+          const analysis = analysisResults.Items[0];
+          analysisId = analysis.analysisId;
+          analysisProgress = 100;
+          analysisMessage = 'Analysis completed successfully';
 
-        logger.info('Analysis status retrieved', {
+          logger.info('Analysis result found', {
+            correlationId,
+            fileId,
+            analysisId,
+            status: analysisStatus
+          });
+        }
+      } catch (queryError) {
+        logger.warn('Failed to query analysis results', {
           correlationId,
           fileId,
-          analysisId: file.analysisId,
-          status: analysisStatus,
-          progress: analysisProgress
+          error: queryError instanceof Error ? queryError.message : 'Unknown error'
         });
       }
     }
 
     const response: FileStatusResponse = {
       fileId,
-      fileName: file.fileName,
-      uploadedAt: file.uploadedAt || Date.now(),
-      analysisId: file.analysisId,
+      fileName: file.filename || file.fileName,
+      uploadedAt: file.uploadedAt || file.uploadTimestamp || Date.now(),
+      analysisId: analysisId,
       analysisStatus: analysisStatus as any,
       analysisProgress,
       analysisMessage,
