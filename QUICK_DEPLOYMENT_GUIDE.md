@@ -1,234 +1,325 @@
-# Quick Deployment Guide
+# Quick Deployment Guide - Production MISRA Platform
 
-**Status**: ✅ Ready to Deploy  
-**Time to Deploy**: ~15-20 minutes  
-**Prerequisites**: AWS account, Node.js 20.x, AWS CLI
-
----
-
-## One-Command Deployment
-
-```bash
-cd packages/backend && npm install && npm run build:lambdas && npm run deploy
-```
+**Time to Deploy**: ~15 minutes  
+**Prerequisites**: AWS credentials, Node.js 20.x, npm
 
 ---
 
-## Step-by-Step Deployment
+## Step 1: Verify Backend Deployment (Already Done ✅)
 
-### 1. Verify Prerequisites
+The backend is already deployed to AWS. Verify it's running:
+
 ```bash
-# Check Node.js
-node --version  # Should be v20.x or higher
+# Check CloudFormation stack status
+aws cloudformation describe-stacks \
+  --stack-name MisraPlatform-dev \
+  --region us-east-1 \
+  --query 'Stacks[0].StackStatus'
 
-# Check AWS CLI
-aws --version
-
-# Verify AWS credentials
-aws sts get-caller-identity
+# Expected output: UPDATE_COMPLETE
 ```
 
-### 2. Install Dependencies
-```bash
-# From root directory
-npm install
+Get the API endpoint:
 
-# Backend dependencies
-cd packages/backend
-npm install
-```
-
-### 3. Build Lambda Functions
-```bash
-npm run build:lambdas
-```
-
-### 4. Deploy Infrastructure
-```bash
-npm run deploy
-```
-
-### 5. Get API Endpoint
 ```bash
 aws cloudformation describe-stacks \
-  --stack-name MisraPlatformMVPStack \
-  --query 'Stacks[0].Outputs[?OutputKey==`APIEndpoint`].OutputValue' \
+  --stack-name MisraPlatform-dev \
+  --region us-east-1 \
+  --query 'Stacks[0].Outputs[?OutputKey==`ApiEndpoint`].OutputValue' \
   --output text
 ```
 
 ---
 
-## What Gets Deployed
+## Step 2: Configure Frontend Environment
 
-### AWS Resources
-- ✅ Cognito User Pool (authentication)
-- ✅ 3 DynamoDB tables (Users, FileMetadata, AnalysisResults)
-- ✅ S3 bucket (file storage)
-- ✅ API Gateway (HTTP API with JWT)
-- ✅ 9 Lambda functions (auth, file, analysis)
+Update frontend environment variables:
 
-### API Endpoints
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login user
-- `POST /auth/verify-otp` - Verify OTP
-- `GET /auth/profile` - Get user profile (protected)
-- `POST /files/upload` - Upload file (protected)
-- `GET /files` - Get files (protected)
-- `POST /analysis/analyze` - Analyze file (protected)
-- `GET /analysis/results` - Get results (protected)
+```bash
+cd packages/frontend
+
+# Create or update .env.local
+cat > .env.local << 'EOF'
+VITE_API_URL=https://YOUR_API_ENDPOINT_HERE
+VITE_USE_MOCK_BACKEND=false
+EOF
+```
+
+Replace `YOUR_API_ENDPOINT_HERE` with the actual API endpoint from Step 1.
 
 ---
 
-## Deployment Output
+## Step 3: Build Frontend
 
-After successful deployment, you'll see:
+```bash
+cd packages/frontend
 
-```
-✅ MisraPlatformMVPStack
-   APIEndpoint: https://xxxxx.execute-api.us-east-1.amazonaws.com/
-   CognitoUserPoolId: us-east-1_xxxxx
-   CognitoClientId: xxxxx
-   FileStorageBucket: misra-files-123456789-us-east-1
+# Install dependencies (if not already done)
+npm install
+
+# Build for production
+npm run build
+
+# Expected output: dist/ directory with optimized files
 ```
 
 ---
 
-## Testing After Deployment
+## Step 4: Deploy Frontend to Vercel
 
-### 1. Register User
+### Option A: Using Vercel CLI
+
 ```bash
-curl -X POST https://xxxxx.execute-api.us-east-1.amazonaws.com/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "TestPassword123!",
-    "name": "Test User"
-  }'
+# Install Vercel CLI (if not already installed)
+npm install -g vercel
+
+# Deploy
+vercel --prod
+
+# Follow prompts to connect to your Vercel account
 ```
 
-### 2. Login
+### Option B: Using GitHub Integration
+
+1. Push code to GitHub
+2. Connect repository to Vercel
+3. Set environment variables in Vercel dashboard
+4. Vercel will auto-deploy on push
+
+### Option C: Manual Deployment
+
 ```bash
-curl -X POST https://xxxxx.execute-api.us-east-1.amazonaws.com/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "TestPassword123!"
-  }'
+# Build the frontend
+npm run build
+
+# Deploy dist/ folder to your hosting provider
+# (AWS S3 + CloudFront, Netlify, etc.)
 ```
 
-### 3. Verify OTP
+---
+
+## Step 5: Verify Deployment
+
+### Test Frontend Access
+
 ```bash
-curl -X POST https://xxxxx.execute-api.us-east-1.amazonaws.com/auth/verify-otp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "otp": "123456"
-  }'
+# Open the frontend URL in browser
+# Should see the MISRA Platform landing page
+```
+
+### Test API Connectivity
+
+```bash
+# Check if frontend can reach backend
+curl -X GET https://YOUR_API_ENDPOINT/health
+
+# Expected: 200 OK or similar
+```
+
+### Test Complete Workflow
+
+1. Open frontend in browser
+2. Enter email address
+3. Click "Start MISRA Analysis"
+4. Watch progress tracker
+5. See results when complete
+
+---
+
+## Step 6: Monitor Deployment
+
+### View Frontend Logs
+
+```bash
+# If deployed to Vercel
+vercel logs
+
+# If deployed to AWS S3 + CloudFront
+aws s3 ls s3://your-bucket/
+```
+
+### View Backend Logs
+
+```bash
+# Watch Lambda logs in real-time
+aws logs tail /aws/lambda/misra-* --follow
+
+# View specific function logs
+aws logs tail /aws/lambda/misra-analysis-analyze-file --follow
+```
+
+### Check DynamoDB
+
+```bash
+# View table items
+aws dynamodb scan --table-name FileMetadata-dev --region us-east-1
+
+# View analysis results
+aws dynamodb scan --table-name AnalysisResults-dev --region us-east-1
 ```
 
 ---
 
 ## Troubleshooting
 
-### Issue: AWS credentials not found
-```bash
-# Configure AWS CLI
-aws configure
+### Issue: "Cannot reach API"
 
-# Or set environment variables
-export AWS_ACCESS_KEY_ID=your_key
-export AWS_SECRET_ACCESS_KEY=your_secret
-export AWS_DEFAULT_REGION=us-east-1
+**Solution**:
+1. Verify API endpoint is correct in `.env.local`
+2. Check CORS is enabled in API Gateway
+3. Verify Lambda functions are running: `aws lambda list-functions`
+
+### Issue: "Authentication failed"
+
+**Solution**:
+1. Check Cognito User Pool is created: `aws cognito-idp list-user-pools --max-results 10`
+2. Verify JWT authorizer is configured
+3. Check CloudWatch logs for auth errors
+
+### Issue: "File upload failed"
+
+**Solution**:
+1. Verify S3 bucket exists: `aws s3 ls`
+2. Check S3 bucket permissions
+3. Verify presigned URL generation works
+
+### Issue: "Analysis timeout"
+
+**Solution**:
+1. Check Lambda timeout setting (should be 300 seconds)
+2. Try with smaller file
+3. Check CloudWatch logs for analysis errors
+
+### Issue: "Results not showing"
+
+**Solution**:
+1. Check DynamoDB table has FileIndex GSI
+2. Verify analysis results are stored: `aws dynamodb scan --table-name AnalysisResults-dev`
+3. Check get-analysis-results Lambda logs
+
+---
+
+## Performance Optimization
+
+### Frontend Optimization
+
+```bash
+# Check bundle size
+npm run build
+ls -lh dist/
+
+# Expected: < 500KB total
 ```
 
-### Issue: Node.js version mismatch
-```bash
-# Install Node.js 20.x
-# Using nvm:
-nvm install 20
-nvm use 20
+### Lambda Optimization
 
-# Or download from https://nodejs.org/
+```bash
+# Increase Lambda memory for faster execution
+aws lambda update-function-configuration \
+  --function-name misra-analysis-analyze-file \
+  --memory-size 1024 \
+  --timeout 300
 ```
 
-### Issue: CDK not installed
+### DynamoDB Optimization
+
 ```bash
-npm install -g aws-cdk
+# Switch to provisioned capacity if needed
+aws dynamodb update-table \
+  --table-name AnalysisResults-dev \
+  --billing-mode PROVISIONED \
+  --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10
 ```
 
-### Issue: Build fails
+---
+
+## Security Checklist
+
+- [ ] API endpoint is HTTPS only
+- [ ] CORS is configured for your domain only
+- [ ] JWT tokens are stored securely (httpOnly cookies)
+- [ ] Environment variables don't contain secrets
+- [ ] S3 bucket is private (not public)
+- [ ] DynamoDB encryption is enabled
+- [ ] CloudTrail logging is enabled
+
+---
+
+## Monitoring Setup
+
+### CloudWatch Alarms
+
 ```bash
-# Clean and rebuild
-rm -rf node_modules dist dist-lambdas
-npm install
-npm run build:lambdas
+# Create alarm for Lambda errors
+aws cloudwatch put-metric-alarm \
+  --alarm-name misra-lambda-errors \
+  --alarm-description "Alert on Lambda errors" \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --statistic Sum \
+  --period 300 \
+  --threshold 5 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 1
 ```
 
-### Issue: Deployment fails
+### CloudWatch Dashboard
+
 ```bash
-# Check CloudFormation events
-aws cloudformation describe-stack-events \
-  --stack-name MisraPlatformMVPStack
+# Create dashboard for monitoring
+aws cloudwatch put-dashboard \
+  --dashboard-name MisraPlatform \
+  --dashboard-body file://dashboard.json
+```
 
-# Check Lambda logs
-aws logs tail /aws/lambda/misra-* --follow
+---
 
-# Rollback if needed
+## Rollback Procedure
+
+If something goes wrong:
+
+```bash
+# Rollback CloudFormation stack
 aws cloudformation cancel-update-stack \
-  --stack-name MisraPlatformMVPStack
+  --stack-name MisraPlatform-dev
+
+# Or revert to previous version
+aws cloudformation update-stack \
+  --stack-name MisraPlatform-dev \
+  --use-previous-template
 ```
 
 ---
 
-## Cleanup (if needed)
+## Post-Deployment Checklist
 
-```bash
-# Delete the entire stack
-aws cloudformation delete-stack \
-  --stack-name MisraPlatformMVPStack
-
-# Wait for deletion
-aws cloudformation wait stack-delete-complete \
-  --stack-name MisraPlatformMVPStack
-```
-
----
-
-## Cost Estimation
-
-**Monthly Cost** (approximate):
-- Cognito: $0 (free tier)
-- DynamoDB: $1-5 (on-demand pricing)
-- Lambda: $0.20 (free tier covers most usage)
-- S3: $0.50 (storage + requests)
-- API Gateway: $3.50 (1M requests)
-
-**Total**: ~$5-10/month for low usage
-
----
-
-## Next Steps
-
-1. ✅ Deploy infrastructure
-2. ✅ Test API endpoints
-3. ✅ Deploy frontend
-4. ✅ Test end-to-end workflow
-5. ✅ Monitor CloudWatch logs
+- [ ] Frontend is accessible
+- [ ] API endpoint is reachable
+- [ ] Authentication works
+- [ ] File upload works
+- [ ] Analysis completes
+- [ ] Results display correctly
+- [ ] Error handling works
+- [ ] Monitoring is active
+- [ ] Logs are being collected
+- [ ] Performance is acceptable
 
 ---
 
 ## Support
 
-For issues or questions:
+For issues:
+
 1. Check CloudWatch logs: `aws logs tail /aws/lambda/misra-* --follow`
-2. Check CloudFormation events: `aws cloudformation describe-stack-events --stack-name MisraPlatformMVPStack`
-3. Review deployment checklist: `DEPLOYMENT_VERIFICATION_CHECKLIST.md`
+2. Check DynamoDB tables: `aws dynamodb scan --table-name AnalysisResults-dev`
+3. Check API Gateway: `aws apigatewayv2 get-apis`
+4. Review error messages in browser console
 
 ---
 
-**Ready to deploy? Run:**
-```bash
-cd packages/backend && npm run deploy
-```
+**Deployment Status**: ✅ READY  
+**Estimated Time**: 15 minutes  
+**Risk Level**: LOW  
+**Rollback Time**: 5 minutes
 
-🚀 **Let's go!**
+🚀 **Ready to Deploy!**

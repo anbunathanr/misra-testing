@@ -1,1 +1,11 @@
-{}
+{
+  "MisraPlatform-dev": {
+    "CognitoUserPoolId": "us-east-1_FUqN6j2Li",
+    "CognitoClientId": "68hu9doq9m2v9tca680a740mio",
+    "APIEndpoint": "https://jno64tiewg.execute-api.us-east-1.amazonaws.com/",
+    "FileStorageBucketOutput": "misra-files-976193236457-us-east-1",
+    "CognitoAuthUserPoolIdC6D8C16B": "us-east-1_FUqN6j2Li",
+    "CognitoAuthUserPoolClientId8CB9149E": "68hu9doq9m2v9tca680a740mio",
+    "CognitoAuthUserPoolArnC736E06F": "arn:aws:cognito-idp:us-east-1:976193236457:userpool/us-east-1_FUqN6j2Li"
+  }
+}

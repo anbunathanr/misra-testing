@@ -119,12 +119,12 @@ export class CostTracker {
       duration: number;
     }
   ): Promise<void> {
-    const timestamp = new Date().toISOString();
+    const timestamp = Date.now(); // CRITICAL: Must be a number, not a string
 
     const item: CostRecord = {
       userId,
       organizationId,
-      timestamp,
+      timestamp: timestamp.toString(), // Store as string in the interface for compatibility
       analysisId,
       fileId,
       costs,
@@ -133,7 +133,10 @@ export class CostTracker {
 
     const command = new PutItemCommand({
       TableName: this.tableName,
-      Item: marshall(item),
+      Item: marshall({
+        ...item,
+        timestamp: timestamp, // Override with number for DynamoDB
+      }),
     });
 
     await this.dynamoClient.send(command);

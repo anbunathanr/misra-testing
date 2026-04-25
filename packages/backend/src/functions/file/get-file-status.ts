@@ -45,6 +45,8 @@ interface FileStatusResponse {
   analysisProgress: number;
   analysisMessage: string;
   errorMessage?: string;
+  rulesProcessed?: number;
+  totalRules?: number;
 }
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
@@ -111,6 +113,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     let analysisMessage = file.analysis_message || file.analysisMessage || getDefaultMessage(analysisStatus);
     let errorMessage = file.error_message || file.errorMessage;
     let analysisId = file.analysisId;
+    let rulesProcessed = file.rules_processed || file.rulesProcessed || 0;
+    let totalRules = file.total_rules || file.totalRules || 357; // Default to actual MISRA rule count
 
     // If analysis is completed, try to get full results from AnalysisResults table
     if (analysisStatus === 'completed' && !analysisId) {
@@ -164,7 +168,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       analysisStatus: analysisStatus as any,
       analysisProgress,
       analysisMessage,
-      errorMessage
+      errorMessage,
+      rulesProcessed,
+      totalRules
     };
 
     logger.info('File status retrieved successfully', {

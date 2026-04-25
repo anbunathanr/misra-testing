@@ -138,6 +138,7 @@ function RegisterPage() {
     }
 
     try {
+      // Step 1: Register user (this sends OTP to email)
       await dispatch(
         registerUser({
           email: formData.email,
@@ -146,8 +147,26 @@ function RegisterPage() {
         }) as any
       ).unwrap();
       
-      // Show verification code input
+      // Step 2: Automatically verify OTP (no user input required)
       setShowVerification(true);
+      setVerificationError('Automatically verifying your email... Please wait.');
+      
+      try {
+        await authService.autoVerifyOTP(formData.email);
+        setSuccess(true);
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          navigate('/login', { 
+            state: { 
+              message: 'Registration completed successfully! You can now log in.' 
+            } 
+          });
+        }, 2000);
+      } catch (verifyError: any) {
+        console.error('Auto verification failed:', verifyError);
+        setVerificationError('Automatic verification failed. Please try again or contact support.');
+      }
     } catch (err: any) {
       // Error is handled by Redux and displayed below
       console.error('Registration failed:', err);
@@ -238,7 +257,7 @@ function RegisterPage() {
 
           {showVerification && !success && (
             <Alert severity="info" sx={{ mb: 3 }}>
-              Please check your email for a verification code and enter it below.
+              {verificationError || 'Automatically verifying your email... This may take a few moments.'}
             </Alert>
           )}
 
@@ -248,8 +267,8 @@ function RegisterPage() {
             </Alert>
           )}
 
-          {verificationError && !success && (
-            <Alert severity={verificationError.includes('resent') ? 'success' : 'error'} sx={{ mb: 3 }}>
+          {verificationError && !success && verificationError.includes('failed') && (
+            <Alert severity="error" sx={{ mb: 3 }}>
               {verificationError}
             </Alert>
           )}
@@ -360,44 +379,17 @@ function RegisterPage() {
               </Box>
             </form>
           ) : (
-            <form onSubmit={handleVerification}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                We've sent a verification code to <strong>{formData.email}</strong>
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                🔄 Verifying Your Email
               </Typography>
-
-              <TextField
-                fullWidth
-                label="Verification Code"
-                type="text"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                placeholder="Enter 6-digit code"
-                margin="normal"
-                required
-                autoFocus
-                inputProps={{ maxLength: 6 }}
-              />
-
-              <Button
-                fullWidth
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={success}
-                sx={{ mt: 3, mb: 2 }}
-              >
-                Verify Email
-              </Button>
-
-              <Box textAlign="center">
-                <Typography variant="body2" color="text.secondary">
-                  Didn't receive the code?{' '}
-                  <Link component="button" type="button" onClick={handleResendCode} underline="hover" fontWeight="bold">
-                    Resend
-                  </Link>
-                </Typography>
-              </Box>
-            </form>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                We're automatically verifying your email address: <strong>{formData.email}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                This process is completely automatic - no action required from you!
+              </Typography>
+            </Box>
           )}
         </CardContent>
       </Card>

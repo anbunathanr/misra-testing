@@ -135,13 +135,13 @@
 - [x] 11.6 Implement automatic file selection and upload
 - [x] 11.7 Implement automatic analysis trigger
 - [x] 11.8 Implement automatic results retrieval
-- [ ] 11.9 Add workflow error recovery and retry logic
-- [ ] 11.10 Write end-to-end workflow tests
+- [x] 11.9 Add workflow error recovery and retry logic
+- [x] 11.10 Write end-to-end workflow tests
 
 ### Task 12: Real-time Progress Updates
 - [x] 12.1 Implement HTTP polling for progress updates (2-second interval from frontend)
 - [x] 12.2 Create progress update service in backend (store progress in DynamoDB)
-- [ ] 12.3 Implement 2-second update interval in frontend
+- [x] 12.3 Implement 2-second update interval in frontend
 - [ ] 12.4 Add progress percentage calculation in analysis Lambda
 - [ ] 12.5 Add estimated time remaining calculation
 - [ ] 12.6 Implement rule-by-rule progress tracking

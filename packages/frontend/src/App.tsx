@@ -5,6 +5,7 @@ import AutomatedAnalysisPage from './pages/AutomatedAnalysisPage';
 import DashboardLayout from './components/DashboardLayout';
 import DashboardPage from './pages/DashboardPage';
 import ProductionMISRAApp from './components/ProductionMISRAApp.tsx';
+import DebugPage from './pages/DebugPage';
 
 function App() {
   return (
@@ -16,9 +17,13 @@ function App() {
       }}
     >
       <Routes>
+        {/* Debug page for testing API configuration */}
+        <Route path="/debug" element={<DebugPage />} />
+        
         {/* Main Automated Analysis Page - Single Page, No Sidebar */}
         <Route path="/" element={<AutomatedAnalysisPage />} />
         <Route path="/analysis" element={<AutomatedAnalysisPage />} />
+        <Route path="/fire-and-forget" element={<AutomatedAnalysisPage />} />
         
         {/* Legacy routes with sidebar (for backward compatibility) */}
         <Route 

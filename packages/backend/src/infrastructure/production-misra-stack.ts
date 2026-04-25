@@ -70,6 +70,13 @@ export class ProductionMisraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Add GSI for file-based queries (used by verification loop and get-analysis-results)
+    this.analysisResultsTable.addGlobalSecondaryIndex({
+      indexName: 'FileIndex',
+      partitionKey: { name: 'fileId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'timestamp', type: dynamodb.AttributeType.NUMBER },
+    });
+
     // Add GSI for user-based queries
     this.analysisResultsTable.addGlobalSecondaryIndex({
       indexName: 'userId-timestamp-index',
@@ -114,6 +121,24 @@ export class ProductionMisraStack extends cdk.Stack {
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'ttl', // Auto-delete after 15 minutes
+    });
+
+    // OTP table for generate-otp function
+    const otpTable = new dynamodb.Table(this, 'OTPTable', {
+      tableName: 'OTP',
+      partitionKey: { name: 'otpId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'email', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'ttl', // Auto-delete after 10 minutes
+    });
+
+    // Add GSI for email-based queries
+    otpTable.addGlobalSecondaryIndex({
+      indexName: 'EmailIndex',
+      partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.NUMBER },
     });
 
     // ============ S3 BUCKET ============
@@ -162,6 +187,8 @@ export class ProductionMisraStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
         COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
         USERS_TABLE: this.usersTable.tableName,
+        OTP_TABLE_NAME: 'OTP',
+        SES_FROM_EMAIL: 'noreply@misra-platform.com',
       },
     });
 
@@ -181,6 +208,67 @@ export class ProductionMisraStack extends cdk.Stack {
       environment: {
         COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
         COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
+      },
+    });
+
+    // Auth: Generate OTP (sends fresh OTP via email)
+    const generateOtpFunction = new lambdaNodejs.NodejsFunction(this, 'GenerateOtpFunction', {
+      functionName: 'misra-platform-auth-generate-otp',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/auth/generate-otp.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        OTP_TABLE_NAME: 'OTP',
+        SES_FROM_EMAIL: 'noreply@misra-platform.com',
+      },
+    });
+
+    // Auth: Verify OTP (Email-based)
+    const verifyOtpEmailFunction = new lambdaNodejs.NodejsFunction(this, 'VerifyOtpEmailFunction', {
+      functionName: 'misra-platform-auth-verify-otp-email',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/auth/verify-otp-email.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
+        COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
+        OTP_TABLE_NAME: 'OTP',
+        USERS_TABLE_NAME: this.usersTable.tableName,
+      },
+    });
+
+    // Auth: Auto Verify OTP (Automatic verification without user input)
+    const autoVerifyOtpFunction = new lambdaNodejs.NodejsFunction(this, 'AutoVerifyOtpFunction', {
+      functionName: 'misra-platform-auth-auto-verify-otp',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/auth/auto-verify-otp.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(60), // Longer timeout for polling
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
+        COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
+        OTP_TABLE_NAME: 'OTP',
+        USERS_TABLE_NAME: this.usersTable.tableName,
       },
     });
 
@@ -251,6 +339,26 @@ export class ProductionMisraStack extends cdk.Stack {
         minify: true,
         sourceMap: false,
         externalModules: ['@aws-sdk/*'],
+      },
+    });
+
+    // Auth: Resend OTP (for existing users)
+    const resendOtpFunction = new lambdaNodejs.NodejsFunction(this, 'ResendOtpFunction', {
+      functionName: 'misra-platform-auth-resend-otp',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/auth/resend-otp.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
+        OTP_TABLE_NAME: 'OTP',
+        SES_FROM_EMAIL: 'noreply@misra-platform.com',
       },
     });
 
@@ -364,6 +472,24 @@ export class ProductionMisraStack extends cdk.Stack {
       },
     });
 
+    // File: Queue Analysis (after S3 upload completes)
+    const queueAnalysisFunction = new lambdaNodejs.NodejsFunction(this, 'QueueAnalysisFunction', {
+      functionName: 'misra-platform-file-queue-analysis',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(__dirname, '../functions/file/queue-analysis.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      bundling: {
+        minify: true,
+        sourceMap: false,
+        externalModules: ['@aws-sdk/*'],
+      },
+      environment: {
+        ANALYSIS_QUEUE_URL: analysisQueue.queueUrl,
+      },
+    });
+
     // Analysis: Analyze File
     const analyzeFileFunction = new lambdaNodejs.NodejsFunction(this, 'AnalyzeFileFunction', {
       functionName: 'misra-platform-analysis-analyze-file',
@@ -382,6 +508,7 @@ export class ProductionMisraStack extends cdk.Stack {
         FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
         ANALYSIS_COSTS_TABLE: analysisCostsTable.tableName,
+        CACHE_BUSTER: '2024-04-25-fileindex-gsi-added', // Force Lambda code reload
       },
     });
 
@@ -452,6 +579,9 @@ export class ProductionMisraStack extends cdk.Stack {
     this.usersTable.grantReadWriteData(registerFunction);
     this.usersTable.grantReadData(getProfileFunction);
     
+    // Grant OTP table permissions to register function
+    otpTable.grantReadWriteData(registerFunction);
+    
     // Grant Cognito permissions to auth functions
     registerFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
       actions: [
@@ -463,6 +593,15 @@ export class ProductionMisraStack extends cdk.Stack {
       resources: [cognitoAuth.userPool.userPoolArn]
     }));
 
+    // Grant SES permissions to register function for OTP email
+    registerFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'ses:SendEmail',
+        'ses:SendRawEmail'
+      ],
+      resources: ['*']
+    }));
+
     loginFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
       actions: [
         'cognito-idp:AdminInitiateAuth',
@@ -471,6 +610,54 @@ export class ProductionMisraStack extends cdk.Stack {
       ],
       resources: [cognitoAuth.userPool.userPoolArn]
     }));
+
+    // Grant SES and DynamoDB permissions to generate-otp function
+    generateOtpFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'ses:SendEmail',
+        'ses:SendRawEmail'
+      ],
+      resources: ['*']
+    }));
+
+    otpTable.grantReadWriteData(generateOtpFunction);
+
+    // Grant permissions to resend-otp function
+    resendOtpFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminGetUser',
+        'ses:SendEmail',
+        'ses:SendRawEmail'
+      ],
+      resources: ['*']
+    }));
+
+    otpTable.grantReadWriteData(resendOtpFunction);
+
+    // Grant permissions to verify-otp-email function
+    verifyOtpEmailFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminInitiateAuth',
+        'cognito-idp:AdminRespondToAuthChallenge'
+      ],
+      resources: [cognitoAuth.userPool.userPoolArn]
+    }));
+
+    otpTable.grantReadData(verifyOtpEmailFunction);
+    this.usersTable.grantReadData(verifyOtpEmailFunction);
+
+    // Grant permissions to auto-verify-otp function
+    autoVerifyOtpFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminInitiateAuth',
+        'cognito-idp:AdminRespondToAuthChallenge'
+      ],
+      resources: [cognitoAuth.userPool.userPoolArn]
+    }));
+
+    otpTable.grantReadWriteData(autoVerifyOtpFunction);
+    this.usersTable.grantReadData(autoVerifyOtpFunction);
 
     startWorkflowFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
       actions: [
@@ -546,6 +733,7 @@ export class ProductionMisraStack extends cdk.Stack {
 
     // Grant SQS permissions to Lambda functions
     analysisQueue.grantSendMessages(uploadFunction);
+    analysisQueue.grantSendMessages(queueAnalysisFunction);
     analysisQueue.grantConsumeMessages(analyzeFileFunction);
 
     // ============ API GATEWAY ============
@@ -588,9 +776,33 @@ export class ProductionMisraStack extends cdk.Stack {
     });
 
     api.addRoutes({
+      path: '/auth/generate-otp',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('GenerateOtpIntegration', generateOtpFunction),
+    });
+
+    api.addRoutes({
+      path: '/auth/resend-otp',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('ResendOtpIntegration', resendOtpFunction),
+    });
+
+    api.addRoutes({
       path: '/auth/verify-otp',
       methods: [apigateway.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('VerifyOtpIntegration', verifyOtpFunction),
+    });
+
+    api.addRoutes({
+      path: '/auth/verify-otp-email',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('VerifyOtpEmailIntegration', verifyOtpEmailFunction),
+    });
+
+    api.addRoutes({
+      path: '/auth/auto-verify-otp',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('AutoVerifyOtpIntegration', autoVerifyOtpFunction),
     });
 
     api.addRoutes({
@@ -631,6 +843,13 @@ export class ProductionMisraStack extends cdk.Stack {
       path: '/files/{fileId}/status',
       methods: [apigateway.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('GetFileStatusIntegration', getFileStatusFunction),
+      authorizer: jwtAuthorizer,
+    });
+
+    api.addRoutes({
+      path: '/files/queue-analysis',
+      methods: [apigateway.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('QueueAnalysisIntegration', queueAnalysisFunction),
       authorizer: jwtAuthorizer,
     });
 

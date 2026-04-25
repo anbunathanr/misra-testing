@@ -24,6 +24,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { validateEmail, validatePassword } from '../../utils/validation';
 import { corsHeaders } from '../../utils/cors';
 import { createLogger } from '../../utils/logger';
@@ -31,6 +32,7 @@ import { createLogger } from '../../utils/logger';
 const logger = createLogger('Register');
 const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const sesClient = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 interface RegisterRequest {
   email: string;
@@ -179,6 +181,58 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       userId
     });
 
+    // Generate and send OTP via email
+    const otp = generateOTP();
+    const otpTableName = process.env.OTP_TABLE_NAME || 'OTP';
+    const otpExpirationTime = Math.floor(Date.now() / 1000) + (10 * 60); // 10 minutes from now
+
+    logger.info('Generating OTP for user', {
+      correlationId,
+      email: request.email,
+      otpTableName
+    });
+
+    // Store OTP in DynamoDB
+    try {
+      await dynamoClient.send(new PutCommand({
+        TableName: otpTableName,
+        Item: {
+          otpId: `${request.email}-${Date.now()}`,
+          email: request.email,
+          otp: otp,
+          createdAt: Date.now(),
+          ttl: otpExpirationTime,
+          userId: userId
+        }
+      }));
+      logger.info('OTP stored in DynamoDB', {
+        correlationId,
+        email: request.email
+      });
+    } catch (dbError) {
+      logger.warn('Failed to store OTP in DynamoDB', {
+        correlationId,
+        error: (dbError as any).message
+      });
+      // Continue anyway - we'll still send the OTP via email
+    }
+
+    // Send OTP via email
+    try {
+      await sendOTPEmail(request.email, otp, request.name || request.email, correlationId);
+      logger.info('OTP email sent successfully', {
+        correlationId,
+        email: request.email
+      });
+    } catch (emailError) {
+      logger.error('Failed to send OTP email', {
+        correlationId,
+        email: request.email,
+        error: (emailError as any).message
+      });
+      // Don't fail registration if email fails - user can request OTP later
+    }
+
     // Store temporary password in DynamoDB for auto-login
     try {
       const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
@@ -189,7 +243,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           userId: userId,
           tempPassword: finalPassword,
           createdAt: Date.now(),
-          name: request.name || request.email
+          name: request.name || request.email,
+          otpVerified: false
         }
       }));
       logger.info('Stored user credentials in DynamoDB', {
@@ -255,6 +310,13 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 };
 
 /**
+ * Generate a 6-digit OTP
+ */
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
  * Generate a temporary password that meets Cognito requirements
  */
 function generateTemporaryPassword(): string {
@@ -277,6 +339,116 @@ function generateTemporaryPassword(): string {
 
   // Shuffle password
   return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/**
+ * Send OTP via email using AWS SES
+ */
+async function sendOTPEmail(
+  email: string,
+  otp: string,
+  userName: string,
+  correlationId: string
+): Promise<void> {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; background-color: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; }
+          .header { text-align: center; color: #7b61ff; margin-bottom: 20px; }
+          .otp-box { background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
+          .otp-code { font-size: 32px; font-weight: bold; color: #7b61ff; letter-spacing: 5px; font-family: monospace; }
+          .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2>🔐 MISRA Platform - OTP Verification</h2>
+          </div>
+          
+          <p>Hi ${userName},</p>
+          
+          <p>Your One-Time Password (OTP) for MISRA Platform is:</p>
+          
+          <div class="otp-box">
+            <div class="otp-code">${otp}</div>
+          </div>
+          
+          <p><strong>⏰ This code will expire in 10 minutes.</strong></p>
+          
+          <p>If you didn't request this code, please ignore this email and your account will remain secure.</p>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          
+          <div class="footer">
+            <p>MISRA Compliance Platform</p>
+            <p>Automated Code Analysis & Compliance Verification</p>
+            <p>© 2026 - All rights reserved</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const textContent = `
+MISRA Platform - OTP Verification
+
+Hi ${userName},
+
+Your One-Time Password (OTP) for MISRA Platform is:
+
+${otp}
+
+⏰ This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email and your account will remain secure.
+
+---
+MISRA Compliance Platform
+Automated Code Analysis & Compliance Verification
+© 2026 - All rights reserved
+  `;
+
+  const params = {
+    Source: process.env.SES_FROM_EMAIL || 'noreply@misra-platform.com',
+    Destination: {
+      ToAddresses: [email],
+    },
+    Message: {
+      Subject: {
+        Data: 'Your MISRA Platform OTP Code',
+        Charset: 'UTF-8',
+      },
+      Body: {
+        Html: {
+          Data: htmlContent,
+          Charset: 'UTF-8',
+        },
+        Text: {
+          Data: textContent,
+          Charset: 'UTF-8',
+        },
+      },
+    },
+  };
+
+  try {
+    await sesClient.send(new SendEmailCommand(params as any));
+    logger.info('OTP email sent via SES', {
+      correlationId,
+      email
+    });
+  } catch (error) {
+    logger.error('Failed to send OTP email via SES', {
+      correlationId,
+      email,
+      error: (error as any).message
+    });
+    throw error;
+  }
 }
 
 /**

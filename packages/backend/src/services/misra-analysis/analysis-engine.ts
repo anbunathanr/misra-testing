@@ -298,6 +298,9 @@ export class MISRAAnalysisEngine {
     let completedRules = 0;
     let lastUpdateTime = Date.now();
 
+    console.log(`[AnalysisEngine] ✅ Starting rule checking: ${totalRules} rules to process`);
+    console.log(`[AnalysisEngine] Rules loaded: ${rules.map((r: any) => r.id).join(', ')}`);
+
     // Process rules in batches for better progress granularity
     const batchSize = enableRealTimeProgress ? 1 : Math.max(1, Math.floor(totalRules / 10)); // 10 progress updates or rule-by-rule
     
@@ -311,46 +314,68 @@ export class MISRAAnalysisEngine {
         // Process rules one by one for detailed progress
         batchViolations = [];
         for (const rule of batch) {
-          const ruleViolations = await rule.check(ast, fileContent);
-          batchViolations.push(ruleViolations);
-          
-          completedRules++;
-          
-          // Update progress for each rule when in real-time mode
-          progressTrackingService.updateAnalysisProgress(
-            workflowId,
-            completedRules,
-            totalRules,
-            rule.id || `Rule ${completedRules}`,
-            Math.max(0, Math.round((totalRules - completedRules) * 0.15))
-          );
-          
-          // Small delay to make progress visible in demonstrations
-          await new Promise(resolve => setTimeout(resolve, 50));
+          try {
+            console.log(`[AnalysisEngine] 🔍 Checking rule: ${rule.id}`);
+            const ruleViolations = await rule.check(ast, fileContent);
+            console.log(`[AnalysisEngine] ✅ Rule ${rule.id} found ${ruleViolations.length} violations`);
+            batchViolations.push(ruleViolations);
+            
+            completedRules++;
+            
+            // Update progress for each rule when in real-time mode
+            progressTrackingService.updateAnalysisProgress(
+              workflowId,
+              completedRules,
+              totalRules,
+              rule.id || `Rule ${completedRules}`,
+              Math.max(0, Math.round((totalRules - completedRules) * 0.15))
+            );
+            
+            // Small delay to make progress visible in demonstrations
+            await new Promise(resolve => setTimeout(resolve, 50));
+          } catch (ruleError) {
+            console.error(`[AnalysisEngine] ❌ Error checking rule ${rule.id}:`, ruleError);
+            batchViolations.push([]);
+            completedRules++;
+          }
         }
       } else {
         // Process batch in parallel for faster execution
         batchViolations = await Promise.all(
-          batch.map(rule => rule.check(ast, fileContent))
+          batch.map(async (rule) => {
+            try {
+              console.log(`[AnalysisEngine] 🔍 Checking rule: ${rule.id}`);
+              const ruleViolations = await rule.check(ast, fileContent);
+              console.log(`[AnalysisEngine] ✅ Rule ${rule.id} found ${ruleViolations.length} violations`);
+              return ruleViolations;
+            } catch (ruleError) {
+              console.error(`[AnalysisEngine] ❌ Error checking rule ${rule.id}:`, ruleError);
+              return [];
+            }
+          })
         );
         completedRules += batch.length;
       }
       
       // Flatten and collect violations
-      violations.push(...batchViolations.flat());
+      const batchViolationsList = batchViolations.flat();
+      violations.push(...batchViolationsList);
+      console.log(`[AnalysisEngine] 📊 Batch complete: ${completedRules}/${totalRules} rules processed, ${violations.length} total violations found`);
       
       const progress = 25 + Math.floor((completedRules / totalRules) * 65); // 25-90% range
       
       // Update progress if enough time has passed (2-second intervals) or in real-time mode
       const now = Date.now();
       if (progressCallback && (now - lastUpdateTime >= updateInterval || completedRules === totalRules || enableRealTimeProgress)) {
-        const message = `Evaluating rules: ${completedRules}/${totalRules} completed`;
+        const message = `Evaluating rules: ${completedRules}/${totalRules} completed, ${violations.length} violations found`;
+        console.log(`[AnalysisEngine] 📈 Progress callback: ${progress}% - ${message}`);
         await progressCallback(progress, message);
         lastUpdateTime = now;
       }
 
       // Update workflow progress for non-real-time mode
       if (workflowId && !enableRealTimeProgress && (now - lastUpdateTime >= updateInterval || completedRules === totalRules)) {
+        console.log(`[AnalysisEngine] 📈 Workflow progress: ${completedRules}/${totalRules} rules`);
         progressTrackingService.updateAnalysisProgress(
           workflowId,
           completedRules,
@@ -361,6 +386,7 @@ export class MISRAAnalysisEngine {
       }
     }
 
+    console.log(`[AnalysisEngine] ✅ Rule checking complete: ${completedRules}/${totalRules} rules processed, ${violations.length} total violations found`);
     return violations;
   }
 

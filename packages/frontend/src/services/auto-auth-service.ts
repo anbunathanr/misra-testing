@@ -11,6 +11,7 @@
  */
 
 import { authService } from './auth-service';
+import { API_URL } from '../config/api-config';
 
 export interface AutoAuthResult {
   success: boolean;
@@ -34,7 +35,15 @@ export class AutoAuthService {
   private readonly DEMO_PASSWORD = 'DemoPass123!@#';
 
   constructor() {
-    this.apiUrl = import.meta.env.VITE_API_URL || '';
+    this.apiUrl = API_URL;
+    
+    // Debug: Log the API URL being used
+    console.log('🔧 AutoAuthService API URL:', this.apiUrl);
+    console.log('🔧 Environment variables:', {
+      VITE_API_URL: import.meta.env.VITE_API_URL,
+      VITE_ENVIRONMENT: import.meta.env.VITE_ENVIRONMENT,
+      VITE_USE_MOCK_BACKEND: import.meta.env.VITE_USE_MOCK_BACKEND
+    });
   }
 
   /**

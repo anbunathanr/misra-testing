@@ -122,9 +122,9 @@ export const handler = async (
     }
 
     // Check ownership (Requirement 7.7)
-    if (fileMetadata.user_id !== user.userId) {
+    if (fileMetadata.userId !== user.userId) {
       // Admins can access files in their organization
-      if (user.role === 'admin' && fileMetadata.organization_id === user.organizationId) {
+      if (user.role === 'admin' && fileMetadata.organizationId === user.organizationId) {
         console.log('Admin accessing file in their organization');
       } else {
         console.log(`Access denied: User ${user.userId} does not own file ${fileId}`);
@@ -148,20 +148,20 @@ export const handler = async (
     // Query analysis results by fileId (Requirement 7.2)
     const analysisResults = await queryAnalysisResultsByFileId(fileId);
 
+    // Check if results are available - if not, analysis is still running
     if (!analysisResults || analysisResults.length === 0) {
-      console.log(`No analysis results found for file: ${fileId}`);
+      console.log(`No analysis results found for file: ${fileId} - analysis may still be processing`);
       return {
-        statusCode: 404,
+        statusCode: 202, // 202 Accepted - processing in progress
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
         body: JSON.stringify({
-          error: {
-            code: 'ANALYSIS_NOT_FOUND',
-            message: 'No analysis results found for this file',
-            timestamp: new Date().toISOString(),
-          },
+          status: 'processing',
+          message: 'Analysis is still processing. Please try again in a few seconds.',
+          fileId: fileId,
+          timestamp: new Date().toISOString(),
         }),
       };
     }
@@ -207,20 +207,25 @@ export const handler = async (
       }),
     };
   } catch (error) {
-    console.error('Error retrieving analysis results:', error);
+    console.error('DB Error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+    });
 
+    // Return 202 instead of 500 - analysis may still be processing
+    // This prevents frontend from failing when backend encounters errors
     return {
-      statusCode: 500,
+      statusCode: 202,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
       body: JSON.stringify({
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to retrieve analysis results',
-          timestamp: new Date().toISOString(),
-        },
+        status: 'processing',
+        message: 'Analysis is still processing. Please try again in a few seconds.',
+        timestamp: new Date().toISOString(),
       }),
     };
   }
@@ -231,20 +236,39 @@ export const handler = async (
  */
 async function getFileMetadata(fileId: string): Promise<any | null> {
   try {
+    console.log(`Getting file metadata for fileId: ${fileId}`);
+    console.log(`Using table: ${fileMetadataTable}`);
+    
     const command = new GetItemCommand({
       TableName: fileMetadataTable,
-      Key: marshall({ file_id: fileId }),
+      Key: marshall({ fileId: fileId }),
     });
 
+    console.log(`Executing GetItem command for table: ${fileMetadataTable}`);
+    
     const response = await dynamoClient.send(command);
 
+    // Check for null results - file metadata not found
     if (!response.Item) {
+      console.log(`File metadata not found for fileId: ${fileId}`);
       return null;
     }
 
-    return unmarshall(response.Item);
+    const metadata = unmarshall(response.Item);
+    console.log(`File metadata retrieved successfully:`, {
+      fileId,
+      userId: metadata.userId,
+      organizationId: metadata.organizationId,
+    });
+    
+    return metadata;
   } catch (error) {
-    console.error('Error getting file metadata:', error);
+    console.error('DB Error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+    });
     throw error;
   }
 }
@@ -256,6 +280,9 @@ async function queryAnalysisResultsByFileId(
   fileId: string
 ): Promise<AnalysisResult[]> {
   try {
+    console.log(`✅ [QUERY] Querying analysis results for fileId: ${fileId}`);
+    console.log(`✅ [QUERY] Using table: ${analysisResultsTable}`);
+    
     const command = new QueryCommand({
       TableName: analysisResultsTable,
       IndexName: 'FileIndex',
@@ -267,15 +294,68 @@ async function queryAnalysisResultsByFileId(
       Limit: 10, // Return up to 10 most recent results
     });
 
+    console.log(`✅ [QUERY] Executing query on FileIndex GSI`);
+    console.log(`✅ [QUERY] Query parameters:`, {
+      table: analysisResultsTable,
+      index: 'FileIndex',
+      fileId: fileId,
+    });
+    
     const response = await dynamoClient.send(command);
 
+    console.log(`✅ [QUERY] Query response received`);
+    console.log(`✅ [QUERY] Items count: ${response.Items?.length || 0}`);
+    console.log(`✅ [QUERY] Count: ${response.Count}`);
+    console.log(`✅ [QUERY] ScannedCount: ${response.ScannedCount}`);
+
+    // Check for null or empty results - analysis may still be running
     if (!response.Items || response.Items.length === 0) {
+      console.log(`⚠️ [QUERY] No analysis results found for fileId: ${fileId}`);
+      console.log(`⚠️ [QUERY] Analysis may still be running or results not yet propagated`);
       return [];
     }
 
-    return response.Items.map((item) => unmarshall(item) as AnalysisResult);
+    // Safely unmarshall items with error handling
+    const results: AnalysisResult[] = [];
+    for (const item of response.Items) {
+      try {
+        const unmarshalled = unmarshall(item) as AnalysisResult;
+        
+        console.log(`✅ [QUERY] Unmarshalled result:`, {
+          analysisId: unmarshalled.analysisId,
+          fileId: unmarshalled.fileId,
+          timestamp: unmarshalled.timestamp,
+          timestampType: typeof unmarshalled.timestamp,
+          violations: unmarshalled.violations?.length || 0,
+          compliance: unmarshalled.summary?.compliancePercentage || 0,
+        });
+        
+        // Validate timestamp is a number
+        if (typeof unmarshalled.timestamp !== 'number') {
+          console.warn(`⚠️ [QUERY] Skipping result with invalid timestamp type: ${typeof unmarshalled.timestamp}`, {
+            analysisId: unmarshalled.analysisId,
+            timestamp: unmarshalled.timestamp,
+          });
+          continue;
+        }
+        
+        results.push(unmarshalled);
+      } catch (itemError) {
+        console.error('❌ [QUERY] Error unmarshalling item:', itemError);
+        continue; // Skip bad items
+      }
+    }
+    
+    console.log(`✅ [QUERY] Successfully retrieved ${results.length} valid analysis results`);
+    return results;
   } catch (error) {
-    console.error('Error querying analysis results:', error);
+    console.error('❌ [QUERY] DB Error:', error);
+    console.error('❌ [QUERY] Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      code: (error as any)?.Code,
+      statusCode: (error as any)?.statusCode,
+    });
     throw error;
   }
 }

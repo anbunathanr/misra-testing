@@ -775,8 +775,8 @@ int main() {
               isRunning={isRunning}
               visible={isRunning || completedSteps.length > 0}
               estimatedTimeRemaining={currentStep === 3 ? Math.max(0, 300 - (analysisProgress * 3)) : undefined}
-              rulesProcessed={Math.floor((analysisProgress / 100) * 50)}
-              totalRules={50}
+              rulesProcessed={Math.floor((analysisProgress / 100) * 371)} // Updated to reflect actual MISRA rule count
+              totalRules={371}
             />
 
             {/* Step Indicator */}

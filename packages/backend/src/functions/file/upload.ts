@@ -134,8 +134,9 @@ export const handler = centralizedErrorHandler.wrapLambdaHandler(
 
       logger.info('FileMetadata record created successfully');
 
-      // Queue analysis with retry (non-critical)
-      await queueAnalysisWithRetry(uploadResponse, uploadRequest, user);
+      // NOTE: Analysis is NOT queued here anymore
+      // Frontend will call /files/queue-analysis after S3 upload completes
+      // This ensures S3 eventual consistency before Lambda tries to download
 
       // Record success metrics
       const duration = Date.now() - startTime;

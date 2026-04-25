@@ -122,6 +122,81 @@ export class AuthService {
   }
 
   /**
+   * Generate and send OTP to email
+   */
+  async generateOTP(email: string): Promise<{ success: boolean; message: string; otpId?: string }> {
+    try {
+      const response = await fetch(`${API_URL}/auth/generate-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to generate OTP');
+      }
+
+      return {
+        success: true,
+        message: data.message,
+        otpId: data.otpId
+      };
+    } catch (error: any) {
+      console.error('Error generating OTP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Automatically verify OTP without user input
+   * This function polls for OTP and verifies it automatically
+   */
+  async autoVerifyOTP(email: string): Promise<{ token: string; user: UserInfo }> {
+    try {
+      frontendAuthMonitoringService.logAuthEvent(
+        AuthEventType.AUTH_FLOW_INITIATED,
+        email,
+        'auto-verify-otp',
+        true
+      );
+
+      const response = await fetch(`${API_URL}/auth/auto-verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Auto verification failed');
+      }
+
+      const userInfo: UserInfo = {
+        email: data.user.email,
+        name: data.user.email, // Use email as name if not provided
+        sub: data.user.userId,
+      };
+
+      this.storeTokens(data.accessToken, data.refreshToken, data.expiresIn);
+      localStorage.setItem('user', JSON.stringify(userInfo));
+
+      frontendAuthMonitoringService.logSessionCreated(email, userInfo.sub, 0);
+
+      return { token: data.accessToken, user: userInfo };
+    } catch (error: any) {
+      frontendAuthMonitoringService.logError(email, error.message, 'auto-verify-otp');
+      throw error;
+    }
+  }
+
+  /**
    * Confirm registration with verification code
    */
   async confirmRegistration(_email: string, _code: string): Promise<void> {

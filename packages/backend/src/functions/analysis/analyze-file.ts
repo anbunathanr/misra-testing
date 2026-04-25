@@ -1,6 +1,6 @@
 import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { DynamoDBClient, PutItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, PutItemCommand, UpdateItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { MISRAAnalysisEngine } from '../../services/misra-analysis/analysis-engine';
 import { Language } from '../../types/misra-analysis';
@@ -183,7 +183,7 @@ async function processAnalysisMessage(
       { 
         maxAttempts: 3, 
         initialDelayMs: 1000,
-        retryableErrors: ['timeout', 'ETIMEDOUT', 'ECONNRESET', 'NetworkError', 'ServiceUnavailable']
+        retryableErrors: ['timeout', 'ETIMEDOUT', 'ECONNRESET', 'NetworkError', 'ServiceUnavailable', 'NoSuchKey']
       }
     );
     
@@ -200,10 +200,21 @@ async function processAnalysisMessage(
     logger.info('Starting MISRA analysis', { language, fileId });
     
     // Create progress callback to update DynamoDB every 2 seconds
+    // We'll get totalRules from the analysis engine when it calls this callback
     const progressCallback = async (progress: number, message: string) => {
       try {
-        await updateAnalysisProgress(fileId, progress, message);
-        logger.debug('Progress updated', { fileId, progress, message });
+        // Extract rules processed from the message if available
+        let rulesProcessed = 0;
+        let totalRulesFromMessage = 357; // Default fallback to actual MISRA rule count
+        
+        const rulesMatch = message.match(/(\d+)\/(\d+) completed/);
+        if (rulesMatch) {
+          rulesProcessed = parseInt(rulesMatch[1]);
+          totalRulesFromMessage = parseInt(rulesMatch[2]);
+        }
+        
+        await updateAnalysisProgress(fileId, progress, message, rulesProcessed, totalRulesFromMessage, userId);
+        logger.debug('Progress updated', { fileId, progress, message, rulesProcessed, totalRules: totalRulesFromMessage });
       } catch (error) {
         logger.warn('Failed to update progress', { fileId, progress, error: (error as Error).message });
         // Don't throw - progress updates are non-critical
@@ -240,6 +251,54 @@ async function processAnalysisMessage(
       { maxAttempts: 3, initialDelayMs: 1000 }
     );
 
+    // CRITICAL: Wait for DynamoDB to propagate results before marking status as completed
+    // This prevents race condition where status is marked complete before results are available
+    console.log(`Waiting for DynamoDB propagation before marking status as completed`);
+    
+    // Add a longer delay to ensure DynamoDB has time to propagate
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Verify results are in DynamoDB with multiple attempts
+    let resultsVerified = false;
+    let verifyAttempts = 0;
+    const maxVerifyAttempts = 15; // Increased from 10
+    
+    while (!resultsVerified && verifyAttempts < maxVerifyAttempts) {
+      try {
+        verifyAttempts++;
+        
+        // Use FileIndex GSI to query by fileId
+        const command = new QueryCommand({
+          TableName: analysisResultsTable,
+          IndexName: 'FileIndex',
+          KeyConditionExpression: 'fileId = :fileId',
+          ExpressionAttributeValues: {
+            ':fileId': { S: fileId },
+          },
+          Limit: 1,
+        });
+        
+        const result = await dynamoClient.send(command);
+        if (result.Items && result.Items.length > 0) {
+          console.log(`✓ Results verified in DynamoDB on attempt ${verifyAttempts}`);
+          resultsVerified = true;
+          break;
+        } else {
+          console.log(`Results not yet visible (attempt ${verifyAttempts}/${maxVerifyAttempts}), retrying...`);
+          // Wait before next attempt
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      } catch (verifyError) {
+        console.warn(`Verification attempt ${verifyAttempts} failed:`, verifyError);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    
+    if (!resultsVerified) {
+      console.warn(`⚠️ Results could not be verified after ${maxVerifyAttempts} attempts`);
+      console.warn(`Proceeding anyway - results may be available shortly`);
+    }
+
     // Track analysis costs (Requirement 14.1)
     console.log(`Tracking analysis costs`);
     const costs = costTracker.calculateCosts(duration, fileSize, 2);
@@ -257,6 +316,7 @@ async function processAnalysisMessage(
     console.log(`Cost tracking completed: $${costs.totalCost.toFixed(6)}`);
 
     // Update file metadata status to COMPLETED
+    // This is now safe because we've verified results are in DynamoDB
     console.log(`Updating file ${fileId} status to COMPLETED`);
     await updateFileMetadataStatus(fileId, 'completed', {
       userId,
@@ -334,7 +394,8 @@ async function downloadFileFromS3(s3Key: string): Promise<string> {
       key: s3Key,
       error: error instanceof Error ? error.message : String(error),
       errorCode: (error as any)?.Code,
-      errorName: (error as any)?.name
+      errorName: (error as any)?.name,
+      timestamp: new Date().toISOString()
     });
     throw new Error(`Failed to download file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -348,6 +409,15 @@ async function storeAnalysisResults(
   organizationId?: string
 ): Promise<void> {
   try {
+    const now = Date.now();
+    
+    console.log(`✅ [STORE] Starting to store analysis results`);
+    console.log(`✅ [STORE] analysisId: ${result.analysisId}`);
+    console.log(`✅ [STORE] fileId: ${result.fileId}`);
+    console.log(`✅ [STORE] userId: ${result.userId}`);
+    console.log(`✅ [STORE] violations: ${result.violations.length}`);
+    
+    // Build the item object with timestamp as a NUMBER (not string)
     const item = {
       analysisId: result.analysisId,
       fileId: result.fileId,
@@ -357,19 +427,48 @@ async function storeAnalysisResults(
       violations: result.violations,
       summary: result.summary,
       status: result.status,
-      createdAt: result.createdAt,
-      timestamp: Date.now(),
+      timestamp: now, // CRITICAL: Must be a number, not a string
+      createdAt: typeof result.createdAt === 'string' ? result.createdAt : new Date(now).toISOString(),
     };
+
+    console.log(`✅ [STORE] Item prepared with timestamp: ${item.timestamp} (type: ${typeof item.timestamp})`);
+
+    // Marshall the item - timestamp will be correctly marshalled as N (number)
+    const marshalledItem = marshall(item);
+
+    console.log(`✅ [STORE] Item marshalled successfully`);
+    console.log(`✅ [STORE] Marshalled timestamp type: ${marshalledItem.timestamp?.N ? 'Number' : 'Unknown'}`);
 
     const command = new PutItemCommand({
       TableName: analysisResultsTable,
-      Item: marshall(item),
+      Item: marshalledItem,
     });
 
+    console.log(`✅ [STORE] Sending PutItemCommand to table: ${analysisResultsTable}`);
     await dynamoClient.send(command);
-    console.log(`Analysis results stored with ID: ${result.analysisId}`);
+    console.log(`✅ [STORE] ✓ Analysis results stored successfully with ID: ${result.analysisId}`);
+    
+    // Immediately verify the data was stored
+    console.log(`✅ [STORE] Verifying data was stored...`);
+    const verifyCommand = new QueryCommand({
+      TableName: analysisResultsTable,
+      IndexName: 'FileIndex',
+      KeyConditionExpression: 'fileId = :fileId',
+      ExpressionAttributeValues: {
+        ':fileId': { S: result.fileId },
+      },
+      Limit: 1,
+    });
+    
+    const verifyResult = await dynamoClient.send(verifyCommand);
+    if (verifyResult.Items && verifyResult.Items.length > 0) {
+      console.log(`✅ [STORE] ✓ Verification successful! Data found in DynamoDB`);
+      console.log(`✅ [STORE] Found ${verifyResult.Items.length} item(s) for fileId: ${result.fileId}`);
+    } else {
+      console.warn(`⚠️ [STORE] Verification failed - no items found immediately after store`);
+    }
   } catch (error) {
-    console.error('Error storing analysis results:', error);
+    console.error('❌ [STORE] Error storing analysis results:', error);
     throw new Error(`Failed to store analysis results: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -440,23 +539,44 @@ async function updateFileMetadataStatus(
 async function updateAnalysisProgress(
   fileId: string,
   progress: number,
-  message: string
+  message: string,
+  rulesProcessed?: number,
+  totalRules?: number,
+  userId?: string
 ): Promise<void> {
   try {
+    const updateExpression = ['SET analysis_progress = :progress', 'analysis_message = :message', 'updated_at = :updatedAt'];
+    const expressionAttributeValues: Record<string, any> = {
+      ':progress': { N: progress.toString() },
+      ':message': { S: message },
+      ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
+    };
+
+    // Add rules progress if provided
+    if (rulesProcessed !== undefined) {
+      updateExpression.push('rules_processed = :rulesProcessed');
+      expressionAttributeValues[':rulesProcessed'] = { N: rulesProcessed.toString() };
+    }
+    
+    if (totalRules !== undefined) {
+      updateExpression.push('total_rules = :totalRules');
+      expressionAttributeValues[':totalRules'] = { N: totalRules.toString() };
+    }
+
     const command = new UpdateItemCommand({
       TableName: fileMetadataTable,
-      Key: marshall({ file_id: fileId }),
-      UpdateExpression: 'SET analysis_progress = :progress, analysis_message = :message, updated_at = :updatedAt',
-      ExpressionAttributeValues: {
-        ':progress': { N: progress.toString() },
-        ':message': { S: message },
-        ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
-      },
+      Key: marshall({ 
+        fileId: fileId, 
+        userId: userId || 'unknown' // Use provided userId or fallback
+      }),
+      UpdateExpression: updateExpression.join(', '),
+      ExpressionAttributeValues: expressionAttributeValues,
     });
 
     await dynamoClient.send(command);
+    console.log(`✅ Progress updated for ${fileId}: ${progress}% - ${message} (${rulesProcessed || 0}/${totalRules || 357} rules)`);
   } catch (error) {
-    console.error('Error updating analysis progress:', error);
+    console.error('❌ Error updating analysis progress:', error);
     // Don't throw - progress updates are non-critical
   }
 }

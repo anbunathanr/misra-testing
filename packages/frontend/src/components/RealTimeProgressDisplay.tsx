@@ -43,7 +43,7 @@ const RealTimeProgressDisplay: React.FC<RealTimeProgressDisplayProps> = ({
   visible,
   estimatedTimeRemaining,
   rulesProcessed = 0,
-  totalRules = 50
+  totalRules = 371 // Updated to reflect actual MISRA rule count
 }) => {
   if (!visible) return null;
 
