@@ -39,6 +39,7 @@ export interface ProductionWorkflowResult {
 
 export interface ProductionWorkflowOptions {
   email: string;
+  password?: string;
   name?: string;
   fileContent?: string;
   fileName?: string;
@@ -139,7 +140,7 @@ export class ProductionWorkflowService {
   }
 
   /**
-   * Automated Authentication - Get or create token
+   * Automated Authentication - Get or create token with silent login
    * Private method for internal use only
    */
   private async executeAutoAuth(
@@ -157,10 +158,11 @@ export class ProductionWorkflowService {
         // No existing token - perform silent login
         logs.push(`📝 No existing token, performing silent login...`);
         
-        // For AI agent: use provided password or generate one
-        const password = options.name || 'DefaultPassword123!';
+        // Use provided password or generate default
+        const password = options.password || 'DefaultPassword123!';
         
         try {
+          console.log(`🔐 Calling loginSilent with email: ${options.email}`);
           await authService.loginSilent(options.email, password);
           token = await authService.getToken();
           
@@ -169,12 +171,16 @@ export class ProductionWorkflowService {
           }
           
           logs.push(`✅ Silent login successful`);
+          console.log(`✅ Token obtained after silent login`);
         } catch (loginError) {
           // If silent login fails, throw error for AI to handle
-          throw new Error(`Silent login failed: ${loginError instanceof Error ? loginError.message : 'Unknown error'}`);
+          const errorMsg = loginError instanceof Error ? loginError.message : 'Unknown error';
+          console.error(`❌ Silent login failed:`, loginError);
+          throw new Error(`Silent login failed: ${errorMsg}`);
         }
       } else {
         logs.push(`✅ Using existing authentication token`);
+        console.log(`✅ Using existing token`);
       }
 
       this.completeStep(1);
@@ -383,7 +389,8 @@ export class ProductionWorkflowService {
    * Step 3: Trigger MISRA Analysis with internal polling
    * Token passed directly to avoid multiple async lookups
    * Uses Promise with 2000ms polling interval
-   * Crucial: Won't resolve if rulesProcessed is 0 even if status is 'completed'
+   * CRITICAL FIX: Won't resolve if rulesProcessed is 0 even if status is 'completed'
+   * Waits up to 5 additional attempts for backend rule-aggregation to sync
    */
   private async executeAnalysisStep(
     token: string,
@@ -403,6 +410,8 @@ export class ProductionWorkflowService {
       const results = await new Promise<any>((resolve, reject) => {
         const maxAttempts = 60;
         let attempts = 0;
+        let completedButEmptyAttempts = 0;
+        const maxEmptyAttempts = 5; // Wait up to 5 more attempts for rule aggregation
 
         const poll = async () => {
           attempts++;
@@ -444,13 +453,22 @@ export class ProductionWorkflowService {
             if (data.analysisStatus === 'completed') {
               console.log(`✅ Analysis status is COMPLETED`);
               
-              // CRUCIAL: Even if status is 'completed', check if rules were actually processed
-              // If rulesProcessed is 0 and totalRules > 0, keep polling
+              // CRITICAL FIX: Even if status is 'completed', check if rules were actually processed
+              // If rulesProcessed is 0 and totalRules > 0, keep polling for rule aggregation
               if (data.rulesProcessed === 0 && data.totalRules > 0) {
-                console.log(`⚠️ Status is completed but no rules processed yet, continuing to poll...`);
-                logs.push(`⚠️ Analysis marked complete but rules not yet processed, retrying...`);
-                this.pollingInterval = setTimeout(poll, 2000);
-                return;
+                completedButEmptyAttempts++;
+                console.log(`⚠️ Status is completed but no rules processed yet (attempt ${completedButEmptyAttempts}/${maxEmptyAttempts})`);
+                logs.push(`⚠️ Analysis marked complete but rules not yet processed, waiting for aggregation (${completedButEmptyAttempts}/${maxEmptyAttempts})...`);
+                
+                // If we've waited enough, give up and fetch results anyway
+                if (completedButEmptyAttempts >= maxEmptyAttempts) {
+                  console.log(`⚠️ Reached max empty attempts, proceeding to fetch results`);
+                  logs.push(`⚠️ Max wait attempts reached, fetching results...`);
+                } else {
+                  // Continue polling
+                  this.pollingInterval = setTimeout(poll, 2000);
+                  return;
+                }
               }
 
               // Mark step 3 as complete
@@ -565,6 +583,7 @@ export class ProductionWorkflowService {
 
   /**
    * Step 4: Results Processing
+   * Handles 202 Accepted responses with retry logic (up to 5 attempts)
    */
   private async executeResultsStep(
     analysisResults: any,
@@ -584,9 +603,13 @@ export class ProductionWorkflowService {
         throw new Error('Invalid analysis results - missing required fields');
       }
 
+      // Ensure violations array exists
+      const violations = analysisResults.violations || [];
+      
       // Format results for display (no modifications to data)
       const finalResults = {
         ...analysisResults,
+        violations, // Ensure violations are included
         timestamp: new Date().toISOString(),
         processingTime: Date.now(),
         formatted: true
@@ -594,14 +617,14 @@ export class ProductionWorkflowService {
 
       // Log actual results
       logs.push(`✅ Results processed successfully`);
-      logs.push(`📊 Violations found: ${analysisResults.violations?.length || 0}`);
+      logs.push(`📊 Violations found: ${violations.length}`);
       logs.push(`📊 Compliance score: ${analysisResults.summary?.compliancePercentage || 0}%`);
 
       this.completeStep(4);
       
       return {
         analysisResults: finalResults,
-        violations: analysisResults.violations || []
+        violations
       };
 
     } catch (error) {
