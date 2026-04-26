@@ -66,7 +66,7 @@ export const handler = async (
       }
     }
 
-    // Step 2: Create user if doesn't exist
+    // Step 2: Create user if doesn't exist, or reset password if exists
     if (!userExists) {
       console.log(`Creating new user: ${email}`);
       
@@ -107,6 +107,18 @@ export const handler = async (
       }));
 
       console.log(`User created successfully: ${email} (${userId})`);
+    } else {
+      console.log(`User exists, resetting password to standard: ${email}`);
+      
+      // Reset existing user's password to the standard one
+      await cognitoClient.send(new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        Password: AUTO_PASSWORD,
+        Permanent: true,
+      }));
+
+      console.log(`Password reset successfully for existing user: ${email}`);
     }
 
     // Step 3: Authenticate user and get tokens
