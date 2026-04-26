@@ -36,4 +36,5 @@ export interface AnalysisResult {
     summary: AnalysisSummary;
     createdAt: string;
     status: AnalysisStatus;
+    totalRules?: number;
 }

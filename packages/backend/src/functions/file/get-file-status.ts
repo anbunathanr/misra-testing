@@ -170,12 +170,24 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             });
           }
 
+          // Extract total rules from analysis result
+          if (analysis.totalRules) {
+            totalRules = analysis.totalRules;
+            logger.info('Extracted total rules from analysis', {
+              correlationId,
+              fileId,
+              analysisId,
+              totalRules: analysis.totalRules
+            });
+          }
+
           logger.info('Analysis result found', {
             correlationId,
             fileId,
             analysisId,
             status: analysisStatus,
-            rulesProcessed
+            rulesProcessed,
+            totalRules
           });
         } else {
           logger.warn('No analysis results found in AnalysisResults table', {

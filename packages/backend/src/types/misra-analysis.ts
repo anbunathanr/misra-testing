@@ -41,4 +41,5 @@ export interface AnalysisResult {
   summary: AnalysisSummary;
   createdAt: string;
   status: AnalysisStatus;
+  totalRules?: number; // Total number of rules checked
 }

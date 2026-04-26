@@ -414,10 +414,10 @@ export class ProductionWorkflowService {
       logs.push(`⏳ Waiting for analysis to complete...`);
 
       const results = await new Promise<any>((resolve, reject) => {
-        const maxAttempts = 120; // 4 minutes max
+        const maxAttempts = 60; // 60 seconds max - analysis should complete quickly
         let attempts = 0;
         let syncAttempts = 0; // Track DB sync attempts when status is "completed" but rules are 0
-        const maxSyncAttempts = 5; // Max 5 attempts (~10 seconds) for DB sync
+        const maxSyncAttempts = 15; // Max 15 attempts (~30 seconds) for DB sync - optimized for fast response
 
         const poll = async () => {
           attempts++;
@@ -458,6 +458,7 @@ export class ProductionWorkflowService {
             // THE CRITICAL GATE: Check both status AND rule data
             const hasRules = data.rulesProcessed > 0;
             const isFinished = data.analysisStatus === 'completed';
+            const allRulesProcessed = data.rulesProcessed >= data.totalRules;
 
             if (isFinished && hasRules) {
               // ✅ GATE PASSED: Analysis complete with rule data
@@ -469,7 +470,7 @@ export class ProductionWorkflowService {
                 if (!this.currentWorkflow.completedSteps.includes(3)) {
                   this.currentWorkflow.completedSteps.push(3);
                   console.log(`✅ Marked Step 3 as complete`);
-                  const totalSteps = 4.5;
+                  const totalSteps = 5; // Steps: 1, 2, 2.5, 3, 4
                   this.currentWorkflow.overallProgress = 
                     (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
                   this.updateProgress();
@@ -481,24 +482,52 @@ export class ProductionWorkflowService {
                 this.pollingInterval = null;
               }
 
-              // Fetch full analysis results
+              // Fetch full analysis results with retry logic for 202 responses
               console.log(`📍 Fetching results from: ${this.apiUrl}/analysis/results/${fileId}`);
-              const resultsResponse = await fetch(`${this.apiUrl}/analysis/results/${fileId}`, {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
+              
+              let resultsFetched = false;
+              let resultsFetchAttempts = 0;
+              const maxResultsFetchAttempts = 60; // 60 attempts (~60 seconds at 1 second intervals) - increased for post-processing time
+              
+              const fetchResults = async (): Promise<any> => {
+                while (resultsFetchAttempts < maxResultsFetchAttempts && !resultsFetched) {
+                  resultsFetchAttempts++;
+                  console.log(`📍 Fetching results attempt ${resultsFetchAttempts}/${maxResultsFetchAttempts}`);
+                  
+                  const resultsResponse = await fetch(`${this.apiUrl}/analysis/results/${fileId}`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+
+                  console.log(`📊 Results response status: ${resultsResponse.status}`);
+
+                  if (resultsResponse.status === 202) {
+                    // Still processing - wait and retry
+                    console.log(`⏳ Results still processing (202), retrying in 1 second...`);
+                    logs.push(`⏳ Results file still being generated, retrying (attempt ${resultsFetchAttempts}/${maxResultsFetchAttempts})...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                  }
+
+                  if (!resultsResponse.ok) {
+                    throw new Error(`Failed to fetch analysis results: ${resultsResponse.status} ${resultsResponse.statusText}`);
+                  }
+
+                  const results = await resultsResponse.json();
+                  console.log(`✅ Results received:`, results);
+                  resultsFetched = true;
+                  return results;
                 }
-              });
-
-              console.log(`📊 Results response status: ${resultsResponse.status}`);
-
-              if (!resultsResponse.ok) {
-                throw new Error(`Failed to fetch analysis results: ${resultsResponse.status} ${resultsResponse.statusText}`);
-              }
-
-              const results = await resultsResponse.json();
-              console.log(`✅ Results received:`, results);
+                
+                if (!resultsFetched) {
+                  throw new Error(`Failed to fetch results after ${maxResultsFetchAttempts} attempts (~60 seconds)`);
+                }
+              };
+              
+              const results = await fetchResults();
               resolve(results);
               return;
             } else if (isFinished && !hasRules) {
@@ -520,7 +549,7 @@ export class ProductionWorkflowService {
                   if (!this.currentWorkflow.completedSteps.includes(3)) {
                     this.currentWorkflow.completedSteps.push(3);
                     console.log(`✅ Marked Step 3 as complete (with 0 rules)`);
-                    const totalSteps = 4.5;
+                    const totalSteps = 5; // Steps: 1, 2, 2.5, 3, 4
                     this.currentWorkflow.overallProgress = 
                       (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
                     this.updateProgress();
@@ -689,25 +718,23 @@ int main(void) {
       return `/* Problematic Code with MISRA Violations */
 #include <stdio.h>
 
-int global_var = 0;  /* MISRA: Global variable */
+int global_var = 0;
 
 void unsafe_function(int *ptr) {
-    *ptr = 10;  /* MISRA: Pointer dereference */
-    global_var++;  /* MISRA: Global variable modification */
+    *ptr = 10;
+    global_var++;
 }
 
 int main(void) {
     int x = 5;
     unsafe_function(&x);
     
-    /* MISRA: Magic number */
     if (x > 42) {
         printf("Value: %d\\n", x);
     }
     
-    /* MISRA: Implicit conversion */
     float f = 3.14;
-    int i = f;
+    int i = (int)f;
     
     return 0;
 }`;
@@ -724,12 +751,12 @@ typedef struct {
 
 void process_data(Data *data) {
     if (data != NULL) {
-        data->value = 100;  /* MISRA: Magic number */
+        data->value = 100;
     }
 }
 
 int main(void) {
-    Data *ptr = (Data *)malloc(sizeof(Data));  /* MISRA: malloc usage */
+    Data *ptr = (Data *)malloc(sizeof(Data));
     
     if (ptr != NULL) {
         process_data(ptr);
@@ -777,10 +804,10 @@ int main(void) {
       console.log(`✅ Step ${stepId} marked as complete. Completed steps:`, this.currentWorkflow.completedSteps);
     }
     
-    // Update progress calculation to handle step 2.5
-    const totalSteps = 4.5; // Steps: 1, 2, 2.5, 3, 4
-    this.currentWorkflow.overallProgress = 
-      (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
+    // Update progress calculation - cap at 100%
+    const totalSteps = 5; // Steps: 1, 2, 2.5, 3, 4 = 5 total
+    const rawProgress = (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
+    this.currentWorkflow.overallProgress = Math.min(rawProgress, 100); // Never exceed 100%
     
     console.log(`📊 Progress: ${this.currentWorkflow.completedSteps.length}/${totalSteps} steps = ${this.currentWorkflow.overallProgress.toFixed(1)}%`);
     this.updateProgress();

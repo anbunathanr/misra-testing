@@ -535,6 +535,7 @@ export class ProductionMisraStack extends cdk.Stack {
         externalModules: ['@aws-sdk/*'],
       },
       environment: {
+        FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
       },
     });
@@ -700,6 +701,7 @@ export class ProductionMisraStack extends cdk.Stack {
     this.fileMetadataTable.grantReadData(getFilesFunction);
     this.fileMetadataTable.grantReadData(getFileStatusFunction);
     this.fileMetadataTable.grantReadWriteData(analyzeFileFunction);
+    this.fileMetadataTable.grantReadData(getAnalysisResultsFunction);
     
     this.analysisResultsTable.grantReadWriteData(analyzeFileFunction);
     this.analysisResultsTable.grantReadData(getAnalysisResultsFunction);

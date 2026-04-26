@@ -1,8 +1,6 @@
 import { Language, Violation } from '../../types/misra-analysis';
 import { AST, Token, FunctionDef } from './code-parser';
 import { RuleConfig, RuleProfile, PROFILE_SEVERITIES } from './rule-config';
-import { registerMISRACRules } from './rules/c/index';
-import { registerMISRACPPRules } from './rules/cpp/index';
 
 // ─── MISRARule interface ────────────────────────────────────────────────────
 
@@ -125,6 +123,10 @@ export class RuleEngine {
     console.log('Loading MISRA rules...');
     
     const initialRuleCount = this.getRuleCount();
+    
+    // Dynamically import and register rules to avoid circular dependencies
+    const { registerMISRACRules } = require('./rules/c/index');
+    const { registerMISRACPPRules } = require('./rules/cpp/index');
     
     // Register MISRA C rules
     registerMISRACRules(this);

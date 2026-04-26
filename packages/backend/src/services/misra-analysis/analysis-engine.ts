@@ -65,6 +65,8 @@ export class MISRAAnalysisEngine {
       // Hash file content for cache key (Requirement 10.7)
       const fileHash = AnalysisCache.hashFileContent(fileContent);
       console.log(`[AnalysisEngine] File hash: ${fileHash}`);
+      console.log(`[AnalysisEngine] File content length: ${fileContent.length}`);
+      console.log(`[AnalysisEngine] File content preview: ${fileContent.substring(0, 200)}`);
 
       if (progressCallback) {
         await progressCallback(5, 'Checking analysis cache...');
@@ -133,6 +135,11 @@ export class MISRAAnalysisEngine {
 
       // Parse source code once (Requirement 10.2 - optimize AST traversal)
       const ast = await this.parser.parse(fileContent, language);
+      console.log(`[AnalysisEngine] AST parsed successfully`);
+      console.log(`[AnalysisEngine] AST tokens: ${ast.tokens.length}`);
+      console.log(`[AnalysisEngine] AST functions: ${ast.functions.length}`);
+      console.log(`[AnalysisEngine] AST variables: ${ast.variables.length}`);
+      console.log(`[AnalysisEngine] AST lines: ${ast.lines.length}`);
 
       if (progressCallback) {
         await progressCallback(20, `Parsed ${language} source code successfully`);
@@ -151,6 +158,8 @@ export class MISRAAnalysisEngine {
       // Get applicable rules
       const rules = this.ruleEngine.getRulesForLanguage(language);
       const totalRules = rules.length;
+      console.log(`[AnalysisEngine] Got ${totalRules} rules for language ${language}`);
+      console.log(`[AnalysisEngine] Rule IDs: ${rules.map(r => r.id).join(', ')}`);
 
       if (progressCallback) {
         await progressCallback(25, `Evaluating ${totalRules} MISRA ${language} rules...`);
@@ -207,6 +216,7 @@ export class MISRAAnalysisEngine {
         summary,
         createdAt: new Date().toISOString(),
         status: AnalysisStatus.COMPLETED,
+        totalRules, // Include total rules checked
       };
 
       if (progressCallback) {
@@ -228,6 +238,7 @@ export class MISRAAnalysisEngine {
 
       const duration = Date.now() - startTime;
       console.log(`[AnalysisEngine] Analysis completed in ${duration}ms`);
+      console.log(`[AnalysisEngine] Found ${violations.length} violations`);
 
       if (progressCallback) {
         await progressCallback(100, `Analysis completed: ${summary.compliancePercentage.toFixed(1)}% compliance`);

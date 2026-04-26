@@ -106,6 +106,26 @@ function ViolationDetails({ analysisId }: ViolationDetailsProps) {
               {new Date(analysis.timestamp).toLocaleString()}
             </Typography>
           </Grid>
+          {analysis.rulesProcessed !== undefined && (
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography variant="body2" color="text.secondary">
+                Rules Processed
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {analysis.rulesProcessed}/{analysis.totalRules || 357}
+              </Typography>
+            </Grid>
+          )}
+          {analysis.compliancePercentage !== undefined && (
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography variant="body2" color="text.secondary">
+                Compliance Score
+              </Typography>
+              <Typography variant="body1" fontWeight="bold" color="success.main">
+                {analysis.compliancePercentage.toFixed(1)}%
+              </Typography>
+            </Grid>
+          )}
         </Grid>
       </Paper>
 

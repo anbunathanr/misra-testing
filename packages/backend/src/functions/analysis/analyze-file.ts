@@ -12,8 +12,8 @@ import { monitoringService } from '../../services/monitoring-service';
 
 const bucketName = process.env.FILE_STORAGE_BUCKET_NAME || '';
 const region = process.env.AWS_REGION || 'us-east-1';
-const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'FileMetadata-dev';
-const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults-dev';
+const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'FileMetadata';
+const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults';
 
 const s3Client = new S3Client({ region });
 const dynamoClient = new DynamoDBClient({ region });
@@ -256,12 +256,12 @@ async function processAnalysisMessage(
     console.log(`Waiting for DynamoDB propagation before marking status as completed`);
     
     // Add a longer delay to ensure DynamoDB has time to propagate
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Verify results are in DynamoDB with multiple attempts
     let resultsVerified = false;
     let verifyAttempts = 0;
-    const maxVerifyAttempts = 15; // Increased from 10
+    const maxVerifyAttempts = 30; // Increased to 30 attempts (~6 seconds total)
     
     while (!resultsVerified && verifyAttempts < maxVerifyAttempts) {
       try {
@@ -285,12 +285,14 @@ async function processAnalysisMessage(
           break;
         } else {
           console.log(`Results not yet visible (attempt ${verifyAttempts}/${maxVerifyAttempts}), retrying...`);
-          // Wait before next attempt
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // Wait before next attempt - use exponential backoff
+          const backoffDelay = Math.min(500, 100 * verifyAttempts);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
         }
       } catch (verifyError) {
         console.warn(`Verification attempt ${verifyAttempts} failed:`, verifyError);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        const backoffDelay = Math.min(500, 100 * verifyAttempts);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       }
     }
     

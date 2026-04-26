@@ -20,6 +20,9 @@ interface AnalysisResult {
   timestamp: number
   violationsCount: number
   rulesChecked: number
+  rulesProcessed?: number
+  totalRules?: number
+  compliancePercentage?: number
   violations: Violation[]
   success: boolean
   errorMessage?: string

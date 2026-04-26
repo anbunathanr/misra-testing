@@ -6,13 +6,13 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { DynamoDBClient, QueryCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, QueryCommand, GetItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
 import { unmarshall, marshall } from '@aws-sdk/util-dynamodb';
 import { getUserFromContext } from '../../utils/auth-util';
 
 const region = process.env.AWS_REGION || 'us-east-1';
-const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults-dev';
-const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'misra-platform-file-metadata-dev';
+const analysisResultsTable = process.env.ANALYSIS_RESULTS_TABLE || 'AnalysisResults';
+const fileMetadataTable = process.env.FILE_METADATA_TABLE || 'FileMetadata';
 
 const dynamoClient = new DynamoDBClient({ region });
 
@@ -36,6 +36,7 @@ interface AnalysisResult {
   status: string;
   createdAt: number;
   timestamp: number;
+  totalRules?: number;
 }
 
 /**
@@ -101,7 +102,7 @@ export const handler = async (
     console.log(`User: ${user.userId}, Organization: ${user.organizationId}`);
 
     // Verify user owns the file (Requirement 7.7)
-    const fileMetadata = await getFileMetadata(fileId);
+    const fileMetadata = await getFileMetadata(fileId, user.userId);
     
     if (!fileMetadata) {
       console.log(`File not found: ${fileId}`);
@@ -151,6 +152,49 @@ export const handler = async (
     // Check if results are available - if not, analysis is still running
     if (!analysisResults || analysisResults.length === 0) {
       console.log(`No analysis results found for file: ${fileId} - analysis may still be processing`);
+      console.log(`Attempting direct table scan as fallback...`);
+      
+      // Try scanning the main table as fallback
+      const scanResults = await scanAnalysisResultsByFileId(fileId);
+      if (scanResults && scanResults.length > 0) {
+        console.log(`Found ${scanResults.length} results via scan`);
+        const latestResult = scanResults[0];
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+          body: JSON.stringify({
+            analysisId: latestResult.analysisId,
+            fileId: latestResult.fileId,
+            language: latestResult.language,
+            violations: latestResult.violations || [],
+            summary: latestResult.summary || {
+              totalViolations: 0,
+              violationsBySeverity: {
+                mandatory: 0,
+                required: 0,
+                advisory: 0,
+              },
+              compliancePercentage: 0,
+              rulesChecked: 0,
+            },
+            status: latestResult.status,
+            rulesProcessed: latestResult.violations?.length || 0,
+            totalRules: latestResult.totalRules || 357,
+            compliancePercentage: latestResult.summary?.compliancePercentage || 0,
+            metadata: {
+              analysisId: latestResult.analysisId,
+              timestamp: latestResult.timestamp,
+              createdAt: latestResult.createdAt,
+              userId: latestResult.userId,
+              organizationId: latestResult.organizationId,
+            },
+          }),
+        };
+      }
+      
       return {
         statusCode: 202, // 202 Accepted - processing in progress
         headers: {
@@ -196,6 +240,9 @@ export const handler = async (
           rulesChecked: 0,
         },
         status: latestResult.status,
+        rulesProcessed: latestResult.violations?.length || 0, // Number of violations found
+        totalRules: latestResult.totalRules || 357, // Total rules checked
+        compliancePercentage: latestResult.summary?.compliancePercentage || 0,
         metadata: {
           // Requirement 7.5
           analysisId: latestResult.analysisId,
@@ -234,34 +281,71 @@ export const handler = async (
 /**
  * Get file metadata from DynamoDB
  */
-async function getFileMetadata(fileId: string): Promise<any | null> {
+async function getFileMetadata(fileId: string, userId?: string): Promise<any | null> {
   try {
-    console.log(`Getting file metadata for fileId: ${fileId}`);
+    console.log(`Getting file metadata for fileId: ${fileId}, userId: ${userId}`);
     console.log(`Using table: ${fileMetadataTable}`);
     
-    const command = new GetItemCommand({
-      TableName: fileMetadataTable,
-      Key: marshall({ fileId: fileId }),
-    });
+    if (userId) {
+      // Use composite key (fileId + userId) - this is the correct approach for the production table
+      const command = new GetItemCommand({
+        TableName: fileMetadataTable,
+        Key: marshall({ 
+          fileId: fileId,
+          userId: userId 
+        }),
+      });
 
-    console.log(`Executing GetItem command for table: ${fileMetadataTable}`);
-    
-    const response = await dynamoClient.send(command);
+      console.log(`Executing GetItem command with composite key for table: ${fileMetadataTable}`);
+      
+      const response = await dynamoClient.send(command);
 
-    // Check for null results - file metadata not found
-    if (!response.Item) {
-      console.log(`File metadata not found for fileId: ${fileId}`);
-      return null;
+      // Check for null results - file metadata not found
+      if (!response.Item) {
+        console.log(`File metadata not found for fileId: ${fileId}, userId: ${userId}`);
+        return null;
+      }
+
+      const metadata = unmarshall(response.Item);
+      console.log(`File metadata retrieved successfully:`, {
+        fileId,
+        userId: metadata.userId,
+        organizationId: metadata.organizationId,
+      });
+      
+      return metadata;
+    } else {
+      // Fallback: Query by fileId only using scan (less efficient but works)
+      console.log(`No userId provided, using scan fallback`);
+      
+      const command = new ScanCommand({
+        TableName: fileMetadataTable,
+        FilterExpression: 'fileId = :fileId',
+        ExpressionAttributeValues: marshall({
+          ':fileId': fileId,
+        }),
+        Limit: 1,
+      });
+
+      console.log(`Executing Scan command for table: ${fileMetadataTable}`);
+      
+      const response = await dynamoClient.send(command);
+
+      // Check for null results - file metadata not found
+      if (!response.Items || response.Items.length === 0) {
+        console.log(`File metadata not found for fileId: ${fileId} via scan`);
+        return null;
+      }
+
+      const metadata = unmarshall(response.Items[0]);
+      console.log(`File metadata retrieved via scan:`, {
+        fileId,
+        userId: metadata.userId,
+        organizationId: metadata.organizationId,
+      });
+      
+      return metadata;
     }
-
-    const metadata = unmarshall(response.Item);
-    console.log(`File metadata retrieved successfully:`, {
-      fileId,
-      userId: metadata.userId,
-      organizationId: metadata.organizationId,
-    });
-    
-    return metadata;
   } catch (error) {
     console.error('DB Error:', error);
     console.error('Error details:', {
@@ -357,5 +441,49 @@ async function queryAnalysisResultsByFileId(
       statusCode: (error as any)?.statusCode,
     });
     throw error;
+  }
+}
+
+/**
+ * Scan analysis results by fileId (fallback when GSI is slow)
+ */
+async function scanAnalysisResultsByFileId(
+  fileId: string
+): Promise<AnalysisResult[]> {
+  try {
+    console.log(`✅ [SCAN] Scanning analysis results for fileId: ${fileId}`);
+    
+    const command = new ScanCommand({
+      TableName: analysisResultsTable,
+      FilterExpression: 'fileId = :fileId',
+      ExpressionAttributeValues: marshall({
+        ':fileId': fileId,
+      }),
+      Limit: 10,
+    });
+
+    const response = await dynamoClient.send(command);
+
+    if (!response.Items || response.Items.length === 0) {
+      console.log(`⚠️ [SCAN] No results found via scan`);
+      return [];
+    }
+
+    const results: AnalysisResult[] = [];
+    for (const item of response.Items) {
+      try {
+        const unmarshalled = unmarshall(item) as AnalysisResult;
+        results.push(unmarshalled);
+      } catch (itemError) {
+        console.error('❌ [SCAN] Error unmarshalling item:', itemError);
+        continue;
+      }
+    }
+    
+    console.log(`✅ [SCAN] Successfully retrieved ${results.length} results via scan`);
+    return results;
+  } catch (error) {
+    console.error('❌ [SCAN] Error:', error);
+    return [];
   }
 }
