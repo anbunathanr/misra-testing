@@ -654,18 +654,81 @@ export class ProductionWorkflowService {
   }
 
   /**
-   * Helper: Get sample file content
+   * Helper: Get sample file content with MISRA violations
    */
   private getSampleFileContent(fileName: string): string {
-    // Return simple sample content
-    // In production, this would come from the sample files library
-    return `/* Sample ${fileName} */
+    // Return sample content with actual MISRA violations for testing
+    if (fileName.includes('compliance')) {
+      // High compliance file - minimal violations
+      return `/* High Compliance Sample */
 #include <stdio.h>
+#include <stdint.h>
+
+int32_t add(int32_t a, int32_t b) {
+    return a + b;
+}
 
 int main(void) {
-    printf("Hello, MISRA!\\n");
+    int32_t result = add(5, 3);
+    (void)printf("Result: %d\\n", result);
     return 0;
 }`;
+    } else if (fileName.includes('problematic')) {
+      // Problematic file - multiple violations
+      return `/* Problematic Code with MISRA Violations */
+#include <stdio.h>
+
+int global_var = 0;  /* MISRA: Global variable */
+
+void unsafe_function(int *ptr) {
+    *ptr = 10;  /* MISRA: Pointer dereference */
+    global_var++;  /* MISRA: Global variable modification */
+}
+
+int main(void) {
+    int x = 5;
+    unsafe_function(&x);
+    
+    /* MISRA: Magic number */
+    if (x > 42) {
+        printf("Value: %d\\n", x);
+    }
+    
+    /* MISRA: Implicit conversion */
+    float f = 3.14;
+    int i = f;
+    
+    return 0;
+}`;
+    } else {
+      // Medium compliance - some violations
+      return `/* Medium Compliance Sample */
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int value;
+    char name[50];
+} Data;
+
+void process_data(Data *data) {
+    if (data != NULL) {
+        data->value = 100;  /* MISRA: Magic number */
+    }
+}
+
+int main(void) {
+    Data *ptr = (Data *)malloc(sizeof(Data));  /* MISRA: malloc usage */
+    
+    if (ptr != NULL) {
+        process_data(ptr);
+        printf("Processed\\n");
+        free(ptr);
+    }
+    
+    return 0;
+}`;
+    }
   }
 
   /**
