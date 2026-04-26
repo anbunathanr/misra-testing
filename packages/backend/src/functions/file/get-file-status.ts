@@ -138,6 +138,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           Limit: 1
         }));
 
+        logger.info('Query result received', {
+          correlationId,
+          fileId,
+          itemsFound: analysisResults.Items?.length || 0
+        });
+
         if (analysisResults.Items && analysisResults.Items.length > 0) {
           const analysis = analysisResults.Items[0];
           analysisId = analysis.analysisId;
@@ -151,7 +157,16 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               correlationId,
               fileId,
               analysisId,
-              rulesProcessed
+              rulesProcessed,
+              violationsLength: analysis.violations.length
+            });
+          } else {
+            logger.warn('Violations array not found or not an array', {
+              correlationId,
+              fileId,
+              analysisId,
+              violationsType: typeof analysis.violations,
+              violationsExists: !!analysis.violations
             });
           }
 
@@ -162,12 +177,19 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             status: analysisStatus,
             rulesProcessed
           });
+        } else {
+          logger.warn('No analysis results found in AnalysisResults table', {
+            correlationId,
+            fileId,
+            analysisResultsTable
+          });
         }
       } catch (queryError) {
         logger.warn('Failed to query analysis results', {
           correlationId,
           fileId,
-          error: queryError instanceof Error ? queryError.message : 'Unknown error'
+          error: queryError instanceof Error ? queryError.message : 'Unknown error',
+          errorCode: (queryError as any)?.Code
         });
       }
     }
