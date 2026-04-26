@@ -144,8 +144,8 @@ export class ProductionWorkflowService {
   }
 
   /**
-   * Automated Authentication - Get or create token with silent login
-   * Fully automatic - no manual checks required
+   * Automated Authentication - Use auto-login endpoint for seamless authentication
+   * Handles both new and existing users automatically
    * Private method for internal use only
    */
   private async executeAutoAuth(
@@ -160,91 +160,40 @@ export class ProductionWorkflowService {
       let token = await authService.getToken();
 
       if (!token) {
-        // No existing token - perform automatic login
-        logs.push(`📝 No existing token, performing automatic login...`);
+        // No existing token - use auto-login endpoint
+        logs.push(`📝 No existing token, calling auto-login endpoint...`);
         
-        // Use provided password or generate default
-        const password = options.password || 'DefaultPassword123!';
+        console.log(`🔐 Calling auto-login endpoint for: ${options.email}`);
         
-        try {
-          console.log(`🔐 Calling login with email: ${options.email}`);
-          const loginResult = await authService.login(options.email, password);
-          token = loginResult.token;
-          
-          if (!token) {
-            throw new Error('Failed to obtain token after login');
-          }
-          
-          logs.push(`✅ Automatic login successful`);
-          console.log(`✅ Token obtained after automatic login`);
-        } catch (loginError) {
-          // If login fails with 401 (user doesn't exist), try registering first
-          const errorMsg = loginError instanceof Error ? loginError.message : 'Unknown error';
-          console.error(`❌ Automatic login failed:`, loginError);
-          
-          // Check if error indicates user doesn't exist (401 Unauthorized)
-          if (errorMsg.includes('Incorrect username or password') || errorMsg.includes('401')) {
-            console.log(`📝 User doesn't exist, attempting registration...`);
-            logs.push(`📝 User not found, attempting registration...`);
-            
-            try {
-              // Try to register the user
-              const registerResponse = await fetch(`${this.apiUrl}/auth/register`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  email: options.email,
-                  password: password,
-                  name: options.email.split('@')[0], // Use email prefix as name
-                }),
-              });
+        const autoLoginResponse = await fetch(`${this.apiUrl}/auth/auto-login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: options.email,
+          }),
+        });
 
-              const registerData = await registerResponse.json();
-
-              if (!registerResponse.ok) {
-                // If 409 (user already exists), try login again
-                if (registerResponse.status === 409) {
-                  console.log(`📝 User already exists (409), retrying login...`);
-                  logs.push(`📝 User already exists, retrying login...`);
-                  
-                  const retryLoginResult = await authService.login(options.email, password);
-                  token = retryLoginResult.token;
-                  
-                  if (!token) {
-                    throw new Error('Failed to obtain token after retry login');
-                  }
-                  
-                  logs.push(`✅ Automatic login successful (after retry)`);
-                  console.log(`✅ Token obtained after retry login`);
-                } else {
-                  throw new Error(registerData.error?.message || 'Registration failed');
-                }
-              } else {
-                // Registration successful, now login
-                console.log(`✅ Registration successful, logging in...`);
-                logs.push(`✅ Registration successful, logging in...`);
-                
-                const loginAfterRegister = await authService.login(options.email, password);
-                token = loginAfterRegister.token;
-                
-                if (!token) {
-                  throw new Error('Failed to obtain token after registration');
-                }
-                
-                logs.push(`✅ Automatic login successful (after registration)`);
-                console.log(`✅ Token obtained after registration`);
-              }
-            } catch (registerError) {
-              const registerErrorMsg = registerError instanceof Error ? registerError.message : 'Unknown error';
-              console.error(`❌ Registration/retry failed:`, registerError);
-              throw new Error(`Authentication failed: ${registerErrorMsg}`);
-            }
-          } else {
-            throw new Error(`Automatic login failed: ${errorMsg}`);
-          }
+        if (!autoLoginResponse.ok) {
+          const errorData = await autoLoginResponse.json();
+          const errorMessage = errorData.error?.message || `Auto-login failed with status ${autoLoginResponse.status}`;
+          console.error(`❌ Auto-login failed:`, errorData);
+          throw new Error(errorMessage);
         }
+
+        const autoLoginData = await autoLoginResponse.json();
+        token = autoLoginData.accessToken;
+        
+        if (!token) {
+          throw new Error('Auto-login succeeded but no access token received');
+        }
+        
+        // Store the token in auth service
+        await authService.setToken(token);
+        
+        logs.push(`✅ Auto-login successful: ${autoLoginData.message}`);
+        console.log(`✅ Auto-login successful for: ${options.email}`);
       } else {
         logs.push(`✅ Using existing authentication token`);
         console.log(`✅ Using existing token`);

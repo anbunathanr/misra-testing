@@ -393,6 +393,7 @@ export class ProductionMisraStack extends cdk.Stack {
       environment: {
         COGNITO_USER_POOL_ID: cognitoAuth.userPool.userPoolId,
         COGNITO_CLIENT_ID: cognitoAuth.userPoolClient.userPoolClientId,
+        USERS_TABLE: this.usersTable.tableName,
       },
     });
 
@@ -691,11 +692,17 @@ export class ProductionMisraStack extends cdk.Stack {
 
     autoLoginFunction.role?.addToPrincipalPolicy(new iam.PolicyStatement({
       actions: [
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminSetUserPassword',
         'cognito-idp:AdminInitiateAuth',
         'cognito-idp:AdminRespondToAuthChallenge'
       ],
       resources: [cognitoAuth.userPool.userPoolArn]
     }));
+
+    // Grant DynamoDB permissions to auto-login function
+    this.usersTable.grantReadWriteData(autoLoginFunction);
     
     this.fileMetadataTable.grantReadWriteData(uploadFunction);
     this.fileMetadataTable.grantReadData(getFilesFunction);
