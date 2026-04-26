@@ -144,11 +144,23 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           analysisProgress = 100;
           analysisMessage = 'Analysis completed successfully';
 
+          // CRITICAL FIX: Extract violation count from analysis object
+          if (analysis.violations && Array.isArray(analysis.violations)) {
+            rulesProcessed = analysis.violations.length;
+            logger.info('Extracted rule count from analysis', {
+              correlationId,
+              fileId,
+              analysisId,
+              rulesProcessed
+            });
+          }
+
           logger.info('Analysis result found', {
             correlationId,
             fileId,
             analysisId,
-            status: analysisStatus
+            status: analysisStatus,
+            rulesProcessed
           });
         }
       } catch (queryError) {
