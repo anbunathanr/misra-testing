@@ -1,220 +1,175 @@
 /**
- * Auto-Login Lambda Function
- * 
- * Logs in user after OTP verification without requiring password
- * This is used in the automated authentication flow
- * 
- * For existing users: Uses the temporary password set during registration
- * For new users: Uses the temporary password generated during registration
- * 
- * Request:
- * {
- *   "email": "user@example.com"
- * }
- * 
- * Response:
- * {
- *   "accessToken": "...",
- *   "refreshToken": "...",
- *   "expiresIn": 3600,
- *   "user": {
- *     "userId": "...",
- *     "email": "user@example.com",
- *     "name": "User"
- *   }
- * }
+ * Auto-login endpoint for automated workflows
+ * Handles user creation and authentication internally
+ * Returns a valid JWT token for any email address
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { 
-  CognitoIdentityProviderClient,
-  AdminInitiateAuthCommand,
-  AuthFlowType,
-  AdminGetUserCommand
-} from '@aws-sdk/client-cognito-identity-provider';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
-import { corsHeaders } from '../../utils/cors';
-import { createLogger } from '../../utils/logger';
+import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminInitiateAuthCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { marshall } from '@aws-sdk/util-dynamodb';
+import jwt from 'jsonwebtoken';
 
-const logger = createLogger('AutoLogin');
-const cognitoClient = new CognitoIdentityProviderClient({ 
-  region: process.env.AWS_REGION || 'us-east-1' 
-});
-const dynamoClient = new DynamoDBClient({ 
-  region: process.env.AWS_REGION || 'us-east-1' 
-});
+const region = process.env.AWS_REGION || 'us-east-1';
+const userPoolId = process.env.COGNITO_USER_POOL_ID!;
+const clientId = process.env.COGNITO_CLIENT_ID!;
+const usersTable = process.env.USERS_TABLE || 'Users';
 
-// Standard demo password for all test accounts
-const DEMO_PASSWORD = 'DemoPass123!@#';
+const cognitoClient = new CognitoIdentityProviderClient({ region });
+const dynamoClient = new DynamoDBClient({ region });
 
-interface AutoLoginRequest {
-  email: string;
-}
+// Fixed password for all auto-generated users
+const AUTO_PASSWORD = 'AutoUser@123!';
 
-interface AutoLoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  user: {
-    userId: string;
-    email: string;
-    name: string;
-  };
-}
-
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  const correlationId = event.headers['X-Correlation-ID'] || Math.random().toString(36).substring(7);
-  
-  logger.info('Auto-login request received', {
-    correlationId,
-    path: event.path,
-    method: event.httpMethod
-  });
+export const handler = async (
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> => {
+  console.log('Auto-login endpoint invoked');
 
   try {
-    // Parse request body
-    if (!event.body) {
-      return errorResponse(400, 'MISSING_BODY', 'Request body is required', correlationId);
+    const body = JSON.parse(event.body || '{}');
+    const { email } = body;
+
+    if (!email) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Email is required',
+          },
+        }),
+      };
     }
 
-    const request: AutoLoginRequest = JSON.parse(event.body);
+    console.log(`Auto-login requested for: ${email}`);
 
-    // Validate required fields
-    if (!request.email) {
-      return errorResponse(400, 'MISSING_EMAIL', 'Email is required', correlationId);
-    }
-
-    logger.info('Auto-logging in user', {
-      correlationId,
-      email: request.email
-    });
-
-    // Try to get the temporary password from DynamoDB (stored during registration)
-    let tempPassword = DEMO_PASSWORD; // Use demo password as fallback for existing users
-    
+    // Step 1: Check if user exists in Cognito
+    let userExists = false;
     try {
-      const usersTableName = process.env.USERS_TABLE_NAME || 'misra-users';
-      const userRecord = await dynamoClient.send(new GetCommand({
-        TableName: usersTableName,
-        Key: {
-          email: request.email
-        }
+      await cognitoClient.send(new AdminGetUserCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+      }));
+      userExists = true;
+      console.log(`User exists in Cognito: ${email}`);
+    } catch (error: any) {
+      if (error.name === 'UserNotFoundException') {
+        console.log(`User does not exist in Cognito: ${email}`);
+        userExists = false;
+      } else {
+        throw error;
+      }
+    }
+
+    // Step 2: Create user if doesn't exist
+    if (!userExists) {
+      console.log(`Creating new user: ${email}`);
+      
+      // Create user in Cognito
+      await cognitoClient.send(new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'name', Value: email.split('@')[0] },
+        ],
+        MessageAction: 'SUPPRESS', // Don't send welcome email
+        TemporaryPassword: AUTO_PASSWORD,
       }));
 
-      if (userRecord.Item?.tempPassword) {
-        tempPassword = userRecord.Item.tempPassword;
-        logger.info('Retrieved temporary password from DynamoDB', { correlationId });
-      }
-    } catch (dbError) {
-      logger.warn('Could not retrieve temp password from DynamoDB, using demo password fallback', {
-        correlationId,
-        error: (dbError as any).message
-      });
-      // Continue with demo password fallback
+      // Set permanent password
+      await cognitoClient.send(new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        Password: AUTO_PASSWORD,
+        Permanent: true,
+      }));
+
+      // Create user record in DynamoDB
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await dynamoClient.send(new PutItemCommand({
+        TableName: usersTable,
+        Item: marshall({
+          userId,
+          email,
+          name: email.split('@')[0],
+          role: 'user',
+          organizationId: 'default',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      }));
+
+      console.log(`User created successfully: ${email} (${userId})`);
     }
 
-    // Authenticate with Cognito using the temporary password
-    const authResult = await cognitoClient.send(new AdminInitiateAuthCommand({
-      UserPoolId: process.env.COGNITO_USER_POOL_ID!,
-      ClientId: process.env.COGNITO_CLIENT_ID!,
-      AuthFlow: AuthFlowType.ADMIN_NO_SRP_AUTH,
+    // Step 3: Authenticate user and get tokens
+    console.log(`Authenticating user: ${email}`);
+    
+    const authResponse = await cognitoClient.send(new AdminInitiateAuthCommand({
+      UserPoolId: userPoolId,
+      ClientId: clientId,
+      AuthFlow: 'ADMIN_NO_SRP_AUTH',
       AuthParameters: {
-        USERNAME: request.email,
-        PASSWORD: tempPassword,
+        USERNAME: email,
+        PASSWORD: AUTO_PASSWORD,
       },
     }));
 
-    // Check if authentication was successful
-    if (!authResult.AuthenticationResult) {
-      throw new Error('Authentication failed - no tokens returned from Cognito');
+    if (!authResponse.AuthenticationResult?.AccessToken) {
+      throw new Error('Failed to obtain access token');
     }
 
-    logger.info('Auto-login successful', {
-      correlationId,
-      email: request.email
-    });
-
-    // Extract user ID from the access token (sub claim)
-    const accessTokenParts = authResult.AuthenticationResult.AccessToken!.split('.');
-    let userId = request.email.split('@')[0];
-    let userName = 'User';
+    // Step 4: Decode token to get user info
+    const accessToken = authResponse.AuthenticationResult.AccessToken;
+    const decodedToken = jwt.decode(accessToken) as any;
     
-    try {
-      const payload = JSON.parse(Buffer.from(accessTokenParts[1], 'base64').toString());
-      userId = payload.sub || userId;
-    } catch (e) {
-      logger.warn('Could not extract userId from token', { correlationId });
-    }
-
-    // Try to get user name from Cognito
-    try {
-      const userInfo = await cognitoClient.send(new AdminGetUserCommand({
-        UserPoolId: process.env.COGNITO_USER_POOL_ID!,
-        Username: request.email
-      }));
-
-      const nameAttr = userInfo.UserAttributes?.find(attr => attr.Name === 'name');
-      if (nameAttr?.Value) {
-        userName = nameAttr.Value;
-      }
-    } catch (e) {
-      logger.warn('Could not retrieve user name from Cognito', { correlationId });
-    }
-
-    const response: AutoLoginResponse = {
-      accessToken: authResult.AuthenticationResult.AccessToken!,
-      refreshToken: authResult.AuthenticationResult.RefreshToken!,
-      expiresIn: authResult.AuthenticationResult.ExpiresIn || 3600,
-      user: {
-        userId,
-        email: request.email,
-        name: userName
-      }
+    const userInfo = {
+      userId: decodedToken.sub,
+      email: decodedToken.email || email,
+      name: decodedToken.name || email.split('@')[0],
+      role: 'user',
+      organizationId: 'default',
     };
+
+    console.log(`Auto-login successful for: ${email}`);
 
     return {
       statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(response)
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        user: userInfo,
+        accessToken: accessToken,
+        refreshToken: authResponse.AuthenticationResult.RefreshToken,
+        expiresIn: authResponse.AuthenticationResult.ExpiresIn,
+        message: userExists ? 'Login successful' : 'User created and logged in',
+      }),
     };
 
-  } catch (error: any) {
-    logger.error('Auto-login failed', {
-      correlationId,
-      error: error.message,
-      stack: error.stack
-    });
-
-    // Check if it's an authentication error
-    if (error.message?.includes('Incorrect username or password') || 
-        error.name === 'NotAuthorizedException') {
-      return errorResponse(401, 'INVALID_CREDENTIALS', 'Incorrect username or password', correlationId);
-    }
-
-    return errorResponse(500, 'AUTO_LOGIN_FAILED', error.message || 'Failed to auto-login', correlationId);
+  } catch (error) {
+    console.error('Auto-login error:', error);
+    
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        error: {
+          code: 'AUTO_LOGIN_FAILED',
+          message: error instanceof Error ? error.message : 'Auto-login failed',
+        },
+      }),
+    };
   }
 };
-
-/**
- * Standard error response
- */
-function errorResponse(
-  statusCode: number,
-  code: string,
-  message: string,
-  correlationId: string
-): APIGatewayProxyResult {
-  return {
-    statusCode,
-    headers: corsHeaders,
-    body: JSON.stringify({
-      error: {
-        code,
-        message,
-        timestamp: new Date().toISOString(),
-        requestId: correlationId
-      }
-    })
-  };
-}
