@@ -33,6 +33,8 @@ export interface ProductionWorkflowResult {
   violations?: any[];
   selectedFile?: any;
   executionTime: number;
+  rulesProcessed?: number;
+  totalRules?: number;
   error?: string;
   logs: string[];
 }
@@ -126,6 +128,8 @@ export class ProductionWorkflowService {
         violations: resultsResult.violations,
         selectedFile: fileResult.file,
         executionTime,
+        rulesProcessed: resultsResult.rulesProcessed,
+        totalRules: resultsResult.totalRules,
         logs
       };
 
@@ -595,7 +599,7 @@ export class ProductionWorkflowService {
   private async executeResultsStep(
     analysisResults: any,
     logs: string[]
-  ): Promise<{ analysisResults: any; violations: any[] }> {
+  ): Promise<{ analysisResults: any; violations: any[]; rulesProcessed: number; totalRules: number }> {
     this.setStepActive(4, 'Processing results...');
     logs.push(`📊 Step 4: Processing and formatting results`);
 
@@ -613,6 +617,10 @@ export class ProductionWorkflowService {
       // Ensure violations array exists
       const violations = analysisResults.violations || [];
       
+      // Extract rule counts from summary
+      const rulesProcessed = analysisResults.summary?.rulesProcessed || analysisResults.violations?.length || 0;
+      const totalRules = analysisResults.summary?.totalRules || 357;
+      
       // Format results for display (no modifications to data)
       const finalResults = {
         ...analysisResults,
@@ -624,6 +632,7 @@ export class ProductionWorkflowService {
 
       // Log actual results
       logs.push(`✅ Results processed successfully`);
+      logs.push(`📊 Rules processed: ${rulesProcessed}/${totalRules}`);
       logs.push(`📊 Violations found: ${violations.length}`);
       logs.push(`📊 Compliance score: ${analysisResults.summary?.compliancePercentage || 0}%`);
 
@@ -631,7 +640,9 @@ export class ProductionWorkflowService {
       
       return {
         analysisResults: finalResults,
-        violations
+        violations,
+        rulesProcessed,
+        totalRules
       };
 
     } catch (error) {
