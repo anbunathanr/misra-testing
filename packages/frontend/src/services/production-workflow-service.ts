@@ -389,8 +389,8 @@ export class ProductionWorkflowService {
    * Step 3: Trigger MISRA Analysis with internal polling
    * Token passed directly to avoid multiple async lookups
    * Uses Promise with 2000ms polling interval
-   * CRITICAL FIX: Won't resolve if rulesProcessed is 0 even if status is 'completed'
-   * Waits up to 5 additional attempts for backend rule-aggregation to sync
+   * CRITICAL GATE: Won't resolve if rulesProcessed is 0, even if status is 'completed'
+   * This prevents the AI from getting empty results due to DB sync delays
    */
   private async executeAnalysisStep(
     token: string,
@@ -408,10 +408,8 @@ export class ProductionWorkflowService {
       logs.push(`⏳ Waiting for analysis to complete...`);
 
       const results = await new Promise<any>((resolve, reject) => {
-        const maxAttempts = 60;
+        const maxAttempts = 120; // 4 minutes max
         let attempts = 0;
-        let completedButEmptyAttempts = 0;
-        const maxEmptyAttempts = 5; // Wait up to 5 more attempts for rule aggregation
 
         const poll = async () => {
           attempts++;
@@ -449,27 +447,14 @@ export class ProductionWorkflowService {
               console.log(`✅ Progress updated: ${data.analysisProgress}% (${data.rulesProcessed || 0}/${data.totalRules || 357} rules)`);
             }
 
-            // Check if analysis is complete
-            if (data.analysisStatus === 'completed') {
-              console.log(`✅ Analysis status is COMPLETED`);
-              
-              // CRITICAL FIX: Even if status is 'completed', check if rules were actually processed
-              // If rulesProcessed is 0 and totalRules > 0, keep polling for rule aggregation
-              if (data.rulesProcessed === 0 && data.totalRules > 0) {
-                completedButEmptyAttempts++;
-                console.log(`⚠️ Status is completed but no rules processed yet (attempt ${completedButEmptyAttempts}/${maxEmptyAttempts})`);
-                logs.push(`⚠️ Analysis marked complete but rules not yet processed, waiting for aggregation (${completedButEmptyAttempts}/${maxEmptyAttempts})...`);
-                
-                // If we've waited enough, give up and fetch results anyway
-                if (completedButEmptyAttempts >= maxEmptyAttempts) {
-                  console.log(`⚠️ Reached max empty attempts, proceeding to fetch results`);
-                  logs.push(`⚠️ Max wait attempts reached, fetching results...`);
-                } else {
-                  // Continue polling
-                  this.pollingInterval = setTimeout(poll, 2000);
-                  return;
-                }
-              }
+            // THE CRITICAL GATE: Check both status AND rule data
+            const hasRules = data.rulesProcessed > 0;
+            const isFinished = data.analysisStatus === 'completed';
+
+            if (isFinished && hasRules) {
+              // ✅ GATE PASSED: Analysis complete with rule data
+              console.log(`✅ AI: Analysis complete with rule data. Rules: ${data.rulesProcessed}/${data.totalRules}`);
+              logs.push(`✅ Analysis complete with rule data: ${data.rulesProcessed}/${data.totalRules} rules processed`);
 
               // Mark step 3 as complete
               if (this.currentWorkflow) {
@@ -500,22 +485,6 @@ export class ProductionWorkflowService {
 
               console.log(`📊 Results response status: ${resultsResponse.status}`);
 
-              // Handle 202 Accepted - analysis still processing, continue polling
-              if (resultsResponse.status === 202) {
-                console.log(`⏳ Results not ready (202), will retry in 2 seconds...`);
-                logs.push(`⏳ Analysis results not yet available (202 Accepted)`);
-                this.pollingInterval = setTimeout(poll, 2000);
-                return;
-              }
-
-              // Handle 500 - backend error, but continue polling
-              if (resultsResponse.status === 500) {
-                console.log(`⚠️ Backend error (500), will retry in 2 seconds...`);
-                logs.push(`⚠️ Backend processing (500 - retrying...)`);
-                this.pollingInterval = setTimeout(poll, 2000);
-                return;
-              }
-
               if (!resultsResponse.ok) {
                 throw new Error(`Failed to fetch analysis results: ${resultsResponse.status} ${resultsResponse.statusText}`);
               }
@@ -524,33 +493,19 @@ export class ProductionWorkflowService {
               console.log(`✅ Results received:`, results);
               resolve(results);
               return;
-            }
-
-            // Check if analysis failed
-            if (data.analysisStatus === 'failed') {
-              console.error(`❌ Analysis failed`);
-              if (this.pollingInterval) {
-                clearInterval(this.pollingInterval);
-                this.pollingInterval = null;
-              }
-              reject(new Error(data.errorMessage || 'Analysis failed'));
+            } else if (isFinished && !hasRules) {
+              // ⏳ GATE BLOCKED: Backend says "completed" but rules are 0
+              // The DB hasn't synced yet. We stay in Step 3 and retry.
+              console.log(`⏳ AI: Backend says "completed" but rules are 0. Waiting for DB sync...`);
+              logs.push(`⏳ Analysis marked complete but rules not yet synced to DB. Retrying...`);
+              this.pollingInterval = setTimeout(poll, 2000);
+              return;
+            } else {
+              // Standard in-progress polling
+              console.log(`⏳ Analysis still running (${data.analysisProgress}%)...`);
+              this.pollingInterval = setTimeout(poll, 2000);
               return;
             }
-
-            // Check timeout
-            if (attempts >= maxAttempts) {
-              console.error(`❌ Analysis timeout after ${maxAttempts} attempts`);
-              if (this.pollingInterval) {
-                clearInterval(this.pollingInterval);
-                this.pollingInterval = null;
-              }
-              reject(new Error('Analysis timeout - please try again'));
-              return;
-            }
-
-            console.log(`⏳ Analysis still running, will retry in 2 seconds...`);
-            // Schedule next poll with 2000ms interval
-            this.pollingInterval = setTimeout(poll, 2000);
 
           } catch (error) {
             console.error(`❌ Poll error on attempt ${attempts}:`, error);
@@ -582,8 +537,9 @@ export class ProductionWorkflowService {
   }
 
   /**
-   * Step 4: Results Processing
-   * Handles 202 Accepted responses with retry logic (up to 5 attempts)
+   * Step 4: Results Processing with 202 Retry Logic
+   * If server returns 202 Accepted, automatically retry up to 10 times
+   * This handles the case where results file is still being generated
    */
   private async executeResultsStep(
     analysisResults: any,
