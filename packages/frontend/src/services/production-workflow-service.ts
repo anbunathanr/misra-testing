@@ -178,10 +178,72 @@ export class ProductionWorkflowService {
           logs.push(`✅ Automatic login successful`);
           console.log(`✅ Token obtained after automatic login`);
         } catch (loginError) {
-          // If login fails, throw error for AI to handle
+          // If login fails with 401 (user doesn't exist), try registering first
           const errorMsg = loginError instanceof Error ? loginError.message : 'Unknown error';
           console.error(`❌ Automatic login failed:`, loginError);
-          throw new Error(`Automatic login failed: ${errorMsg}`);
+          
+          // Check if error indicates user doesn't exist (401 Unauthorized)
+          if (errorMsg.includes('Incorrect username or password') || errorMsg.includes('401')) {
+            console.log(`📝 User doesn't exist, attempting registration...`);
+            logs.push(`📝 User not found, attempting registration...`);
+            
+            try {
+              // Try to register the user
+              const registerResponse = await fetch(`${this.apiUrl}/auth/register`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  email: options.email,
+                  password: password,
+                  name: options.email.split('@')[0], // Use email prefix as name
+                }),
+              });
+
+              const registerData = await registerResponse.json();
+
+              if (!registerResponse.ok) {
+                // If 409 (user already exists), try login again
+                if (registerResponse.status === 409) {
+                  console.log(`📝 User already exists (409), retrying login...`);
+                  logs.push(`📝 User already exists, retrying login...`);
+                  
+                  const retryLoginResult = await authService.login(options.email, password);
+                  token = retryLoginResult.token;
+                  
+                  if (!token) {
+                    throw new Error('Failed to obtain token after retry login');
+                  }
+                  
+                  logs.push(`✅ Automatic login successful (after retry)`);
+                  console.log(`✅ Token obtained after retry login`);
+                } else {
+                  throw new Error(registerData.error?.message || 'Registration failed');
+                }
+              } else {
+                // Registration successful, now login
+                console.log(`✅ Registration successful, logging in...`);
+                logs.push(`✅ Registration successful, logging in...`);
+                
+                const loginAfterRegister = await authService.login(options.email, password);
+                token = loginAfterRegister.token;
+                
+                if (!token) {
+                  throw new Error('Failed to obtain token after registration');
+                }
+                
+                logs.push(`✅ Automatic login successful (after registration)`);
+                console.log(`✅ Token obtained after registration`);
+              }
+            } catch (registerError) {
+              const registerErrorMsg = registerError instanceof Error ? registerError.message : 'Unknown error';
+              console.error(`❌ Registration/retry failed:`, registerError);
+              throw new Error(`Authentication failed: ${registerErrorMsg}`);
+            }
+          } else {
+            throw new Error(`Automatic login failed: ${errorMsg}`);
+          }
         }
       } else {
         logs.push(`✅ Using existing authentication token`);
