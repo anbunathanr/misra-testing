@@ -141,6 +141,7 @@ export class ProductionWorkflowService {
 
   /**
    * Automated Authentication - Get or create token with silent login
+   * Fully automatic - no manual checks required
    * Private method for internal use only
    */
   private async executeAutoAuth(
@@ -155,28 +156,28 @@ export class ProductionWorkflowService {
       let token = await authService.getToken();
 
       if (!token) {
-        // No existing token - perform silent login
-        logs.push(`📝 No existing token, performing silent login...`);
+        // No existing token - perform automatic login
+        logs.push(`📝 No existing token, performing automatic login...`);
         
         // Use provided password or generate default
         const password = options.password || 'DefaultPassword123!';
         
         try {
-          console.log(`🔐 Calling loginSilent with email: ${options.email}`);
-          await authService.loginSilent(options.email, password);
-          token = await authService.getToken();
+          console.log(`🔐 Calling login with email: ${options.email}`);
+          const loginResult = await authService.login(options.email, password);
+          token = loginResult.token;
           
           if (!token) {
             throw new Error('Failed to obtain token after login');
           }
           
-          logs.push(`✅ Silent login successful`);
-          console.log(`✅ Token obtained after silent login`);
+          logs.push(`✅ Automatic login successful`);
+          console.log(`✅ Token obtained after automatic login`);
         } catch (loginError) {
-          // If silent login fails, throw error for AI to handle
+          // If login fails, throw error for AI to handle
           const errorMsg = loginError instanceof Error ? loginError.message : 'Unknown error';
-          console.error(`❌ Silent login failed:`, loginError);
-          throw new Error(`Silent login failed: ${errorMsg}`);
+          console.error(`❌ Automatic login failed:`, loginError);
+          throw new Error(`Automatic login failed: ${errorMsg}`);
         }
       } else {
         logs.push(`✅ Using existing authentication token`);
@@ -682,30 +683,6 @@ int main(void) {
     this.currentWorkflow.estimatedTimeRemaining = 0;
     this.currentWorkflow.currentMessage = 'Workflow completed successfully';
     this.updateProgress();
-  }
-
-  /**
-   * Handle workflow error - throw for AI agent to catch
-   */
-  private handleWorkflowError(
-    error: string,
-    logs: string[],
-    startTime: number
-  ): ProductionWorkflowResult {
-    logs.push(`❌ Workflow failed: ${error}`);
-    
-    if (this.currentWorkflow) {
-      this.currentWorkflow.isRunning = false;
-      this.currentWorkflow.currentMessage = `Error: ${error}`;
-      this.updateProgress();
-    }
-
-    return {
-      success: false,
-      error,
-      executionTime: Date.now() - startTime,
-      logs
-    };
   }
 
   /**
