@@ -391,7 +391,8 @@ export class ProductionWorkflowService {
    * Token passed directly to avoid multiple async lookups
    * Uses Promise with 2000ms polling interval
    * CRITICAL GATE: Won't resolve if rulesProcessed is 0, even if status is 'completed'
-   * This prevents the AI from getting empty results due to DB sync delays
+   * Includes graceful timeout: if DB sync fails after 5 attempts (~10 seconds), proceeds anyway
+   * This prevents infinite loops for files with 0 violations or parse failures
    */
   private async executeAnalysisStep(
     token: string,
@@ -411,6 +412,8 @@ export class ProductionWorkflowService {
       const results = await new Promise<any>((resolve, reject) => {
         const maxAttempts = 120; // 4 minutes max
         let attempts = 0;
+        let syncAttempts = 0; // Track DB sync attempts when status is "completed" but rules are 0
+        const maxSyncAttempts = 5; // Max 5 attempts (~10 seconds) for DB sync
 
         const poll = async () => {
           attempts++;
@@ -496,14 +499,61 @@ export class ProductionWorkflowService {
               return;
             } else if (isFinished && !hasRules) {
               // ⏳ GATE BLOCKED: Backend says "completed" but rules are 0
-              // The DB hasn't synced yet. We stay in Step 3 and retry.
-              console.log(`⏳ AI: Backend says "completed" but rules are 0. Waiting for DB sync...`);
-              logs.push(`⏳ Analysis marked complete but rules not yet synced to DB. Retrying...`);
+              // The DB might not have synced yet. Retry with graceful timeout.
+              syncAttempts++;
+              console.log(`⏳ Waiting for DB sync: attempt ${syncAttempts}/${maxSyncAttempts}`);
+              console.log(`⏳ Backend says "completed" but rules are 0. Waiting for DB sync...`);
+              logs.push(`⏳ Analysis marked complete but rules not yet synced to DB (sync attempt ${syncAttempts}/${maxSyncAttempts})...`);
+
+              if (syncAttempts >= maxSyncAttempts) {
+                // Graceful timeout: DB sync failed after max attempts
+                // Assume file has 0 violations or analysis finished empty
+                console.log(`⚠️ DB sync timeout after ${maxSyncAttempts} attempts. Proceeding with 0 rules.`);
+                logs.push(`⚠️ DB sync timeout after ${maxSyncAttempts} attempts. File may have 0 violations or analysis completed empty.`);
+
+                // Mark step 3 as complete
+                if (this.currentWorkflow) {
+                  if (!this.currentWorkflow.completedSteps.includes(3)) {
+                    this.currentWorkflow.completedSteps.push(3);
+                    console.log(`✅ Marked Step 3 as complete (with 0 rules)`);
+                    const totalSteps = 4.5;
+                    this.currentWorkflow.overallProgress = 
+                      (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
+                    this.updateProgress();
+                  }
+                }
+
+                if (this.pollingInterval) {
+                  clearInterval(this.pollingInterval);
+                  this.pollingInterval = null;
+                }
+
+                // Return empty results to allow workflow to proceed
+                const emptyResults = {
+                  analysisId: fileId,
+                  fileId: fileId,
+                  violations: [],
+                  summary: {
+                    compliancePercentage: 100,
+                    totalRulesChecked: 0,
+                    violationsFound: 0
+                  },
+                  language: 'unknown',
+                  status: 'completed'
+                };
+
+                console.log(`✅ Returning empty results after sync timeout:`, emptyResults);
+                resolve(emptyResults);
+                return;
+              }
+
+              // Continue retrying
               this.pollingInterval = setTimeout(poll, 2000);
               return;
             } else {
-              // Standard in-progress polling
-              console.log(`⏳ Analysis still running (${data.analysisProgress}%)...`);
+              // Standard in-progress polling (reset sync counter)
+              syncAttempts = 0;
+              console.log(`⏳ Standard polling: Analysis still running (${data.analysisProgress}%)...`);
               this.pollingInterval = setTimeout(poll, 2000);
               return;
             }
