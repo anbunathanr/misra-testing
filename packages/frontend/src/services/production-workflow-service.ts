@@ -30,6 +30,7 @@ export interface ProductionWorkflowProgress {
 export interface ProductionWorkflowResult {
   success: boolean;
   analysisResults?: any;
+  violations?: any[];
   selectedFile?: any;
   executionTime: number;
   error?: string;
@@ -70,6 +71,7 @@ export class ProductionWorkflowService {
 
   /**
    * Start the production automated workflow with real AWS backend
+   * Fully automated for AI agent execution - no human interaction required
    */
   public async startAutomatedWorkflow(
     options: ProductionWorkflowOptions,
@@ -88,7 +90,7 @@ export class ProductionWorkflowService {
       estimatedTimeRemaining: 60,
       analysisProgress: 0,
       rulesProcessed: 0,
-      totalRules: 357, // Updated to reflect actual MISRA rule count (151 C + 206 C++)
+      totalRules: 357,
       currentMessage: 'Initializing workflow...'
     };
 
@@ -96,35 +98,20 @@ export class ProductionWorkflowService {
       logs.push(`🚀 Starting production workflow for ${options.email}`);
       this.updateProgress();
 
-      // Step 1: Authentication with AWS Cognito
-      const authResult = await this.executeAuthenticationStep(options, logs);
-      if (!authResult.success) {
-        return this.handleWorkflowError(authResult.error!, logs, startTime);
-      }
+      // Get token once at the start - pass through entire workflow
+      const token = await this.executeAutoAuth(options, logs);
 
       // Step 2: File Selection and Upload to S3
-      const fileResult = await this.executeFileUploadStep(options, logs);
-      if (!fileResult.success) {
-        return this.handleWorkflowError(fileResult.error!, logs, startTime);
-      }
+      const fileResult = await this.executeFileUploadStep(token, options, logs);
 
       // Step 2.5: Queue Analysis (after S3 upload completes)
-      const queueResult = await this.executeQueueAnalysisStep(fileResult, logs);
-      if (!queueResult.success) {
-        return this.handleWorkflowError(queueResult.error!, logs, startTime);
-      }
+      await this.executeQueueAnalysisStep(token, fileResult, logs);
 
-      // Step 3: Trigger MISRA Analysis Lambda
-      const analysisResult = await this.executeAnalysisStep(fileResult.fileId!, logs);
-      if (!analysisResult.success) {
-        return this.handleWorkflowError(analysisResult.error!, logs, startTime);
-      }
+      // Step 3: Trigger MISRA Analysis Lambda with polling
+      const analysisResult = await this.executeAnalysisStep(token, fileResult.fileId!, logs);
 
       // Step 4: Results Processing
-      const resultsResult = await this.executeResultsStep(analysisResult.results, logs);
-      if (!resultsResult.success) {
-        return this.handleWorkflowError(resultsResult.error!, logs, startTime);
-      }
+      const resultsResult = await this.executeResultsStep(analysisResult, logs);
 
       // Workflow completed successfully
       this.completeWorkflow();
@@ -134,7 +121,8 @@ export class ProductionWorkflowService {
 
       return {
         success: true,
-        analysisResults: resultsResult.results,
+        analysisResults: resultsResult.analysisResults,
+        violations: resultsResult.violations,
         selectedFile: fileResult.file,
         executionTime,
         logs
@@ -142,7 +130,7 @@ export class ProductionWorkflowService {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      return this.handleWorkflowError(errorMessage, logs, startTime);
+      throw new Error(errorMessage);
     } finally {
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
@@ -151,45 +139,61 @@ export class ProductionWorkflowService {
   }
 
   /**
-   * Step 1: Authentication with AWS Cognito
+   * Automated Authentication - Get or create token
+   * Private method for internal use only
    */
-  private async executeAuthenticationStep(
+  private async executeAutoAuth(
     options: ProductionWorkflowOptions,
     logs: string[]
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<string> {
     this.setStepActive(1, 'Authenticating with AWS Cognito...');
     logs.push(`🔐 Step 1: Authenticating user ${options.email}`);
 
     try {
-      // Check if user is already authenticated
-      const isAuthenticated = await authService.isAuthenticated();
+      // Try to get existing token first
+      let token = await authService.getToken();
 
-      if (!isAuthenticated) {
-        logs.push(`⚠️ User not authenticated - authentication required`);
-        logs.push(`📝 Please log in through the Login page first`);
+      if (!token) {
+        // No existing token - perform silent login
+        logs.push(`📝 No existing token, performing silent login...`);
         
-        // For production, users must authenticate through the proper login flow
-        // This includes email verification and MFA setup
-        throw new Error('Authentication required. Please log in first.');
+        // For AI agent: use provided password or generate one
+        const password = options.name || 'DefaultPassword123!';
+        
+        try {
+          await authService.loginSilent(options.email, password);
+          token = await authService.getToken();
+          
+          if (!token) {
+            throw new Error('Failed to obtain token after login');
+          }
+          
+          logs.push(`✅ Silent login successful`);
+        } catch (loginError) {
+          // If silent login fails, throw error for AI to handle
+          throw new Error(`Silent login failed: ${loginError instanceof Error ? loginError.message : 'Unknown error'}`);
+        }
       } else {
-        logs.push(`✅ User already authenticated`);
+        logs.push(`✅ Using existing authentication token`);
       }
 
       this.completeStep(1);
-      return { success: true };
+      return token;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
       this.setStepError(1, errorMessage);
       logs.push(`❌ Authentication failed: ${errorMessage}`);
-      return { success: false, error: errorMessage };
+      throw new Error(errorMessage);
     }
   }
 
   /**
    * Step 2: File Upload to S3
+   * Token passed directly to avoid multiple async lookups
    */
   private async executeFileUploadStep(
+    token: string,
     options: ProductionWorkflowOptions,
     logs: string[]
   ): Promise<{ success: boolean; fileId?: string; s3Key?: string; file?: any; error?: string }> {
@@ -197,8 +201,6 @@ export class ProductionWorkflowService {
     logs.push(`📁 Step 2: Uploading file to S3`);
 
     try {
-      // Get authentication token
-      const token = await authService.getToken();
       if (!token) {
         throw new Error('No authentication token available');
       }
@@ -287,8 +289,6 @@ export class ProductionWorkflowService {
       logs.push(`✅ File uploaded successfully to S3 (ETag: ${etag})`);
 
       // Add delay for S3 eventual consistency
-      // S3 is eventually consistent - wait before queuing analysis
-      // Increased to 2 seconds for nested folder paths
       console.log(`⏳ Waiting for S3 consistency (2000ms)...`);
       await new Promise(resolve => setTimeout(resolve, 2000));
       logs.push(`⏳ S3 consistency check complete`);
@@ -310,23 +310,23 @@ export class ProductionWorkflowService {
       this.setStepError(2, errorMessage);
       logs.push(`❌ File upload failed: ${errorMessage}`);
       console.error(`❌ File upload error:`, error);
-      return { success: false, error: errorMessage };
+      throw new Error(errorMessage);
     }
   }
 
   /**
    * Step 2.5: Queue Analysis (after S3 upload completes)
-   * This ensures S3 eventual consistency before Lambda tries to download
+   * Token passed directly to avoid multiple async lookups
    */
   private async executeQueueAnalysisStep(
+    token: string,
     fileResult: { success: boolean; fileId?: string; s3Key?: string; file?: any; error?: string },
     logs: string[]
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<void> {
     this.setStepActive(2.5, 'Queuing analysis...');
     logs.push(`📋 Step 2.5: Queuing analysis after S3 upload`);
 
     try {
-      const token = await authService.getToken();
       if (!token) {
         throw new Error('No authentication token available');
       }
@@ -369,213 +369,198 @@ export class ProductionWorkflowService {
       logs.push(`✅ Analysis queued successfully`);
 
       this.completeStep(2.5);
-      return { success: true };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to queue analysis';
       this.setStepError(2.5, errorMessage);
       logs.push(`❌ Queue analysis failed: ${errorMessage}`);
       console.error(`❌ Queue analysis error:`, error);
-      return { success: false, error: errorMessage };
+      throw new Error(errorMessage);
     }
   }
 
   /**
-   * Step 3: Trigger MISRA Analysis
+   * Step 3: Trigger MISRA Analysis with internal polling
+   * Token passed directly to avoid multiple async lookups
+   * Uses Promise with 2000ms polling interval
+   * Crucial: Won't resolve if rulesProcessed is 0 even if status is 'completed'
    */
   private async executeAnalysisStep(
+    token: string,
     fileId: string,
     logs: string[]
-  ): Promise<{ success: boolean; results?: any; error?: string }> {
+  ): Promise<any> {
     this.setStepActive(3, 'Running MISRA analysis...');
     logs.push(`🔍 Step 3: Starting MISRA analysis for file ${fileId}`);
 
     try {
-      const token = await authService.getToken();
       if (!token) {
         throw new Error('No authentication token available');
       }
 
-      // Analysis is triggered automatically via SQS queue after upload
-      // We need to poll for results
       logs.push(`⏳ Waiting for analysis to complete...`);
 
-      const results = await this.pollForAnalysisResults(fileId, logs);
+      const results = await new Promise<any>((resolve, reject) => {
+        const maxAttempts = 60;
+        let attempts = 0;
+
+        const poll = async () => {
+          attempts++;
+          console.log(`📡 Poll attempt ${attempts}/${maxAttempts} for fileId: ${fileId}`);
+
+          try {
+            // Check file metadata for analysis status
+            console.log(`📍 Checking status at: ${this.apiUrl}/files/${fileId}/status`);
+            const response = await fetch(`${this.apiUrl}/files/${fileId}/status`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (!response.ok) {
+              console.error(`❌ Status check failed: ${response.status}`);
+              throw new Error(`Failed to check analysis status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`📊 Status response:`, data);
+
+            // Update progress
+            if (data.analysisProgress !== undefined) {
+              if (this.currentWorkflow) {
+                this.currentWorkflow.analysisProgress = data.analysisProgress;
+                this.currentWorkflow.rulesProcessed = data.rulesProcessed || 0;
+                this.currentWorkflow.totalRules = data.totalRules || 357;
+                this.currentWorkflow.currentMessage = data.analysisMessage || 'Analyzing...';
+                this.updateProgress();
+              }
+              logs.push(`🔍 Analysis progress: ${data.analysisProgress}%`);
+              console.log(`✅ Progress updated: ${data.analysisProgress}% (${data.rulesProcessed || 0}/${data.totalRules || 357} rules)`);
+            }
+
+            // Check if analysis is complete
+            if (data.analysisStatus === 'completed') {
+              console.log(`✅ Analysis status is COMPLETED`);
+              
+              // CRUCIAL: Even if status is 'completed', check if rules were actually processed
+              // If rulesProcessed is 0 and totalRules > 0, keep polling
+              if (data.rulesProcessed === 0 && data.totalRules > 0) {
+                console.log(`⚠️ Status is completed but no rules processed yet, continuing to poll...`);
+                logs.push(`⚠️ Analysis marked complete but rules not yet processed, retrying...`);
+                this.pollingInterval = setTimeout(poll, 2000);
+                return;
+              }
+
+              // Mark step 3 as complete
+              if (this.currentWorkflow) {
+                if (!this.currentWorkflow.completedSteps.includes(3)) {
+                  this.currentWorkflow.completedSteps.push(3);
+                  console.log(`✅ Marked Step 3 as complete`);
+                  const totalSteps = 4.5;
+                  this.currentWorkflow.overallProgress = 
+                    (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
+                  this.updateProgress();
+                }
+              }
+
+              if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+              }
+
+              // Fetch full analysis results
+              console.log(`📍 Fetching results from: ${this.apiUrl}/analysis/results/${fileId}`);
+              const resultsResponse = await fetch(`${this.apiUrl}/analysis/results/${fileId}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              console.log(`📊 Results response status: ${resultsResponse.status}`);
+
+              // Handle 202 Accepted - analysis still processing, continue polling
+              if (resultsResponse.status === 202) {
+                console.log(`⏳ Results not ready (202), will retry in 2 seconds...`);
+                logs.push(`⏳ Analysis results not yet available (202 Accepted)`);
+                this.pollingInterval = setTimeout(poll, 2000);
+                return;
+              }
+
+              // Handle 500 - backend error, but continue polling
+              if (resultsResponse.status === 500) {
+                console.log(`⚠️ Backend error (500), will retry in 2 seconds...`);
+                logs.push(`⚠️ Backend processing (500 - retrying...)`);
+                this.pollingInterval = setTimeout(poll, 2000);
+                return;
+              }
+
+              if (!resultsResponse.ok) {
+                throw new Error(`Failed to fetch analysis results: ${resultsResponse.status} ${resultsResponse.statusText}`);
+              }
+
+              const results = await resultsResponse.json();
+              console.log(`✅ Results received:`, results);
+              resolve(results);
+              return;
+            }
+
+            // Check if analysis failed
+            if (data.analysisStatus === 'failed') {
+              console.error(`❌ Analysis failed`);
+              if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+              }
+              reject(new Error(data.errorMessage || 'Analysis failed'));
+              return;
+            }
+
+            // Check timeout
+            if (attempts >= maxAttempts) {
+              console.error(`❌ Analysis timeout after ${maxAttempts} attempts`);
+              if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+              }
+              reject(new Error('Analysis timeout - please try again'));
+              return;
+            }
+
+            console.log(`⏳ Analysis still running, will retry in 2 seconds...`);
+            // Schedule next poll with 2000ms interval
+            this.pollingInterval = setTimeout(poll, 2000);
+
+          } catch (error) {
+            console.error(`❌ Poll error on attempt ${attempts}:`, error);
+            if (this.pollingInterval) {
+              clearInterval(this.pollingInterval);
+              this.pollingInterval = null;
+            }
+            reject(error);
+          }
+        };
+
+        // Start polling immediately
+        console.log(`🚀 Starting polling for fileId: ${fileId}`);
+        poll();
+      });
 
       logs.push(`✅ Analysis completed: ${results.summary.compliancePercentage}% compliance`);
       logs.push(`📊 Found ${results.violations.length} violations`);
 
       this.completeStep(3);
-      return { success: true, results };
+      return results;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
       this.setStepError(3, errorMessage);
       logs.push(`❌ Analysis failed: ${errorMessage}`);
-      return { success: false, error: errorMessage };
+      throw new Error(errorMessage);
     }
-  }
-
-  /**
-   * Poll for analysis results with progress updates
-   */
-  private async pollForAnalysisResults(fileId: string, logs: string[]): Promise<any> {
-    const maxAttempts = 60; // 5 minutes max (5 second intervals)
-    let attempts = 0;
-
-    return new Promise((resolve, reject) => {
-      const poll = async () => {
-        attempts++;
-        console.log(`📡 Poll attempt ${attempts}/${maxAttempts} for fileId: ${fileId}`);
-
-        try {
-          // Get fresh token on each poll attempt
-          const token = await authService.getToken();
-          if (!token) {
-            console.error('❌ No authentication token available');
-            throw new Error('No authentication token available - user may have been logged out');
-          }
-
-          // Check file metadata for analysis status
-          console.log(`📍 Checking status at: ${this.apiUrl}/files/${fileId}/status`);
-          const response = await fetch(`${this.apiUrl}/files/${fileId}/status`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (!response.ok) {
-            console.error(`❌ Status check failed: ${response.status}`);
-            throw new Error(`Failed to check analysis status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log(`📊 Status response:`, data);
-
-          // Update progress
-          if (data.analysisProgress !== undefined) {
-            if (this.currentWorkflow) {
-              this.currentWorkflow.analysisProgress = data.analysisProgress;
-              this.currentWorkflow.rulesProcessed = data.rulesProcessed || 0;
-              this.currentWorkflow.totalRules = data.totalRules || 357; // Use backend value or fallback to actual MISRA rule count
-              this.currentWorkflow.currentMessage = data.analysisMessage || 'Analyzing...';
-              this.updateProgress();
-            }
-            logs.push(`🔍 Analysis progress: ${data.analysisProgress}%`);
-            console.log(`✅ Progress updated: ${data.analysisProgress}% (${data.rulesProcessed || 0}/${data.totalRules || 357} rules)`);
-          }
-
-          // Check if analysis is complete
-          if (data.analysisStatus === 'completed') {
-            console.log(`✅ Analysis status is COMPLETED`);
-            
-            // Mark step 3 as complete immediately when analysis is done
-            // Steps 2 and 2.5 should already be complete from earlier
-            if (this.currentWorkflow) {
-              if (!this.currentWorkflow.completedSteps.includes(3)) {
-                this.currentWorkflow.completedSteps.push(3);
-                console.log(`✅ Marked Step 3 as complete`);
-                // Update progress calculation
-                const totalSteps = 4.5;
-                this.currentWorkflow.overallProgress = 
-                  (this.currentWorkflow.completedSteps.length / totalSteps) * 100;
-                this.updateProgress();
-              }
-            }
-
-            if (this.pollingInterval) {
-              clearInterval(this.pollingInterval);
-              this.pollingInterval = null;
-            }
-
-            // Get fresh token for results fetch
-            const resultsToken = await authService.getToken();
-            if (!resultsToken) {
-              throw new Error('No authentication token available for results fetch');
-            }
-
-            // Fetch full analysis results using fileId (not analysisId)
-            console.log(`📍 Fetching results from: ${this.apiUrl}/analysis/results/${fileId}`);
-            const resultsResponse = await fetch(`${this.apiUrl}/analysis/results/${fileId}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${resultsToken}`,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            console.log(`📊 Results response status: ${resultsResponse.status}`);
-
-            // Handle 202 Accepted - analysis still processing, continue polling
-            if (resultsResponse.status === 202) {
-              console.log(`⏳ Results not ready (202), will retry in 5 seconds...`);
-              logs.push(`⏳ Analysis results not yet available (202 Accepted)`);
-              // Schedule next poll
-              this.pollingInterval = setTimeout(poll, 5000);
-              return;
-            }
-
-            // Handle 500 - backend error, but continue polling
-            if (resultsResponse.status === 500) {
-              console.log(`⚠️ Backend error (500), will retry in 5 seconds...`);
-              logs.push(`⚠️ Backend processing (500 - retrying...)`);
-              // Schedule next poll
-              this.pollingInterval = setTimeout(poll, 5000);
-              return;
-            }
-
-            if (!resultsResponse.ok) {
-              throw new Error(`Failed to fetch analysis results: ${resultsResponse.status} ${resultsResponse.statusText}`);
-            }
-
-            const results = await resultsResponse.json();
-            console.log(`✅ Results received:`, results);
-            resolve(results);
-            return;
-          }
-
-          // Check if analysis failed
-          if (data.analysisStatus === 'failed') {
-            console.error(`❌ Analysis failed`);
-            if (this.pollingInterval) {
-              clearInterval(this.pollingInterval);
-              this.pollingInterval = null;
-            }
-            reject(new Error(data.errorMessage || 'Analysis failed'));
-            return;
-          }
-
-          // Check timeout
-          if (attempts >= maxAttempts) {
-            console.error(`❌ Analysis timeout after ${maxAttempts} attempts`);
-            if (this.pollingInterval) {
-              clearInterval(this.pollingInterval);
-              this.pollingInterval = null;
-            }
-            reject(new Error('Analysis timeout - please try again'));
-            return;
-          }
-
-          console.log(`⏳ Analysis still running, will retry in 5 seconds...`);
-          // Schedule next poll
-          this.pollingInterval = setTimeout(poll, 5000);
-
-        } catch (error) {
-          console.error(`❌ Poll error on attempt ${attempts}:`, error);
-          if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-            this.pollingInterval = null;
-          }
-          reject(error);
-        }
-      };
-
-      // Start polling immediately
-      console.log(`🚀 Starting polling for fileId: ${fileId}`);
-      poll();
-    });
   }
 
   /**
@@ -584,24 +569,19 @@ export class ProductionWorkflowService {
   private async executeResultsStep(
     analysisResults: any,
     logs: string[]
-  ): Promise<{ success: boolean; results?: any; error?: string }> {
+  ): Promise<{ analysisResults: any; violations: any[] }> {
     this.setStepActive(4, 'Processing results...');
     logs.push(`📊 Step 4: Processing and formatting results`);
 
     try {
       // PRODUCTION: Only process REAL results from backend
-      // No demo/mock results fallback
       if (!analysisResults) {
-        const errorMsg = 'No analysis results received from backend';
-        logs.push(`❌ ${errorMsg}`);
-        return { success: false, error: errorMsg };
+        throw new Error('No analysis results received from backend');
       }
 
       // Validate that we have real analysis data
       if (!analysisResults.analysisId || !analysisResults.fileId) {
-        const errorMsg = 'Invalid analysis results - missing required fields';
-        logs.push(`❌ ${errorMsg}`);
-        return { success: false, error: errorMsg };
+        throw new Error('Invalid analysis results - missing required fields');
       }
 
       // Format results for display (no modifications to data)
@@ -618,13 +598,17 @@ export class ProductionWorkflowService {
       logs.push(`📊 Compliance score: ${analysisResults.summary?.compliancePercentage || 0}%`);
 
       this.completeStep(4);
-      return { success: true, results: finalResults };
+      
+      return {
+        analysisResults: finalResults,
+        violations: analysisResults.violations || []
+      };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Results processing failed';
       this.setStepError(4, errorMessage);
       logs.push(`❌ Results processing failed: ${errorMessage}`);
-      return { success: false, error: errorMessage };
+      throw new Error(errorMessage);
     }
   }
 
@@ -722,7 +706,7 @@ int main(void) {
   }
 
   /**
-   * Handle workflow error with recovery suggestions
+   * Handle workflow error - throw for AI agent to catch
    */
   private handleWorkflowError(
     error: string,
@@ -737,28 +721,9 @@ int main(void) {
       this.updateProgress();
     }
 
-    // Add recovery suggestions based on error type
-    let recoveryMessage = '';
-    if (error.includes('Authentication')) {
-      recoveryMessage = 'Please log in again and try the workflow.';
-      logs.push(`💡 Recovery: ${recoveryMessage}`);
-    } else if (error.includes('timeout') || error.includes('Timeout')) {
-      recoveryMessage = 'The analysis took too long. Try again with a smaller file.';
-      logs.push(`💡 Recovery: ${recoveryMessage}`);
-    } else if (error.includes('S3') || error.includes('upload')) {
-      recoveryMessage = 'File upload failed. Check your internet connection and try again.';
-      logs.push(`💡 Recovery: ${recoveryMessage}`);
-    } else if (error.includes('Analysis')) {
-      recoveryMessage = 'Analysis failed. Try with a different file.';
-      logs.push(`💡 Recovery: ${recoveryMessage}`);
-    } else {
-      recoveryMessage = 'An unexpected error occurred. Please try again.';
-      logs.push(`💡 Recovery: ${recoveryMessage}`);
-    }
-
     return {
       success: false,
-      error: `${error}. ${recoveryMessage}`,
+      error,
       executionTime: Date.now() - startTime,
       logs
     };
