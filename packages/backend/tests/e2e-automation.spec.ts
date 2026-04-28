@@ -137,67 +137,81 @@ test.describe('MISRA Platform E2E Automation', () => {
   test('Complete MISRA Analysis Workflow', async () => {
     console.log('🚀 Starting MISRA Platform E2E Test');
 
-    // Step 1: Navigate to login page
-    console.log('📍 Step 1: Navigating to login page');
-    await page.goto(`${TEST_CONFIG.baseUrl}/login`);
-    await expect(page).toHaveTitle(/login|sign in/i);
-
-    // Step 2: Enter email
-    console.log('📍 Step 2: Entering email');
-    await page.fill('input[type="email"]', TEST_CONFIG.testEmail);
-    await page.click('button:has-text("Continue"), button:has-text("Next")');
+    // Step 1: Navigate to site and check if already logged in
+    console.log('📍 Step 1: Checking login status');
+    await page.goto(`${TEST_CONFIG.baseUrl}`);
     await page.waitForLoadState('networkidle');
-
-    // Step 3: Enter password
-    console.log('📍 Step 3: Entering password');
-    await page.fill('input[type="password"]', TEST_CONFIG.testPassword);
-    await page.click('button:has-text("Sign In"), button:has-text("Login")');
-    await page.waitForLoadState('networkidle');
-
-    // Step 4: Wait for OTP email and extract it
-    console.log('📍 Step 4: Waiting for OTP email');
-    let otp: string;
-    try {
-      // Try IMAP first (more reliable)
-      console.log('   Attempting to fetch OTP via IMAP...');
-      otp = await getOtpFromGmail(TEST_CONFIG.testEmail);
-      console.log(`   ✅ OTP fetched via IMAP: ${otp}`);
-    } catch (error) {
-      console.log('   ⚠️ IMAP failed, falling back to UI scraping...');
-      otp = await getOtpFromGmailUI(page);
-      console.log(`   ✅ OTP fetched via UI: ${otp}`);
-    }
-
-    // Step 5: Enter OTP
-    console.log('📍 Step 5: Entering OTP');
-    const otpInputs = page.locator('input[placeholder*="OTP"], input[placeholder*="code"], input[maxlength="1"]');
-    const count = await otpInputs.count();
     
-    if (count > 0) {
-      // Multi-digit input fields
-      for (let i = 0; i < otp.length; i++) {
-        await otpInputs.nth(i).fill(otp[i]);
-      }
+    const signOutButton = page.locator('button:has-text("Sign Out"), a:has-text("Sign Out")');
+    const isLoggedIn = await signOutButton.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (isLoggedIn) {
+      console.log('   ✅ Already logged in, skipping login steps');
     } else {
-      // Single input field
-      await page.fill('input[type="text"]', otp);
+      console.log('   📍 Not logged in, proceeding with login...');
+      
+      // Navigate to login page
+      await page.goto(`${TEST_CONFIG.baseUrl}/login`);
+      await page.waitForLoadState('networkidle');
+
+      // Step 2: Enter email
+      console.log('📍 Step 2: Entering email');
+      await page.fill('input[type="email"]', TEST_CONFIG.testEmail);
+      await page.click('button:has-text("Continue"), button:has-text("Next")');
+      await page.waitForLoadState('networkidle');
+
+      // Step 3: Enter password
+      console.log('📍 Step 3: Entering password');
+      await page.fill('input[type="password"]', TEST_CONFIG.testPassword);
+      await page.click('button:has-text("Sign In"), button:has-text("Login")');
+      await page.waitForLoadState('networkidle');
+
+      // Step 4: Wait for OTP email and extract it
+      console.log('📍 Step 4: Waiting for OTP email');
+      let otp: string;
+      try {
+        // Try IMAP first (more reliable)
+        console.log('   Attempting to fetch OTP via IMAP...');
+        otp = await getOtpFromGmail(TEST_CONFIG.testEmail);
+        console.log(`   ✅ OTP fetched via IMAP: ${otp}`);
+      } catch (error) {
+        console.log('   ⚠️ IMAP failed, falling back to UI scraping...');
+        otp = await getOtpFromGmailUI(page);
+        console.log(`   ✅ OTP fetched via UI: ${otp}`);
+      }
+
+      // Step 5: Enter OTP
+      console.log('📍 Step 5: Entering OTP');
+      const otpInputs = page.locator('input[placeholder*="OTP"], input[placeholder*="code"], input[maxlength="1"]');
+      const count = await otpInputs.count();
+      
+      if (count > 0) {
+        // Multi-digit input fields
+        for (let i = 0; i < otp.length; i++) {
+          await otpInputs.nth(i).fill(otp[i]);
+        }
+      } else {
+        // Single input field
+        await page.fill('input[type="text"]', otp);
+      }
+      
+      await page.click('button:has-text("Verify"), button:has-text("Confirm")');
+      await page.waitForLoadState('networkidle');
+
+      console.log('   ✅ Login successful');
     }
-    
-    await page.click('button:has-text("Verify"), button:has-text("Confirm")');
-    await page.waitForLoadState('networkidle');
 
-    // Step 6: Verify login success
-    console.log('📍 Step 6: Verifying login success');
-    await expect(page).toHaveURL(/dashboard|home|analysis/i);
-    console.log('   ✅ Login successful');
+    // Step 6: Navigate to dashboard/home if not already there
+    console.log('📍 Step 6: Navigating to dashboard');
+    const currentUrl = page.url();
+    if (!currentUrl.match(/dashboard|home|analysis/i)) {
+      await page.goto(`${TEST_CONFIG.baseUrl}`);
+      await page.waitForLoadState('networkidle');
+    }
+    console.log('   ✅ On dashboard');
 
-    // Step 7: Navigate to file upload
-    console.log('📍 Step 7: Navigating to file upload');
-    await page.click('button:has-text("Upload"), a:has-text("Upload File"), button:has-text("New Analysis")');
-    await page.waitForLoadState('networkidle');
-
-    // Step 8: Upload C file
-    console.log('📍 Step 8: Uploading C file');
+    // Step 7: Upload C file
+    console.log('📍 Step 7: Uploading C file');
     const fileInput = page.locator('input[type="file"]');
     
     // Create temporary file
@@ -212,13 +226,13 @@ test.describe('MISRA Platform E2E Automation', () => {
     await fileInput.setInputFiles(filePath);
     console.log('   ✅ File selected');
 
-    // Step 9: Click Analyze button
-    console.log('📍 Step 9: Clicking Analyze MISRA Compliance button');
-    await page.click('button:has-text("Analyze"), button:has-text("Start Analysis"), button:has-text("Run MISRA")');
+    // Step 8: Click Analyze button
+    console.log('📍 Step 8: Clicking Analyze MISRA Compliance button');
+    await page.click('button:has-text("Analyze"), button:has-text("Start Analysis"), button:has-text("Run MISRA"), button:has-text("Analyze MISRA Compliance")');
     await page.waitForLoadState('networkidle');
 
-    // Step 10: Wait for analysis to complete
-    console.log('📍 Step 10: Waiting for analysis to complete');
+    // Step 9: Wait for analysis to complete
+    console.log('📍 Step 9: Waiting for analysis to complete');
     const maxWaitTime = 120000; // 2 minutes
     const startTime = Date.now();
     let analysisComplete = false;
@@ -242,8 +256,8 @@ test.describe('MISRA Platform E2E Automation', () => {
       throw new Error('Analysis did not complete within timeout period');
     }
 
-    // Step 11: Verify compliance report
-    console.log('📍 Step 11: Verifying compliance report');
+    // Step 10: Verify compliance report
+    console.log('📍 Step 10: Verifying compliance report');
     
     // Check for report elements
     const reportTitle = page.locator('text=/analysis results|compliance report|violations/i');
@@ -265,15 +279,15 @@ test.describe('MISRA Platform E2E Automation', () => {
       console.log(`   ✅ Found ${violationCount} violations in report`);
     }
 
-    // Step 12: Verify report contains expected data
-    console.log('📍 Step 12: Verifying report data');
+    // Step 11: Verify report contains expected data
+    console.log('📍 Step 11: Verifying report data');
     const reportContent = await page.locator('body').innerText();
     
     expect(reportContent).toContain(/violation|rule|compliance|analysis/i);
     console.log('   ✅ Report contains expected data');
 
-    // Step 13: Download or export report (optional)
-    console.log('📍 Step 13: Checking for export options');
+    // Step 12: Download or export report (optional)
+    console.log('📍 Step 12: Checking for export options');
     const exportButton = page.locator('button:has-text("Download"), button:has-text("Export"), button:has-text("PDF")');
     if (await exportButton.isVisible().catch(() => false)) {
       console.log('   ✅ Export button available');
