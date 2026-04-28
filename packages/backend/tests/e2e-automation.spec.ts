@@ -225,6 +225,7 @@ test.describe('MISRA Platform E2E Automation', () => {
 
         console.log('   ✅ Login successful');
       }
+    }
 
     // Step 6: Navigate to dashboard/home if not already there
     console.log('📍 Step 6: Navigating to dashboard');
