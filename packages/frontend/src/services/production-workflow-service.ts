@@ -190,7 +190,7 @@ export class ProductionWorkflowService {
         }
         
         // Store the token in auth service
-        await authService.setToken(token);
+        authService.storeTokens(token, '', undefined);
         
         logs.push(`✅ Auto-login successful: ${autoLoginData.message}`);
         console.log(`✅ Auto-login successful for: ${options.email}`);
@@ -469,7 +469,21 @@ export class ProductionWorkflowService {
             // THE CRITICAL GATE: Check both status AND rule data
             const hasRules = data.rulesProcessed > 0;
             const isFinished = data.analysisStatus === 'completed';
-            const allRulesProcessed = data.rulesProcessed >= data.totalRules;
+            const isFailed = data.analysisStatus === 'failed';
+
+            // ❌ HANDLE FAILED STATUS IMMEDIATELY
+            if (isFailed) {
+              console.error(`❌ Analysis failed:`, data.errorMessage);
+              logs.push(`❌ Analysis failed: ${data.errorMessage || 'Unknown error'}`);
+              
+              if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+              }
+
+              reject(new Error(data.errorMessage || 'Analysis failed'));
+              return;
+            }
 
             if (isFinished && hasRules) {
               // ✅ GATE PASSED: Analysis complete with rule data
