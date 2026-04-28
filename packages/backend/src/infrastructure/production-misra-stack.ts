@@ -509,7 +509,7 @@ export class ProductionMisraStack extends cdk.Stack {
         FILE_METADATA_TABLE: this.fileMetadataTable.tableName,
         ANALYSIS_RESULTS_TABLE: this.analysisResultsTable.tableName,
         ANALYSIS_COSTS_TABLE: analysisCostsTable.tableName,
-        CACHE_BUSTER: '2024-04-25-fileindex-gsi-added', // Force Lambda code reload
+        CACHE_BUSTER: '2024-04-28-analysis-costs-permissions', // Force Lambda code reload
       },
     });
 

@@ -490,6 +490,12 @@ async function updateFileMetadataStatus(
       ':updatedAt': { N: Math.floor(Date.now() / 1000).toString() },
     };
 
+    // When status is failed, reset progress to 0 for consistency
+    if (status === 'failed') {
+      updateExpression.push('analysis_progress = :progress');
+      expressionAttributeValues[':progress'] = { N: '0' };
+    }
+
     if (additionalData) {
       if (additionalData.violations_count !== undefined) {
         updateExpression.push('violations_count = :violationsCount');
