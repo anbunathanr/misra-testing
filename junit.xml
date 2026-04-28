@@ -1,0 +1,50 @@
+<testsuites id="" name="" tests="1" failures="1" skipped="0" errors="0" time="11.008472">
+<testsuite name="e2e-automation.spec.ts" timestamp="2026-04-28T07:48:45.238Z" hostname="chromium" tests="1" failures="1" skipped="0" time="6.778" errors="0">
+<testcase name="MISRA Platform E2E Automation › Test Button - Quick Verification" classname="e2e-automation.spec.ts" time="6.778">
+<system-out>
+<![CDATA[🧪 Running Quick Verification Test
+✅ Site is accessible
+
+[[ATTACHMENT|test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\error-context.md]]
+
+[[ATTACHMENT|test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\error-context.md]]
+]]>
+</system-out>
+<failure message="expect(locator).toBeVisible() failed" type="expect.toBeVisible">
+<![CDATA[  [chromium] › e2e-automation.spec.ts:286:7 › MISRA Platform E2E Automation › Test Button - Quick Verification 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('button:has-text("Login"), a:has-text("Sign In")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('button:has-text("Login"), a:has-text("Sign In")')
+
+
+      296 |     // Check for main UI elements
+      297 |     const loginButton = page.locator('button:has-text("Login"), a:has-text("Sign In")');
+    > 298 |     await expect(loginButton).toBeVisible();
+          |                               ^
+      299 |     console.log('✅ Login button visible');
+      300 |
+      301 |     // Check for upload section
+        at D:\Code\misra-testing\packages\backend\tests\e2e-automation.spec.ts:298:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\..\test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\..\test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\error-context.md
+
+    Error Context: ..\..\..\test-results\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\error-context.md
+]]>
+</failure>
+</testcase>
+</testsuite>
+</testsuites>

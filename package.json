@@ -12,10 +12,12 @@
     "lint": "npm run lint --workspaces",
     "dev": "npm run dev --workspaces",
     "deploy": "npm run deploy --workspaces",
-    "test:e2e": "npx playwright test --config=packages/backend/playwright.config.ts",
-    "test:e2e:headed": "npx playwright test --config=packages/backend/playwright.config.ts --headed",
-    "test:e2e:debug": "npx playwright test --config=packages/backend/playwright.config.ts --debug",
-    "test:e2e:report": "npx playwright show-report playwright-report"
+    "test:e2e": "npx playwright test",
+    "test:e2e:quick": "npx playwright test -g \"Quick Verification\"",
+    "test:e2e:full": "npx playwright test -g \"Complete MISRA Analysis\"",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:debug": "npx playwright test --debug",
+    "test:e2e:report": "npx playwright show-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

@@ -1,0 +1,181 @@
+{
+  "config": {
+    "configFile": "D:\\Code\\misra-testing\\playwright.config.ts",
+    "rootDir": "D:/Code/misra-testing/packages/backend/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/Code/misra-testing/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/Code/misra-testing/packages/backend/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "junit.xml"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "e2e-automation.spec.ts",
+      "file": "e2e-automation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "MISRA Platform E2E Automation",
+          "file": "e2e-automation.spec.ts",
+          "line": 115,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Test Button - Quick Verification",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 6778,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\u001b[22m\n\n    at D:\\Code\\misra-testing\\packages\\backend\\tests\\e2e-automation.spec.ts:298:31",
+                        "location": {
+                          "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\e2e-automation.spec.ts",
+                          "column": 31,
+                          "line": 298
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 296 |\u001b[39m     \u001b[90m// Check for main UI elements\u001b[39m\n \u001b[90m 297 |\u001b[39m     \u001b[36mconst\u001b[39m loginButton \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'button:has-text(\"Login\"), a:has-text(\"Sign In\")'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 298 |\u001b[39m     \u001b[36mawait\u001b[39m expect(loginButton)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 299 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'✅ Login button visible'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 300 |\u001b[39m\n \u001b[90m 301 |\u001b[39m     \u001b[90m// Check for upload section\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\e2e-automation.spec.ts",
+                            "column": 31,
+                            "line": 298
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('button:has-text(\"Login\"), a:has-text(\"Sign In\")')\u001b[22m\n\n\n\u001b[0m \u001b[90m 296 |\u001b[39m     \u001b[90m// Check for main UI elements\u001b[39m\n \u001b[90m 297 |\u001b[39m     \u001b[36mconst\u001b[39m loginButton \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'button:has-text(\"Login\"), a:has-text(\"Sign In\")'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 298 |\u001b[39m     \u001b[36mawait\u001b[39m expect(loginButton)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 299 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'✅ Login button visible'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 300 |\u001b[39m\n \u001b[90m 301 |\u001b[39m     \u001b[90m// Check for upload section\u001b[39m\u001b[0m\n\u001b[2m    at D:\\Code\\misra-testing\\packages\\backend\\tests\\e2e-automation.spec.ts:298:31\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "🧪 Running Quick Verification Test\n"
+                        },
+                        {
+                          "text": "✅ Site is accessible\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-28T07:48:47.397Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "D:\\Code\\misra-testing\\test-results\\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\Code\\misra-testing\\test-results\\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\Code\\misra-testing\\test-results\\e2e-automation-MISRA-Platf-19786-Button---Quick-Verification-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\e2e-automation.spec.ts",
+                        "column": 31,
+                        "line": 298
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "8c166db57424cb3bd461-39f1d8783132ea83f643",
+              "file": "e2e-automation.spec.ts",
+              "line": 286,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-04-28T07:48:44.868Z",
+    "duration": 11008.472,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}
