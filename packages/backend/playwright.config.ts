@@ -1,7 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load environment variables from .env.test
+dotenv.config({ path: path.join(process.cwd(), '.env.test') });
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './packages/backend/tests',
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,

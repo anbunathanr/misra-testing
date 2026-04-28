@@ -12,16 +12,19 @@
     "lint": "npm run lint --workspaces",
     "dev": "npm run dev --workspaces",
     "deploy": "npm run deploy --workspaces",
-    "test:e2e": "cd packages/backend && dotenv -e ../../.env.test -- npx playwright test",
-    "test:e2e:headed": "cd packages/backend && dotenv -e ../../.env.test -- npx playwright test --headed",
-    "test:e2e:debug": "cd packages/backend && dotenv -e ../../.env.test -- npx playwright test --debug",
-    "test:e2e:report": "cd packages/backend && npx playwright show-report"
+    "test:e2e": "npx playwright test --config=packages/backend/playwright.config.ts",
+    "test:e2e:headed": "npx playwright test --config=packages/backend/playwright.config.ts --headed",
+    "test:e2e:debug": "npx playwright test --config=packages/backend/playwright.config.ts --debug",
+    "test:e2e:report": "npx playwright show-report playwright-report"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20.0.0",
     "aws-cdk": "^2.130.0",
     "aws-cdk-lib": "^2.130.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^8.0.0",
+    "imapflow": "^1.3.2",
     "prettier": "^3.0.0",
     "typescript": "^5.0.0"
   },
