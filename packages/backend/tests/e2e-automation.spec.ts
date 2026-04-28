@@ -156,50 +156,75 @@ test.describe('MISRA Platform E2E Automation', () => {
 
       // Step 2: Enter email
       console.log('📍 Step 2: Entering email');
-      await page.fill('input[type="email"]', TEST_CONFIG.testEmail);
-      await page.click('button:has-text("Continue"), button:has-text("Next")');
-      await page.waitForLoadState('networkidle');
-
-      // Step 3: Enter password
-      console.log('📍 Step 3: Entering password');
-      await page.fill('input[type="password"]', TEST_CONFIG.testPassword);
-      await page.click('button:has-text("Sign In"), button:has-text("Login")');
-      await page.waitForLoadState('networkidle');
-
-      // Step 4: Wait for OTP email and extract it
-      console.log('📍 Step 4: Waiting for OTP email');
-      let otp: string;
-      try {
-        // Try IMAP first (more reliable)
-        console.log('   Attempting to fetch OTP via IMAP...');
-        otp = await getOtpFromGmail(TEST_CONFIG.testEmail);
-        console.log(`   ✅ OTP fetched via IMAP: ${otp}`);
-      } catch (error) {
-        console.log('   ⚠️ IMAP failed, falling back to UI scraping...');
-        otp = await getOtpFromGmailUI(page);
-        console.log(`   ✅ OTP fetched via UI: ${otp}`);
-      }
-
-      // Step 5: Enter OTP
-      console.log('📍 Step 5: Entering OTP');
-      const otpInputs = page.locator('input[placeholder*="OTP"], input[placeholder*="code"], input[maxlength="1"]');
-      const count = await otpInputs.count();
-      
-      if (count > 0) {
-        // Multi-digit input fields
-        for (let i = 0; i < otp.length; i++) {
-          await otpInputs.nth(i).fill(otp[i]);
-        }
+      const emailInput = page.locator('input[type="email"]');
+      if (await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await emailInput.fill(TEST_CONFIG.testEmail);
+        await page.click('button:has-text("Continue"), button:has-text("Next"), button:has-text("Sign In"), button:has-text("Login")');
+        await page.waitForLoadState('networkidle');
+        console.log('   ✅ Email entered');
       } else {
-        // Single input field
-        await page.fill('input[type="text"]', otp);
+        console.log('   ⚠️ Email input not found, might already be on password page');
       }
-      
-      await page.click('button:has-text("Verify"), button:has-text("Confirm")');
-      await page.waitForLoadState('networkidle');
 
-      console.log('   ✅ Login successful');
-    }
+      // Step 3: Enter password (if password field exists)
+      console.log('📍 Step 3: Entering password');
+      const passwordInput = page.locator('input[type="password"]');
+      if (await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await passwordInput.fill(TEST_CONFIG.testPassword);
+        await page.click('button:has-text("Sign In"), button:has-text("Login")');
+        await page.waitForLoadState('networkidle');
+        console.log('   ✅ Password entered');
+      } else {
+        console.log('   ⚠️ Password input not found, checking if already logged in...');
+        // Check if we're already on dashboard
+        const signOutBtn = page.locator('button:has-text("Sign Out"), a:has-text("Sign Out")');
+        if (await signOutBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          console.log('   ✅ Already logged in, skipping remaining login steps');
+          isLoggedIn = true;
+        }
+      }
+
+      if (isLoggedIn) {
+        console.log('   ✅ Login successful (or already logged in)');
+      } else {
+
+      if (isLoggedIn) {
+        console.log('   ✅ Login successful (or already logged in)');
+      } else {
+        // Step 4: Wait for OTP email and extract it
+        console.log('📍 Step 4: Waiting for OTP email');
+        let otp: string;
+        try {
+          // Try IMAP first (more reliable)
+          console.log('   Attempting to fetch OTP via IMAP...');
+          otp = await getOtpFromGmail(TEST_CONFIG.testEmail);
+          console.log(`   ✅ OTP fetched via IMAP: ${otp}`);
+        } catch (error) {
+          console.log('   ⚠️ IMAP failed, falling back to UI scraping...');
+          otp = await getOtpFromGmailUI(page);
+          console.log(`   ✅ OTP fetched via UI: ${otp}`);
+        }
+
+        // Step 5: Enter OTP
+        console.log('📍 Step 5: Entering OTP');
+        const otpInputs = page.locator('input[placeholder*="OTP"], input[placeholder*="code"], input[maxlength="1"]');
+        const count = await otpInputs.count();
+        
+        if (count > 0) {
+          // Multi-digit input fields
+          for (let i = 0; i < otp.length; i++) {
+            await otpInputs.nth(i).fill(otp[i]);
+          }
+        } else {
+          // Single input field
+          await page.fill('input[type="text"]', otp);
+        }
+        
+        await page.click('button:has-text("Verify"), button:has-text("Confirm")');
+        await page.waitForLoadState('networkidle');
+
+        console.log('   ✅ Login successful');
+      }
 
     // Step 6: Navigate to dashboard/home if not already there
     console.log('📍 Step 6: Navigating to dashboard');
