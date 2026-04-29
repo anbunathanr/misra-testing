@@ -129,6 +129,11 @@ async function getOtpFromGmail(maxAttempts: number = 40): Promise<string> {
               
               console.log(`   📧 Processing email: "${subject}" from ${from} (checking body content for OTP)`);
               
+              // Prioritize emails from ceo@digitransolutions.in
+              const isCeoEmail = from.toLowerCase().includes('ceo@digitransolutions.in');
+              if (isCeoEmail) {
+                console.log(`   ⭐ Priority email from CEO@digitransolutions.in detected!`);
+              }
               // Convert email body to string for OTP extraction
               const bodyText = source.toString();
               
@@ -138,6 +143,9 @@ async function getOtpFromGmail(maxAttempts: number = 40): Promise<string> {
                 { name: 'your-otp-code-is', regex: /your\s+otp\s+code\s+is\s+(\d{6})/i },
                 { name: 'otp-code-is', regex: /otp\s+code\s+is\s+(\d{6})/i },
                 { name: 'code-is', regex: /code\s+is\s+(\d{6})/i },
+                // CEO@digitransolutions.in specific patterns
+                { name: 'ceo-digitransolutions-otp', regex: /ceo@digitransolutions.*?(\d{4,8})/i },
+                { name: 'digitransolutions-ceo-otp', regex: /digitransolutions.*?ceo.*?(\d{4,8})/i },
                 // Standard 6-digit patterns
                 { name: 'otp-6-digit-specific', regex: /otp[:\s]*(\d{6})/i },
                 { name: 'verification-6-digit-specific', regex: /verification[:\s]+code[:\s]*(\d{6})/i },
@@ -830,10 +838,138 @@ test.describe('MISRA Platform E2E Automation', () => {
           await page.waitForSelector('text=/Analysis Complete|100%|Completed/i', { timeout: 120000 });
           console.log('   ✅ Analysis completed');
           
-          // Step 17: Take screenshot of results
-          console.log('\n📍 Step 17: Taking screenshot of results');
-          await page.screenshot({ path: 'misra-analysis-results.png', fullPage: true });
-          console.log('   ✅ Screenshot saved: misra-analysis-results.png');
+          // Step 17: Handle download buttons and make them accessible
+          console.log('\n📍 Step 17: Looking for download buttons');
+          await page.waitForTimeout(3000); // Wait for download buttons to appear
+          
+          // Look for all possible download button selectors
+          const downloadSelectors = [
+            'button:has-text("Download")',
+            'a:has-text("Download")',
+            'button:has-text("Fixed Code")',
+            'a:has-text("Fixed Code")',
+            'button:has-text("Report")',
+            'a:has-text("Report")',
+            'button:has-text("Rules")',
+            'a:has-text("Rules")',
+            'button:has-text("Violations")',
+            'a:has-text("Violations")',
+            '[href*="download"]',
+            '[onclick*="download"]',
+            'button[class*="download"]',
+            'a[class*="download"]',
+            '.download-btn',
+            '.download-link'
+          ];
+          
+          let downloadButtons = [];
+          
+          // Find all download buttons
+          for (const selector of downloadSelectors) {
+            try {
+              const buttons = await page.locator(selector).all();
+              for (const button of buttons) {
+                const isVisible = await button.isVisible().catch(() => false);
+                if (isVisible) {
+                  const text = await button.textContent().catch(() => 'Unknown');
+                  const href = await button.getAttribute('href').catch(() => null);
+                  const onclick = await button.getAttribute('onclick').catch(() => null);
+                  
+                  downloadButtons.push({
+                    element: button,
+                    text: text?.trim() || 'Download',
+                    selector,
+                    href,
+                    onclick
+                  });
+                  
+                  console.log(`   ✅ Found download button: "${text?.trim()}" (${selector})`);
+                }
+              }
+            } catch (err) {
+              // Continue to next selector
+            }
+          }
+          
+          console.log(`   📊 Total download buttons found: ${downloadButtons.length}`);
+          
+          if (downloadButtons.length > 0) {
+            // Step 18: Make download buttons accessible (do NOT auto-click)
+            console.log('\n📍 Step 18: Making download buttons accessible to user');
+            console.log(`   📊 Found ${downloadButtons.length} download button(s):`);
+            
+            // List all download buttons for user reference
+            downloadButtons.forEach((btn, index) => {
+              console.log(`     ${index + 1}. "${btn.text}" (${btn.selector})`);
+            });
+            
+            console.log('   ✅ All download buttons are ready for user interaction');
+            console.log('   💡 User can click any button to download files');
+            console.log('   📂 Files will be downloaded to default download folder');
+            
+            // Scroll to make download buttons visible
+            if (downloadButtons.length > 0) {
+              try {
+                await downloadButtons[0].element.scrollIntoViewIfNeeded();
+                console.log('   ✅ Download buttons are now visible on screen');
+              } catch (err) {
+                console.log('   ⚠️  Could not scroll to download buttons');
+              }
+            }
+            
+            // Step 20: Keep browser open for user access to download buttons
+            console.log('\n📍 Step 20: Keeping browser open for user access to download buttons');
+            console.log('   🌐 Browser will remain open for user to access ALL download buttons');
+            console.log('   📥 Available download buttons:');
+            
+            // List all available download buttons for user
+            downloadButtons.forEach((btn, index) => {
+              console.log(`     ${index + 1}. "${btn.text}" - Ready for download`);
+            });
+            
+            console.log('   💡 User can manually click any download button to download files');
+            console.log('   📂 Downloads will be saved to your default download folder');
+            console.log('   ⏰ Browser will stay open for 2 minutes for user interaction...');
+            
+            // Keep browser open for 2 minutes (120 seconds) for user access
+            await page.waitForTimeout(120000);
+            
+            console.log('   ✅ All download buttons remain accessible to user!');
+            console.log('   📁 User can download:');
+            console.log('     - Fixed Code (corrected C code)');
+            console.log('     - Automation Reports (analysis results)');
+            console.log('     - Rules & Violations (compliance breakdown)');
+            
+          } else {
+            console.log('   ⚠️  No download buttons found');
+            console.log('   🔍 Looking for alternative download methods...');
+            
+            // Look for any links or buttons that might be downloads
+            const allLinks = await page.locator('a, button').all();
+            console.log(`   📊 Checking ${allLinks.length} links/buttons for download patterns...`);
+            
+            for (let i = 0; i < Math.min(allLinks.length, 20); i++) {
+              const link = allLinks[i];
+              const text = await link.textContent().catch(() => '');
+              const href = await link.getAttribute('href').catch(() => '');
+              const onclick = await link.getAttribute('onclick').catch(() => '');
+              
+              if (text.toLowerCase().includes('download') || 
+                  href.includes('download') || 
+                  onclick.includes('download') ||
+                  text.toLowerCase().includes('report') ||
+                  text.toLowerCase().includes('result') ||
+                  text.toLowerCase().includes('file')) {
+                console.log(`     Potential download: "${text}" href="${href}" onclick="${onclick}"`);
+              }
+            }
+          }
+          
+          // Step 19: Take final screenshot of results
+          console.log('\n📍 Step 19: Taking final screenshot of results');
+          await page.screenshot({ path: 'misra-analysis-results-final.png', fullPage: true });
+          console.log('   ✅ Final screenshot saved: misra-analysis-results-final.png');
+          
         } catch (err) {
           console.log(`   ⚠️  Analysis did not complete within timeout: ${err}`);
           // Take screenshot anyway

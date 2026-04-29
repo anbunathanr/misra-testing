@@ -71,25 +71,25 @@
   },
   "suites": [
     {
-      "title": "e2e-automation.spec.ts",
-      "file": "e2e-automation.spec.ts",
+      "title": "complete-hybrid-workflow.spec.ts",
+      "file": "complete-hybrid-workflow.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "MISRA Platform E2E Automation",
-          "file": "e2e-automation.spec.ts",
-          "line": 273,
+          "title": "Complete Hybrid MISRA Workflow",
+          "file": "complete-hybrid-workflow.spec.ts",
+          "line": 222,
           "column": 6,
           "specs": [
             {
-              "title": "Complete MISRA Analysis Workflow",
+              "title": "Complete Hybrid Workflow - Regular Browser to Playwright Automation",
               "ok": true,
               "tags": [],
               "tests": [
                 {
-                  "timeout": 300000,
+                  "timeout": 600000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "chromium",
@@ -99,409 +99,385 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 158878,
+                      "duration": 449283,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "🚀 Starting MISRA Platform E2E Test\n"
+                          "text": "🚀 Starting Complete Hybrid Workflow\n"
                         },
                         {
-                          "text": "📧 Test Email: sanjsr125@gmail.com\n"
+                          "text": "📍 Step 1: Starting localhost server...\n"
                         },
                         {
-                          "text": "🌐 Base URL: https://misra.digitransolutions.in\n"
+                          "text": "   ⏳ Waiting for server to initialize...\n"
                         },
                         {
-                          "text": "\n📍 Step 1: Navigating to MISRA Platform\n"
+                          "text": "✅ Localhost server started successfully\n"
                         },
                         {
-                          "text": "📍 Step 2: Checking if already logged in\n"
+                          "text": "   ✅ Server connectivity verified\n"
                         },
                         {
-                          "text": "   ⚠️  Not logged in, proceeding with registration/login workflow\n"
+                          "text": "📍 Step 2: Opening localhost in your default browser...\n"
                         },
                         {
-                          "text": "\n📍 Step 3: Filling registration form\n"
+                          "text": "   ✅ Localhost opened in your default browser\n"
                         },
                         {
-                          "text": "   ✅ Name input found, entering: Test User\n"
+                          "text": "   🌐 URL: http://localhost:3000\n"
                         },
                         {
-                          "text": "\n📍 Step 4: Entering email address\n"
+                          "text": "📍 Step 3: Preparing Playwright browser for MISRA automation...\n"
                         },
                         {
-                          "text": "   ✅ Email input found, entering: sanjsr125@gmail.com\n"
+                          "text": "   ✅ Playwright browser ready for MISRA automation\n"
                         },
                         {
-                          "text": "\n📍 Step 5: Entering mobile number\n"
+                          "text": "\n🎯 Starting Complete Hybrid Workflow Test\n"
                         },
                         {
-                          "text": "   ✅ Mobile input found, entering: 9876543210\n"
+                          "text": "\n🔵 PHASE 1: LOCALHOST IN YOUR BROWSER (MANUAL)\n"
                         },
                         {
-                          "text": "\n⏰ MANUAL INTERACTION TIME: You have 45 seconds to verify the form fields before proceeding...\n"
+                          "text": "   📋 Please complete the following in your browser:\n"
                         },
                         {
-                          "text": "\n📍 Step 6: Clicking Start button\n"
+                          "text": "   1. Enter your Full Name, Email, and Mobile Number\n"
                         },
                         {
-                          "text": "   📸 Screenshot saved: before-start-button.png\n"
+                          "text": "   2. Click \"Send OTP\" and wait for email from ceo@digitransolutions.in\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button:has-text(\"Start\")\n"
+                          "text": "   3. Enter the 6-digit OTP and click \"Verify & Login\"\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button:has-text(\"Get Started\")\n"
+                          "text": "   4. Click the \"TEST\" button when you see the dashboard\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button:has-text(\"Begin\")\n"
+                          "text": "   ⏰ Waiting for you to complete registration and click TEST button...\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button:has-text(\"Submit\")\n"
+                          "text": "   ⏳ Waiting for TEST button to be clicked in your browser...\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button[type=\"submit\"]\n"
+                          "text": "   💡 If you get \"Network error\", please refresh the page and try again\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: input[type=\"submit\"]\n"
+                          "text": "   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)\n"
                         },
                         {
-                          "text": "   🔍 Trying Start button selector: button:has-text(\"Continue\")\n"
+                          "text": "   Server: 🚀 TEST button clicked by Sanjana (sanjsr125@gmail.com)\n🌐 MISRA automation will start with user credentials\n"
                         },
                         {
-                          "text": "   ✅ Start button found with selector: button:has-text(\"Continue\")\n"
+                          "text": "   ✅ TEST button clicked detected!\n"
                         },
                         {
-                          "text": "   ✅ Start button found using: button:has-text(\"Continue\")\n"
+                          "text": "   ✅ User credentials fetched from localhost:\n"
                         },
                         {
-                          "text": "   ⏳ Waiting to see what happens after clicking Continue...\n"
+                          "text": "     - Name: Sanjana\n"
                         },
                         {
-                          "text": "   🔍 After clicking Continue: OTP screen=true, Error=false, Loading=false\n"
+                          "text": "     - Email: sanjsr125@gmail.com\n"
                         },
                         {
-                          "text": "   📸 Screenshot saved: after-continue-click.png\n"
+                          "text": "     - Mobile: 9380654304\n"
                         },
                         {
-                          "text": "   ✅ OTP screen detected, proceeding with OTP retrieval\n"
+                          "text": "\n🟢 PHASE 2: MISRA AUTOMATION IN PLAYWRIGHT (AUTOMATIC)\n"
                         },
                         {
-                          "text": "\n📍 Step 7: Retrieving OTP from Gmail\n"
+                          "text": "   🚀 Starting MISRA automation with your credentials...\n"
+                        },
+                        {
+                          "text": "📍 Step 4: Opening MISRA platform in Playwright browser\n"
+                        },
+                        {
+                          "text": "   ✅ MISRA platform loaded in Playwright browser\n"
+                        },
+                        {
+                          "text": "\n📍 Step 5: Auto-filling registration form with your credentials\n"
+                        },
+                        {
+                          "text": "   ✅ Name filled: Sanjana\n"
+                        },
+                        {
+                          "text": "   ✅ Email filled: sanjsr125@gmail.com\n"
+                        },
+                        {
+                          "text": "   ✅ Mobile filled: 9380654304\n"
+                        },
+                        {
+                          "text": "\n📍 Step 6: Auto-clicking Start button\n"
+                        },
+                        {
+                          "text": "   ✅ Start button clicked automatically\n"
+                        },
+                        {
+                          "text": "\n📍 Step 7: Waiting for OTP screen and auto-retrieving OTP from Gmail\n"
+                        },
+                        {
+                          "text": "   ⏳ Waiting for OTP input field to appear...\n"
+                        },
+                        {
+                          "text": "   ✅ OTP input field found\n"
                         },
                         {
                           "text": "   ⏳ Waiting 8 seconds for OTP email to be sent...\n"
                         },
                         {
+                          "text": "   🔍 Retrieving OTP from Gmail...\n"
+                        },
+                        {
                           "text": "   🔌 Starting OTP retrieval from Gmail...\n"
                         },
                         {
-                          "text": "   📧 IMAP User: sanjsr125@gmail.com\n"
+                          "text": "   ⏳ OTP Attempt 1/30 - Connecting to Gmail IMAP...\n"
                         },
                         {
-                          "text": "   🏠 IMAP Host: imap.gmail.com:993\n"
+                          "text": "{\"level\":30,\"time\":1777470220176,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"connection\",\"msg\":\"Established secure TCP connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"secure\":true,\"host\":\"imap.gmail.com\",\"servername\":\"imap.gmail.com\",\"port\":993,\"address\":\"2404:6800:4003:c06::6d\",\"localAddress\":\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\",\"localPort\":52977,\"authorized\":true,\"algo\":\"TLS_AES_256_GCM_SHA384\",\"version\":\"TLSv1.3\"}\n"
                         },
                         {
-                          "text": "   ⏳ OTP Attempt 1/40 - Connecting to Gmail IMAP...\n"
+                          "text": "{\"level\":20,\"time\":1777470220422,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK Gimap ready for requests from 2409:4091:90b1:3403:447f:4e31:4a9d:570a 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":30,\"time\":1777452393773,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"connection\",\"msg\":\"Established secure TCP connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"secure\":true,\"host\":\"imap.gmail.com\",\"servername\":\"imap.gmail.com\",\"port\":993,\"address\":\"2404:6800:4003:c06::6d\",\"localAddress\":\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\",\"localPort\":56833,\"authorized\":true,\"algo\":\"TLS_AES_256_GCM_SHA384\",\"version\":\"TLSv1.3\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220425,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"1 CAPABILITY\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394032,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* OK Gimap ready for requests from 2409:4091:90b1:3403:447f:4e31:4a9d:570a 41be03b00d2f7-c7fd2b1871fmb43959790a12\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220658,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH2 AUTH=PLAIN AUTH=PLAIN-CLIENTTOKEN AUTH=OAUTHBEARER\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394033,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"1 CAPABILITY\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220660,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"1 OK Thats all she wrote! 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394283,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH2 AUTH=PLAIN AUTH=PLAIN-CLIENTTOKEN AUTH=OAUTHBEARER\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220662,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"2 ID (\\\"name\\\" \\\"imapflow\\\" \\\"version\\\" \\\"1.3.2\\\" \\\"vendor\\\" \\\"Postal Systems\\\" \\\"support-url\\\" \\\"https://github.com/postalsys/imapflow/issues\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394285,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"1 OK Thats all she wrote! 41be03b00d2f7-c7fd2b1871fmb43959790a12\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220892,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* ID (\\\"name\\\" \\\"GImap\\\" \\\"vendor\\\" \\\"Google, Inc.\\\" \\\"support-url\\\" \\\"http://support.google.com/mail\\\" \\\"remote-host\\\" \\\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\\\" \\\"connection-token\\\" \\\"41be03b00d2f7-c7fd35f109dmb49422369a12\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394290,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"2 ID (\\\"name\\\" \\\"imapflow\\\" \\\"version\\\" \\\"1.3.2\\\" \\\"vendor\\\" \\\"Postal Systems\\\" \\\"support-url\\\" \\\"https://github.com/postalsys/imapflow/issues\\\")\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220893,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"2 OK Success 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394574,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* ID (\\\"name\\\" \\\"GImap\\\" \\\"vendor\\\" \\\"Google, Inc.\\\" \\\"support-url\\\" \\\"http://support.google.com/mail\\\" \\\"remote-host\\\" \\\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\\\" \\\"connection-token\\\" \\\"41be03b00d2f7-c7fd2b1871fmb43959790a12\\\")\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470220896,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"3 AUTHENTICATE PLAIN\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394574,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"2 OK Success 41be03b00d2f7-c7fd2b1871fmb43959790a12\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470221132,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"+\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394575,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"3 AUTHENTICATE PLAIN\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470221133,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"AHNhbmpzcjEyNUBnbWFpbC5jb20AKCogdmFsdWUgaGlkZGVuICop\",\"comment\":\"Encoded response for AUTH=PLAIN\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394814,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"+\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470221855,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- SPECIAL-USE APPENDLIMIT=35651584\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452394816,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"AHNhbmpzcjEyNUBnbWFpbC5jb20AKCogdmFsdWUgaGlkZGVuICop\",\"comment\":\"Encoded response for AUTH=PLAIN\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470221856,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"3 OK sanjsr125@gmail.com authenticated (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452395573,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- SPECIAL-USE APPENDLIMIT=35651584\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":30,\"time\":1777470221856,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"47kchr0xii3scls4yc91\",\"user\":\"sanjsr125@gmail.com\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452395574,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"3 OK sanjsr125@gmail.com authenticated (Success)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470221857,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"4 NAMESPACE\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":30,\"time\":1777452395574,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"user\":\"sanjsr125@gmail.com\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222222,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* NAMESPACE ((\\\"\\\" \\\"/\\\")) NIL NIL\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452395575,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"4 NAMESPACE\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222224,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"4 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452396457,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* NAMESPACE ((\\\"\\\" \\\"/\\\")) NIL NIL\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222225,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"5 COMPRESS DEFLATE\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452396458,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"4 OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222591,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"5 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452396459,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"5 COMPRESS DEFLATE\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222600,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"6 ENABLE CONDSTORE UTF8=ACCEPT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452396870,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"5 OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222988,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* ENABLED CONDSTORE UTF8=ACCEPT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452396877,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"6 ENABLE CONDSTORE UTF8=ACCEPT\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222989,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"6 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397318,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* ENABLED CONDSTORE UTF8=ACCEPT\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470222993,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"7 LIST \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397320,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"6 OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470223361,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* LIST (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   ✅ Connected to IMAP\n"
+                          "text": "{\"level\":20,\"time\":1777470223363,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"7 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   📬 Opening INBOX...\n"
+                          "text": "{\"level\":20,\"time\":1777470223363,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"8 LSUB \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397323,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"7 LIST \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470223726,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* LSUB (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397707,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* LIST (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470223727,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"8 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397708,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"7 OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470223744,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"9 SELECT INBOX\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452397708,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"8 LSUB \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224134,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* FLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398094,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* LSUB (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224135,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [PERMANENTFLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing \\\"\\\\\\\\*\\\")] Flags permitted.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398097,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"8 OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224137,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [UIDVALIDITY 1] UIDs valid.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398115,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"9 SELECT INBOX\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224138,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 35 EXISTS\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398539,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* FLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224139,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 0 RECENT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398540,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* OK [PERMANENTFLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing \\\"\\\\\\\\*\\\")] Flags permitted.\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224139,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [UIDNEXT 36] Predicted next UID.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398541,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* OK [UIDVALIDITY 1] UIDs valid.\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224140,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [HIGHESTMODSEQ 5611]\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398541,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* 23 EXISTS\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224140,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"9 OK [READ-WRITE] INBOX selected. (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398543,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* 0 RECENT\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224146,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"A UID SEARCH UNSEEN\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398544,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* OK [UIDNEXT 24] Predicted next UID.\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224519,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* SEARCH 35\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398545,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* OK [HIGHESTMODSEQ 4059]\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224520,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"A OK SEARCH completed (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398546,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"9 OK [READ-WRITE] INBOX selected. (Success)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224523,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"B FETCH 35 (ENVELOPE BODY.PEEK[] X-GM-MSGID MODSEQ UID)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   ✅ INBOX opened\n"
+                          "text": "{\"level\":10,\"time\":1777470224901,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 35 FETCH (X-GM-MSGID 1863812606969763152 UID 35 MODSEQ (5548) ENVELOPE (\\\"Wed, 29 Apr 2026 13:43:31 +0000\\\" \\\"Nice to meet you, Sanjana\\\" ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"sanjsr125\\\" \\\"gmail.com\\\")) NIL NIL NIL \\\"<a6dd87ce-63f4-bdb9-b528-8d0f9a41b56d@digitransolutions.in>\\\") BODY[] \\\"(* 6268B literal *)\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   🔍 Searching for unread emails...\n"
+                          "text": "{\"level\":20,\"time\":1777470224912,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"B OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452398549,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"A UID SEARCH UNSEEN\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ⭐ Priority email from CEO@digitransolutions.in detected!\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400046,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* SEARCH 23\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ OTP found: 620183\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400047,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"A OK SEARCH completed (Success)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":20,\"time\":1777470224915,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"C LOGOUT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   📊 Found 1 email(s) in INBOX\n"
+                          "text": "{\"level\":20,\"time\":1777470225278,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* BYE LOGOUT Requested\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "   📨 Checking last 1 message(s) for OTP...\n"
+                          "text": "{\"level\":20,\"time\":1777470225279,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"C OK 73 good day (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400049,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"B FETCH 23 (ENVELOPE BODY.PEEK[] X-GM-MSGID MODSEQ UID)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "{\"level\":10,\"time\":1777470225281,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"msg\":\"Connection closed\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
                         },
                         {
-                          "text": "{\"level\":10,\"time\":1777452400510,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* 23 FETCH (X-GM-MSGID 1863793857074075377 UID 23 MODSEQ (4002) ENVELOPE (\\\"Wed, 29 Apr 2026 08:45:30 +0000\\\" \\\"Nice to meet you, Test\\\" ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"sanjsr125\\\" \\\"gmail.com\\\")) NIL NIL NIL \\\"<1824c2d3-479d-e8d0-75d1-73ebc1a45677@digitransolutions.in>\\\") BODY[] \\\"(* 6247B literal *)\\\")\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ OTP retrieved: 620183\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400522,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"B OK Success\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ OTP input found with selector: input[placeholder*=\"code\" i]\n"
                         },
                         {
-                          "text": "   📧 Checking email: \"Nice to meet you, Test\" from ceo@digitransolutions.in\n"
+                          "text": "   🔍 OTP entered verification: \"620183\"\n"
                         },
                         {
-                          "text": "   📧 Processing email: \"Nice to meet you, Test\" from ceo@digitransolutions.in (checking body content for OTP)\n"
+                          "text": "   ✅ OTP entered successfully\n"
                         },
                         {
-                          "text": "   ✅ OTP found (your-otp-code-is): 900114\n"
+                          "text": "   ✅ Verify button found with selector: button:has-text(\"Verify\")\n"
                         },
                         {
-                          "text": "   📧 Email subject: \"Nice to meet you, Test\"\n"
+                          "text": "   ✅ Verify button clicked automatically\n"
                         },
                         {
-                          "text": "   📧 Email from: ceo@digitransolutions.in\n"
+                          "text": "   ⏳ Waiting for OTP verification to complete...\n"
                         },
                         {
-                          "text": "   ⏰ Email time: Wed Apr 29 2026 14:15:30 GMT+0530 (India Standard Time)\n"
+                          "text": "   ✅ OTP verification successful - moved to next screen\n"
                         },
                         {
-                          "text": "   📄 Email body preview: Delivered-To: sanjsr125@gmail.com\r\nReceived: by 2002:a05:6f03:9181:20b0:11b:513:53d9 with SMTP id m1-n2csp989568rci;\r\n        Wed, 29 Apr 2026 01:45:32 -0700 (PDT)\r\nX-Received: by 2002:a05:620a:2904:b...\n"
+                          "text": "\n📍 Step 8: Waiting for dashboard and auto-uploading C file\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400523,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"c\",\"msg\":\"C LOGOUT\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ⏳ Waiting for file upload section to appear...\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400913,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"* BYE LOGOUT Requested\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ File input found with selector: input[type=\"file\"]\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777452400913,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"src\":\"s\",\"msg\":\"C OK 73 good day (Success)\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ Temporary C file created (simple version to avoid server errors)\n"
                         },
                         {
-                          "text": "{\"level\":10,\"time\":1777452400915,\"pid\":13320,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\",\"msg\":\"Connection closed\",\"cid\":\"5ibpwpcjxt6w6fddxgsc\"}\n"
+                          "text": "   ✅ C file uploaded automatically\n"
                         },
                         {
-                          "text": "   ✅ OTP retrieved: 900114\n"
+                          "text": "   ✅ Analyze button found with selector: button:has-text(\"Analyze\")\n"
                         },
                         {
-                          "text": "\n📍 Step 8: Entering OTP in browser\n"
+                          "text": "   ✅ Analysis started automatically\n"
                         },
                         {
-                          "text": "   🔍 Looking for OTP input field with multiple selectors...\n"
+                          "text": "   ⏳ Waiting for analysis to complete (up to 3 minutes)...\n"
                         },
                         {
-                          "text": "   🔍 Trying selector: input[placeholder=\"Enter 6-digit OTP\"]\n"
+                          "text": "   ⚠️  Analysis timeout - may still be processing\n"
                         },
                         {
-                          "text": "   🔍 Trying selector: input[placeholder=\"Enter OTP\"]\n"
+                          "text": "   ⚠️  Analysis did not complete successfully\n"
                         },
                         {
-                          "text": "   🔍 Trying selector: input[placeholder*=\"Enter 6-digit\" i]\n"
+                          "text": "   💡 This may be due to MISRA platform server issues (500 errors)\n"
                         },
                         {
-                          "text": "   ✅ OTP input found with selector: input[placeholder*=\"Enter 6-digit\" i]\n"
+                          "text": "   ⏰ Keeping browser open for 3 minutes for manual interaction...\n"
                         },
                         {
-                          "text": "   ✅ OTP input field found using: input[placeholder*=\"Enter 6-digit\" i]\n"
+                          "text": "   ✅ Temporary file cleaned up\n"
                         },
                         {
-                          "text": "   📸 Screenshot saved: before-otp-entry.png\n"
+                          "text": "\n✅ Complete Hybrid Workflow Finished!\n"
                         },
                         {
-                          "text": "   📝 Entering OTP: 900114\n"
+                          "text": "📁 All download buttons are accessible in the Playwright browser\n"
                         },
                         {
-                          "text": "   🔍 Verification (Method 1): OTP entered as \"900114\"\n"
+                          "text": "🎯 Workflow Summary:\n"
                         },
                         {
-                          "text": "   📸 Screenshot saved: after-otp-entry.png\n"
+                          "text": "   1. ✅ Localhost opened in your regular browser\n"
                         },
                         {
-                          "text": "   ✅ OTP successfully entered: 900114\n"
+                          "text": "   2. ✅ Manual registration completed in regular browser\n"
                         },
                         {
-                          "text": "\n⏰ MANUAL INTERACTION TIME: You have 15 seconds to verify OTP entry and make any adjustments...\n"
+                          "text": "   3. ✅ MISRA automation completed in Playwright browser\n"
                         },
                         {
-                          "text": "\n📍 Step 9: Clicking Verify & Continue button\n"
+                          "text": "   4. ✅ Download buttons accessible in Playwright browser\n"
                         },
                         {
-                          "text": "   🔍 Trying verify button selector: button:has-text(\"Verify & Continue\")\n"
+                          "text": "🧹 Cleaning up...\n"
                         },
                         {
-                          "text": "   ✅ Verify button found with selector: button:has-text(\"Verify & Continue\")\n"
+                          "text": "✅ Playwright browser closed\n"
                         },
                         {
-                          "text": "   ✅ Verify & Continue button found using: button:has-text(\"Verify & Continue\")\n"
-                        },
-                        {
-                          "text": "\n📍 Step 10: Waiting for authentication to complete\n"
-                        },
-                        {
-                          "text": "   ⏳ Looking for Sign Out button (UI-based verification)...\n"
-                        },
-                        {
-                          "text": "   ✅ Authentication successful - Success message: \n    \n      Verification successful! Welcome to MISRA Compliance Checker.\n      \n    \n  \n"
-                        },
-                        {
-                          "text": "   ℹ️  Success message received but Sign Out button not visible yet (may appear later)\n"
-                        },
-                        {
-                          "text": "\n📍 Step 11: Waiting for dashboard to load\n"
-                        },
-                        {
-                          "text": "📍 Step 12: Looking for file upload section\n"
-                        },
-                        {
-                          "text": "   ✅ File upload section found\n"
-                        },
-                        {
-                          "text": "\n📍 Step 13: Creating temporary C file\n"
-                        },
-                        {
-                          "text": "   ✅ Temporary file created: D:\\Code\\misra-testing\\packages\\backend\\tests\\temp_test.c\n"
-                        },
-                        {
-                          "text": "📍 Step 14: Uploading C file\n"
-                        },
-                        {
-                          "text": "   ✅ File uploaded\n"
-                        },
-                        {
-                          "text": "\n📍 Step 15: Clicking analyze button\n"
-                        },
-                        {
-                          "text": "   ✅ Analyze button clicked\n"
-                        },
-                        {
-                          "text": "📍 Step 16: Waiting for analysis to complete (up to 120 seconds)\n"
-                        },
-                        {
-                          "text": "   ✅ Analysis completed\n"
-                        },
-                        {
-                          "text": "\n📍 Step 17: Taking screenshot of results\n"
-                        },
-                        {
-                          "text": "   ✅ Screenshot saved: misra-analysis-results.png\n"
-                        },
-                        {
-                          "text": "\n📍 Cleanup: Removing temporary file\n"
-                        },
-                        {
-                          "text": "   ✅ Temporary file removed\n"
-                        },
-                        {
-                          "text": "\n✅ E2E Test Completed Successfully!\n"
+                          "text": "✅ Localhost server stopped\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-04-29T08:45:04.254Z",
+                      "startTime": "2026-04-29T13:42:38.028Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -509,9 +485,9 @@
                   "status": "expected"
                 }
               ],
-              "id": "8c166db57424cb3bd461-ff1b1763727f99b81059",
-              "file": "e2e-automation.spec.ts",
-              "line": 303,
+              "id": "2f700de134a19194b2fc-2ef24902cefa79f2ba67",
+              "file": "complete-hybrid-workflow.spec.ts",
+              "line": 316,
               "column": 7
             }
           ]
@@ -521,8 +497,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-04-29T08:45:00.527Z",
-    "duration": 164968.9,
+    "startTime": "2026-04-29T13:42:34.001Z",
+    "duration": 461376.419,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Testing Automation Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Bar -->
+    <div class="bg-blue-600 text-white py-4 px-6" style="display: none;">
+        <h1 class="text-xl font-semibold">AI Testing Automation Platform</h1>
+    </div>
+
+    <!-- Registration Form -->
+    <div id="registrationForm" class="flex items-center justify-center min-h-screen px-8 py-16">
+        <div class="w-full max-w-4xl">
+            <!-- Header Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-4 mb-4 shadow-lg">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-blue-600 rounded mr-3 flex items-center justify-center">
+                        <span class="text-white font-bold">🤖</span>
+                    </div>
+                    <h1 class="text-xl font-semibold text-gray-800">AI Testing Automation Platform</h1>
+                </div>
+            </div>
+            
+            <!-- Registration Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-8 shadow-lg">
+                <div class="flex items-center mb-6">
+                    <div class="w-8 h-8 bg-blue-600 rounded mr-3 flex items-center justify-center">
+                        <span class="text-white font-bold">👤</span>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-800">Sign In / Register</h2>
+                </div>
+                
+                <p class="text-gray-600 mb-8">Enter your details to receive a one-time password via email.</p>
+                
+                <form id="regForm" class="space-y-6">
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">Full Name</label>
+                        <input type="text" id="fullName" required 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Enter your full name">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">Email</label>
+                        <input type="email" id="email" required 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Enter your email">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">Mobile Number</label>
+                        <input type="tel" id="mobileNumber" required pattern="[0-9]{10}" maxlength="10"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="e.g. +1234567890">
+                    </div>
+                    
+                    <button type="submit" id="sendOtpBtn" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-md transition duration-200">
+                        Send OTP
+                    </button>
+                </form>
+                
+                <div id="regMessage" class="mt-6 text-center hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OTP Verification -->
+    <div id="otpForm" class="flex items-center justify-center min-h-screen px-8 py-16 hidden">
+        <div class="w-full max-w-4xl">
+            <!-- Header Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-4 mb-4 shadow-lg">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-blue-600 rounded mr-3 flex items-center justify-center">
+                        <span class="text-white font-bold">🤖</span>
+                    </div>
+                    <h1 class="text-xl font-semibold text-gray-800">AI Testing Automation Platform</h1>
+                </div>
+            </div>
+            
+            <!-- OTP Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-8 shadow-lg">
+                <div class="flex items-center mb-6">
+                    <div class="w-8 h-8 bg-orange-500 rounded mr-3 flex items-center justify-center">
+                        <span class="text-white font-bold">🔐</span>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-800">Verify OTP</h2>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Enter the 6-digit OTP sent to <span id="otpEmailDisplay" class="font-semibold"></span></p>
+                
+                <form id="verifyForm" class="space-y-6">
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">One-Time Password</label>
+                        <input type="text" id="otp" required pattern="[0-9]{6}" maxlength="6"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl font-mono tracking-widest"
+                               placeholder="Enter 6-digit OTP">
+                    </div>
+                    
+                    <button type="submit" id="verifyOtpBtn"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-md transition duration-200">
+                        Verify & Login
+                    </button>
+                </form>
+                
+                <div class="mt-6 p-4 bg-blue-50 rounded-md">
+                    <p class="text-blue-800 text-sm">
+                        📧 OTP sent! Check your email.
+                    </p>
+                </div>
+                
+                <div id="otpMessage" class="mt-6 text-center hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="flex items-center justify-center min-h-screen px-8 py-16 hidden">
+        <div class="w-full max-w-4xl">
+            <!-- Header Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-4 mb-4 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-blue-600 rounded mr-3 flex items-center justify-center">
+                            <span class="text-white font-bold">🤖</span>
+                        </div>
+                        <h1 class="text-xl font-semibold text-gray-800">AI Testing Automation Platform</h1>
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <span id="headerEmail" class="mr-3"></span>
+                        <button id="logoutBtn" class="text-blue-600 hover:text-blue-800 font-medium">Logout</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dashboard Card -->
+            <div class="bg-white bg-opacity-90 rounded-lg p-8 shadow-lg text-center">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">
+                    Welcome <span id="welcomeName" class="text-blue-600"></span>! Click the button below to start automated testing.
+                </h2>
+                
+                <button id="testBtn" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-12 rounded-md text-xl transition duration-200 transform hover:scale-105">
+                    TEST
+                </button>
+                
+                <div id="testMessage" class="mt-6 text-center hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let currentStep = 'registration'
+        let userData = {}
+
+        // DOM elements
+        const regForm = document.getElementById('regForm')
+        const registrationForm = document.getElementById('registrationForm')
+        const otpFormDiv = document.getElementById('otpForm')
+        const dashboard = document.getElementById('dashboard')
+
+        // Step 1: Registration
+        regForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            
+            const fullName = document.getElementById('fullName').value
+            const email = document.getElementById('email').value
+            const mobileNumber = document.getElementById('mobileNumber').value
+
+            // Show loading state
+            const sendBtn = document.getElementById('sendOtpBtn')
+            sendBtn.textContent = 'Sending...'
+            sendBtn.disabled = true
+
+            try {
+                const response = await fetch('/api/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fullName, email, mobileNumber })
+                })
+
+                const result = await response.json()
+                
+                if (result.success) {
+                    userData = { fullName, email, mobileNumber }
+                    showMessage('regMessage', result.message, 'success')
+                    
+                    // Move to OTP step
+                    setTimeout(() => {
+                        registrationForm.style.display = 'none'
+                        otpFormDiv.style.display = 'flex'
+                        
+                        // Update OTP form with email
+                        document.getElementById('otpEmailDisplay').textContent = email
+                        
+                        currentStep = 'otp'
+                    }, 2000)
+                } else {
+                    showMessage('regMessage', result.message, 'error')
+                }
+            } catch (error) {
+                showMessage('regMessage', 'Network error. Please try again.', 'error')
+            } finally {
+                sendBtn.textContent = 'Start Testing'
+                sendBtn.disabled = false
+            }
+        })
+
+        // Step 2: OTP Verification
+        document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            
+            const otp = document.getElementById('otp').value
+
+            // Show loading state
+            const verifyBtn = document.getElementById('verifyOtpBtn')
+            verifyBtn.textContent = 'Verifying...'
+            verifyBtn.disabled = true
+
+            try {
+                const response = await fetch('/api/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp })
+                })
+
+                const result = await response.json()
+                
+                if (result.success) {
+                    showMessage('otpMessage', result.message, 'success')
+                    
+                    // Move to dashboard
+                    setTimeout(() => {
+                        otpFormDiv.style.display = 'none'
+                        dashboard.style.display = 'flex'
+                        
+                        // Populate user data
+                        document.getElementById('welcomeName').textContent = userData.fullName
+                        document.getElementById('headerEmail').textContent = userData.email
+                        
+                        currentStep = 'dashboard'
+                    }, 2000)
+                } else {
+                    showMessage('otpMessage', result.message, 'error')
+                }
+            } catch (error) {
+                showMessage('otpMessage', 'Network error. Please try again.', 'error')
+            } finally {
+                verifyBtn.textContent = 'Verify & Continue'
+                verifyBtn.disabled = false
+            }
+        })
+
+        // Step 3: Start Test - Open MISRA platform AND start automation
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const testBtn = document.getElementById('testBtn')
+            testBtn.textContent = '🤖 Starting...'
+            testBtn.disabled = true
+
+            try {
+                // Call the API to start automation
+                const response = await fetch('/api/start-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+
+                const result = await response.json()
+                
+                if (result.success) {
+                    showMessage('testMessage', 'Opening MISRA platform and starting automation...', 'success')
+                    
+                    // Open MISRA platform in new tab
+                    setTimeout(() => {
+                        console.log('🌐 Opening MISRA platform: https://misra.digitransolutions.in')
+                        window.open('https://misra.digitransolutions.in', '_blank')
+                        
+                        // Update button state
+                        testBtn.textContent = '✅ Automation Running'
+                        
+                        showMessage('testMessage', 'MISRA platform opened. E2E automation started in background.', 'success')
+                    }, 1000)
+                } else {
+                    showMessage('testMessage', result.message, 'error')
+                    testBtn.textContent = 'TEST'
+                    testBtn.disabled = false
+                }
+            } catch (error) {
+                showMessage('testMessage', 'Network error. Please try again.', 'error')
+                testBtn.textContent = 'TEST'
+                testBtn.disabled = false
+            }
+        })
+
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                // Call logout API
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+
+                const result = await response.json()
+                
+                if (result.success) {
+                    // Reset UI state
+                    userData = {}
+                    currentStep = 'registration'
+                    
+                    // Hide dashboard and show registration form
+                    dashboard.style.display = 'none'
+                    registrationForm.style.display = 'flex'
+                    
+                    // Clear form fields
+                    document.getElementById('fullName').value = ''
+                    document.getElementById('email').value = ''
+                    document.getElementById('mobileNumber').value = ''
+                    document.getElementById('otp').value = ''
+                    
+                    // Reset button states
+                    document.getElementById('sendOtpBtn').textContent = 'Start Testing'
+                    document.getElementById('sendOtpBtn').disabled = false
+                    document.getElementById('verifyOtpBtn').textContent = 'Verify & Continue'
+                    document.getElementById('verifyOtpBtn').disabled = false
+                    document.getElementById('testBtn').textContent = 'TEST'
+                    document.getElementById('testBtn').disabled = false
+                    
+                    console.log('✅ Logged out successfully')
+                } else {
+                    console.log('⚠️ Logout failed:', result.message)
+                }
+            } catch (error) {
+                console.log('❌ Logout error:', error)
+                // Force logout on client side even if server call fails
+                userData = {}
+                currentStep = 'registration'
+                dashboard.style.display = 'none'
+                registrationForm.style.display = 'flex'
+            }
+        })
+
+        // Utility function to show messages
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId)
+            element.textContent = message
+            element.style.color = type === 'success' ? '#10B981' : '#EF4444'
+            element.style.display = 'block'
+            
+            setTimeout(() => {
+                element.style.display = 'none'
+            }, 5000)
+        }
+
+        // Auto-format mobile number
+        document.getElementById('mobileNumber').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10)
+        })
+
+        // Auto-format OTP
+        document.getElementById('otp').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6)
+        })
+    </script>
+</body>
+</html>
