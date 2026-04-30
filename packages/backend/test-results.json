@@ -99,7 +99,7 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 449283,
+                      "duration": 465182,
                       "errors": [],
                       "stdout": [
                         {
@@ -163,10 +163,10 @@
                           "text": "   💡 If you get \"Network error\", please refresh the page and try again\n"
                         },
                         {
-                          "text": "   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)\n"
+                          "text": "   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)\n🚀 Triggering OTP from MISRA platform using direct registration...\n"
                         },
                         {
-                          "text": "   Server: 🚀 TEST button clicked by Sanjana (sanjsr125@gmail.com)\n🌐 MISRA automation will start with user credentials\n"
+                          "text": "   Server: 🚀 TEST button clicked by Sanjana (sanjsr125@gmail.com)\n"
                         },
                         {
                           "text": "   ✅ TEST button clicked detected!\n"
@@ -181,7 +181,7 @@
                           "text": "     - Email: sanjsr125@gmail.com\n"
                         },
                         {
-                          "text": "     - Mobile: 9380654304\n"
+                          "text": "     - Mobile: 9380653049\n"
                         },
                         {
                           "text": "\n🟢 PHASE 2: MISRA AUTOMATION IN PLAYWRIGHT (AUTOMATIC)\n"
@@ -205,7 +205,7 @@
                           "text": "   ✅ Email filled: sanjsr125@gmail.com\n"
                         },
                         {
-                          "text": "   ✅ Mobile filled: 9380654304\n"
+                          "text": "   ✅ Mobile filled: 9380653049\n"
                         },
                         {
                           "text": "\n📍 Step 6: Auto-clicking Start button\n"
@@ -235,160 +235,160 @@
                           "text": "   ⏳ OTP Attempt 1/30 - Connecting to Gmail IMAP...\n"
                         },
                         {
-                          "text": "{\"level\":30,\"time\":1777470220176,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"connection\",\"msg\":\"Established secure TCP connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"secure\":true,\"host\":\"imap.gmail.com\",\"servername\":\"imap.gmail.com\",\"port\":993,\"address\":\"2404:6800:4003:c06::6d\",\"localAddress\":\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\",\"localPort\":52977,\"authorized\":true,\"algo\":\"TLS_AES_256_GCM_SHA384\",\"version\":\"TLSv1.3\"}\n"
+                          "text": "{\"level\":30,\"time\":1777525460358,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"connection\",\"msg\":\"Established secure TCP connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"secure\":true,\"host\":\"imap.gmail.com\",\"servername\":\"imap.gmail.com\",\"port\":993,\"address\":\"172.217.194.109\",\"localAddress\":\"10.100.47.107\",\"localPort\":62205,\"authorized\":true,\"algo\":\"TLS_AES_256_GCM_SHA384\",\"version\":\"TLSv1.3\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220422,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK Gimap ready for requests from 2409:4091:90b1:3403:447f:4e31:4a9d:570a 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525460648,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* OK Gimap ready for requests from 118.95.65.182 d2e1a72fcca58-834e8d4ba35mb110391620b3a\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220425,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"1 CAPABILITY\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525460652,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"1 CAPABILITY\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220658,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH2 AUTH=PLAIN AUTH=PLAIN-CLIENTTOKEN AUTH=OAUTHBEARER\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525460896,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH2 AUTH=PLAIN AUTH=PLAIN-CLIENTTOKEN AUTH=OAUTHBEARER\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220660,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"1 OK Thats all she wrote! 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525460899,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"1 OK Thats all she wrote! d2e1a72fcca58-834e8d4ba35mb110391620b3a\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220662,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"2 ID (\\\"name\\\" \\\"imapflow\\\" \\\"version\\\" \\\"1.3.2\\\" \\\"vendor\\\" \\\"Postal Systems\\\" \\\"support-url\\\" \\\"https://github.com/postalsys/imapflow/issues\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525460901,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"2 ID (\\\"name\\\" \\\"imapflow\\\" \\\"version\\\" \\\"1.3.2\\\" \\\"vendor\\\" \\\"Postal Systems\\\" \\\"support-url\\\" \\\"https://github.com/postalsys/imapflow/issues\\\")\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220892,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* ID (\\\"name\\\" \\\"GImap\\\" \\\"vendor\\\" \\\"Google, Inc.\\\" \\\"support-url\\\" \\\"http://support.google.com/mail\\\" \\\"remote-host\\\" \\\"2409:4091:90b1:3403:447f:4e31:4a9d:570a\\\" \\\"connection-token\\\" \\\"41be03b00d2f7-c7fd35f109dmb49422369a12\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525461129,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* ID (\\\"name\\\" \\\"GImap\\\" \\\"vendor\\\" \\\"Google, Inc.\\\" \\\"support-url\\\" \\\"http://support.google.com/mail\\\" \\\"remote-host\\\" \\\"118.95.65.182\\\" \\\"connection-token\\\" \\\"d2e1a72fcca58-834e8d4ba35mb110391620b3a\\\")\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220893,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"2 OK Success 41be03b00d2f7-c7fd35f109dmb49422369a12\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525461131,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"2 OK Success d2e1a72fcca58-834e8d4ba35mb110391620b3a\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470220896,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"3 AUTHENTICATE PLAIN\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525461135,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"3 AUTHENTICATE PLAIN\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470221132,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"+\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525461397,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"+\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470221133,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"AHNhbmpzcjEyNUBnbWFpbC5jb20AKCogdmFsdWUgaGlkZGVuICop\",\"comment\":\"Encoded response for AUTH=PLAIN\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525461398,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"AHNhbmpzcjEyNUBnbWFpbC5jb20AKCogdmFsdWUgaGlkZGVuICop\",\"comment\":\"Encoded response for AUTH=PLAIN\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470221855,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- SPECIAL-USE APPENDLIMIT=35651584\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462170,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- SPECIAL-USE APPENDLIMIT=35651584\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470221856,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"3 OK sanjsr125@gmail.com authenticated (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462172,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"3 OK sanjsr125@gmail.com authenticated (Success)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":30,\"time\":1777470221856,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"47kchr0xii3scls4yc91\",\"user\":\"sanjsr125@gmail.com\"}\n"
+                          "text": "{\"level\":30,\"time\":1777525462172,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"user\":\"sanjsr125@gmail.com\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470221857,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"4 NAMESPACE\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462214,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"4 NAMESPACE\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222222,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* NAMESPACE ((\\\"\\\" \\\"/\\\")) NIL NIL\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462576,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* NAMESPACE ((\\\"\\\" \\\"/\\\")) NIL NIL\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222224,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"4 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462578,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"4 OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222225,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"5 COMPRESS DEFLATE\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462579,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"5 COMPRESS DEFLATE\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222591,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"5 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525462992,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"5 OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222600,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"6 ENABLE CONDSTORE UTF8=ACCEPT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525463003,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"6 ENABLE CONDSTORE UTF8=ACCEPT\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222988,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* ENABLED CONDSTORE UTF8=ACCEPT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525463513,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* ENABLED CONDSTORE UTF8=ACCEPT\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222989,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"6 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525463515,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"6 OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470222993,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"7 LIST \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525463692,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"7 LIST \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223361,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* LIST (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525464335,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* LIST (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223363,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"7 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525464345,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"7 OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223363,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"8 LSUB \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525464348,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"8 LSUB \\\"\\\" \\\"INBOX\\\"\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223726,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* LSUB (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525464937,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* LSUB (\\\\HasNoChildren) \\\"/\\\" \\\"INBOX\\\"\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223727,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"8 OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525464938,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"8 OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470223744,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"9 SELECT INBOX\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465246,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"9 SELECT INBOX\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224134,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* FLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465759,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* FLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224135,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [PERMANENTFLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing \\\"\\\\\\\\*\\\")] Flags permitted.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465761,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* OK [PERMANENTFLAGS (\\\\Answered \\\\Flagged \\\\Draft \\\\Deleted \\\\Seen $NotPhishing $Phishing \\\"\\\\\\\\*\\\")] Flags permitted.\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224137,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [UIDVALIDITY 1] UIDs valid.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465762,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* OK [UIDVALIDITY 1] UIDs valid.\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224138,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 35 EXISTS\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465763,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* 37 EXISTS\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224139,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 0 RECENT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465765,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* 0 RECENT\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224139,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [UIDNEXT 36] Predicted next UID.\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465768,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* OK [UIDNEXT 38] Predicted next UID.\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224140,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* OK [HIGHESTMODSEQ 5611]\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465771,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* OK [HIGHESTMODSEQ 5855]\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224140,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"9 OK [READ-WRITE] INBOX selected. (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465775,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"9 OK [READ-WRITE] INBOX selected. (Success)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224146,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"A UID SEARCH UNSEEN\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525465787,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"A UID SEARCH UNSEEN\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224519,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* SEARCH 35\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525466314,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* SEARCH 35 37\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224520,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"A OK SEARCH completed (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525466316,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"A OK SEARCH completed (Success)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224523,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"B FETCH 35 (ENVELOPE BODY.PEEK[] X-GM-MSGID MODSEQ UID)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525466321,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"B FETCH 37 (ENVELOPE BODY.PEEK[] X-GM-MSGID MODSEQ UID)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":10,\"time\":1777470224901,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* 35 FETCH (X-GM-MSGID 1863812606969763152 UID 35 MODSEQ (5548) ENVELOPE (\\\"Wed, 29 Apr 2026 13:43:31 +0000\\\" \\\"Nice to meet you, Sanjana\\\" ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"sanjsr125\\\" \\\"gmail.com\\\")) NIL NIL NIL \\\"<a6dd87ce-63f4-bdb9-b528-8d0f9a41b56d@digitransolutions.in>\\\") BODY[] \\\"(* 6268B literal *)\\\")\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":10,\"time\":1777525466811,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* 37 FETCH (X-GM-MSGID 1863870528571860034 UID 37 MODSEQ (5845) ENVELOPE (\\\"Thu, 30 Apr 2026 05:04:09 +0000\\\" \\\"Nice to meet you, Sanjana\\\" ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"ceo\\\" \\\"digitransolutions.in\\\")) ((NIL NIL \\\"sanjsr125\\\" \\\"gmail.com\\\")) NIL NIL NIL \\\"<9f767832-05a4-3cb4-4710-fffae87677db@digitransolutions.in>\\\") BODY[] \\\"(* 6255B literal *)\\\")\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224912,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"B OK Success\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525466823,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"B OK Success\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
                           "text": "   ⭐ Priority email from CEO@digitransolutions.in detected!\n"
                         },
                         {
-                          "text": "   ✅ OTP found: 620183\n"
+                          "text": "   ✅ OTP found: 383728\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470224915,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"c\",\"msg\":\"C LOGOUT\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525466827,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"c\",\"msg\":\"C LOGOUT\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470225278,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"* BYE LOGOUT Requested\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525467396,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"* BYE LOGOUT Requested\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":20,\"time\":1777470225279,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"src\":\"s\",\"msg\":\"C OK 73 good day (Success)\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":20,\"time\":1777525467397,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"src\":\"s\",\"msg\":\"C OK 73 good day (Success)\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "{\"level\":10,\"time\":1777470225281,\"pid\":25180,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"47kchr0xii3scls4yc91\",\"msg\":\"Connection closed\",\"cid\":\"47kchr0xii3scls4yc91\"}\n"
+                          "text": "{\"level\":10,\"time\":1777525467401,\"pid\":36816,\"hostname\":\"DELL-INSPIRON\",\"component\":\"imap-connection\",\"cid\":\"0p6hmsp2taxsepmmduh7\",\"msg\":\"Connection closed\",\"cid\":\"0p6hmsp2taxsepmmduh7\"}\n"
                         },
                         {
-                          "text": "   ✅ OTP retrieved: 620183\n"
+                          "text": "   ✅ OTP retrieved: 383728\n"
                         },
                         {
                           "text": "   ✅ OTP input found with selector: input[placeholder*=\"code\" i]\n"
                         },
                         {
-                          "text": "   🔍 OTP entered verification: \"620183\"\n"
+                          "text": "   🔍 OTP entered verification: \"383728\"\n"
                         },
                         {
                           "text": "   ✅ OTP entered successfully\n"
@@ -477,7 +477,7 @@
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-04-29T13:42:38.028Z",
+                      "startTime": "2026-04-30T05:03:06.187Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -497,8 +497,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-04-29T13:42:34.001Z",
-    "duration": 461376.419,
+    "startTime": "2026-04-30T05:03:04.721Z",
+    "duration": 475711.28,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,
