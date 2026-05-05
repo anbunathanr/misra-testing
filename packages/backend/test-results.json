@@ -85,7 +85,7 @@
           "specs": [
             {
               "title": "Complete Hybrid Workflow - Regular Browser to Playwright Automation",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -98,9 +98,28 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "interrupted",
-                      "duration": 194756,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 307813,
+                      "error": {
+                        "message": "Error: TEST button was not clicked within 5 minutes",
+                        "stack": "Error: TEST button was not clicked within 5 minutes\n    at D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts:334:13",
+                        "location": {
+                          "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts",
+                          "column": 13,
+                          "line": 334
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 332 |\u001b[39m     \n \u001b[90m 333 |\u001b[39m     \u001b[36mif\u001b[39m (\u001b[33m!\u001b[39mtestButtonClicked) {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 334 |\u001b[39m       \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m'TEST button was not clicked within 5 minutes'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m             \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 335 |\u001b[39m     }\n \u001b[90m 336 |\u001b[39m     \n \u001b[90m 337 |\u001b[39m     \u001b[90m// Fetch user credentials from localhost\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts",
+                            "column": 13,
+                            "line": 334
+                          },
+                          "message": "Error: TEST button was not clicked within 5 minutes\n\n\u001b[0m \u001b[90m 332 |\u001b[39m     \n \u001b[90m 333 |\u001b[39m     \u001b[36mif\u001b[39m (\u001b[33m!\u001b[39mtestButtonClicked) {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 334 |\u001b[39m       \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m'TEST button was not clicked within 5 minutes'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m             \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 335 |\u001b[39m     }\n \u001b[90m 336 |\u001b[39m     \n \u001b[90m 337 |\u001b[39m     \u001b[90m// Fetch user credentials from localhost\u001b[39m\u001b[0m\n\u001b[2m    at D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts:334:13\u001b[22m"
+                        }
+                      ],
                       "stdout": [
                         {
                           "text": "🚀 Starting Complete Hybrid Workflow\n"
@@ -163,7 +182,7 @@
                           "text": "   💡 If you get \"Network error\", please refresh the page and try again\n"
                         },
                         {
-                          "text": "   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)\n🚀 Triggering OTP from MISRA platform using direct registration...\n"
+                          "text": "   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)\n"
                         },
                         {
                           "text": "   Server Error: ❌ Error triggering OTP: Could not find name input field on the page\n"
@@ -187,7 +206,13 @@
                           "text": "   📧 User: sanjsr125@gmail.com\n"
                         },
                         {
-                          "text": "   Server Error: ^C\n"
+                          "text": "   📊 Session status: OTP verified=false, Test running=false\n"
+                        },
+                        {
+                          "text": "   📧 User: sanjsr125@gmail.com\n"
+                        },
+                        {
+                          "text": "   ❌ Timeout waiting for TEST button click\n"
                         },
                         {
                           "text": "🧹 Cleaning up...\n"
@@ -201,12 +226,28 @@
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-05-05T06:32:48.158Z",
+                      "startTime": "2026-05-05T06:58:35.574Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\Code\\misra-testing\\packages\\backend\\test-results\\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "D:\\Code\\misra-testing\\packages\\backend\\test-results\\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts",
+                        "column": 13,
+                        "line": 334
+                      }
                     }
                   ],
-                  "status": "skipped"
+                  "status": "unexpected"
                 }
               ],
               "id": "2f700de134a19194b2fc-2ef24902cefa79f2ba67",
@@ -221,11 +262,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-05T06:32:46.099Z",
-    "duration": 205460.558,
+    "startTime": "2026-05-05T06:58:31.255Z",
+    "duration": 321891.049,
     "expected": 0,
-    "skipped": 1,
-    "unexpected": 0,
+    "skipped": 0,
+    "unexpected": 1,
     "flaky": 0
   }
 }
