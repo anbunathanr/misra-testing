@@ -1,0 +1,41 @@
+{
+  "sessionId": "session-1778060334874-q4g98skdq",
+  "startTime": "2026-05-06T09:38:54.874Z",
+  "endTime": "2026-05-06T09:42:57.767Z",
+  "totalFiles": 3,
+  "verifiedFiles": 3,
+  "failedFiles": 0,
+  "totalSize": 4025,
+  "files": [
+    {
+      "filename": "misra-fixed.c",
+      "filepath": "downloads\\session-2026-05-06-09-38-54\\misra-fixed.c",
+      "size": 76,
+      "type": "fixed-code",
+      "verified": true,
+      "verificationDetails": "✅ File exists | ✅ File size valid (76 Bytes) | ✅ File format valid (.c) | ✅ Fixed code syntax verified",
+      "timestamp": "2026-05-06T09:42:34.084Z",
+      "downloadDuration": 773
+    },
+    {
+      "filename": "misra-check-report.md",
+      "filepath": "downloads\\session-2026-05-06-09-38-54\\misra-check-report.md",
+      "size": 2891,
+      "type": "report",
+      "verified": true,
+      "verificationDetails": "✅ File exists | ✅ File size valid (2.82 KB) | ✅ Report content verified",
+      "timestamp": "2026-05-06T09:42:36.641Z",
+      "downloadDuration": 409
+    },
+    {
+      "filename": "misra-fix-report.md",
+      "filepath": "downloads\\session-2026-05-06-09-38-54\\misra-fix-report.md",
+      "size": 1058,
+      "type": "report",
+      "verified": true,
+      "verificationDetails": "✅ File exists | ✅ File size valid (1.03 KB) | ✅ Report content verified",
+      "timestamp": "2026-05-06T09:42:43.131Z",
+      "downloadDuration": 432
+    }
+  ]
+}

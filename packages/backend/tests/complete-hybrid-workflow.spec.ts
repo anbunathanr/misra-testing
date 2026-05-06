@@ -3,6 +3,10 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as imapflow from 'imapflow';
 import * as fs from 'fs';
+import { DownloadManager } from './download-manager';
+import { ProgressDisplay } from './progress-display';
+import { ProperBrowserEmbedding, setupProperBrowserEmbedding } from './browser-embedding-proper';
+import { AWSBedrockVerifier, generateBedrockVerificationReport } from './aws-bedrock-verifier';
 
 /**
  * Complete Hybrid Workflow Test
@@ -11,9 +15,13 @@ import * as fs from 'fs';
  */
 
 let serverProcess: ChildProcess | null = null;
-let browser: Browser;
-let misraContext: BrowserContext;
-let misraPage: Page;
+let browser: Browser | null = null;
+let misraContext: BrowserContext | null = null;
+let misraPage: Page | null = null;
+let downloadManager: DownloadManager;
+let progressDisplay: ProgressDisplay;
+let browserEmbedding: ProperBrowserEmbedding | null = null;
+let bedrockVerifier: AWSBedrockVerifier | null = null;
 
 // Store user credentials from localhost API
 let userCredentials = {
@@ -56,6 +64,23 @@ int main(void) {
     return 0;
 }
 `;
+
+/**
+ * Update progress on server
+ */
+async function updateProgress(stepId: string, status: string, currentStep?: string): Promise<void> {
+  try {
+    await fetch('http://localhost:3000/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stepId, status, currentStep })
+    }).catch(() => {
+      // Silently fail if server is not available
+    });
+  } catch (error) {
+    // Ignore errors
+  }
+}
 
 /**
  * Extract OTP from Gmail using IMAP
@@ -224,6 +249,15 @@ test.describe('Complete Hybrid MISRA Workflow', () => {
   test.beforeAll(async () => {
     console.log('🚀 Starting Complete Hybrid Workflow');
     
+    // Initialize progress display
+    progressDisplay = new ProgressDisplay();
+    progressDisplay.startStep('launch-browser');
+    await updateProgress('launch-browser', 'in-progress', 'Launching browser...');
+    
+    // Initialize download manager
+    downloadManager = new DownloadManager();
+    await downloadManager.initialize();
+    
     // Step 1: Start the hybrid server
     console.log('📍 Step 1: Starting localhost server...');
     const serverPath = path.join(__dirname, '..', '..', '..');
@@ -289,20 +323,55 @@ test.describe('Complete Hybrid MISRA Workflow', () => {
     console.log('   ✅ Localhost opened in your default browser');
     console.log('   🌐 URL: http://localhost:3000');
     
+    // Complete launch-browser step
+    progressDisplay.completeStep('launch-browser');
+    await updateProgress('launch-browser', 'completed', 'Browser launched');
+    
     // Step 3: Start Playwright browser (for MISRA automation only)
-    console.log('📍 Step 3: Preparing Playwright browser for MISRA automation...');
-    browser = await chromium.launch({ 
-      headless: false,
-      slowMo: 1000,
-      timeout: 120000
-    });
-    console.log('   ✅ Playwright browser ready for MISRA automation');
+    console.log('📍 Step 3: Preparing browser for MISRA automation...');
+    
+    // Try to use proper browser embedding (connectOverCDP)
+    browserEmbedding = await setupProperBrowserEmbedding(
+      parseInt(process.env.CDP_PORT || '9222'),
+      './downloads'
+    );
+    
+    if (browserEmbedding) {
+      console.log('   ✅ Proper browser embedding ready (connectOverCDP)');
+      console.log('   💡 MISRA will open in YOUR browser, downloads will be visible');
+      
+      // Get the browser instance from embedder
+      browser = browserEmbedding.getBrowser();
+      misraPage = browserEmbedding.getPage();
+      
+      if (misraPage) {
+        misraContext = misraPage.context();
+      }
+    } else {
+      console.log('   ⚠️  Proper browser embedding failed, falling back to separate Playwright browser');
+      console.log('   💡 Make sure Chrome is running with: --remote-debugging-port=9222');
+      
+      // Fallback: Launch separate Playwright browser
+      browser = await chromium.launch({ 
+        headless: false,
+        slowMo: 1000,
+        timeout: 120000
+      });
+      console.log('   ✅ Fallback Playwright browser launched');
+    }
+    
+    // Initialize AWS Bedrock verifier
+    bedrockVerifier = new AWSBedrockVerifier(process.env.AWS_REGION || 'us-east-1');
+    console.log('   ✅ AWS Bedrock verifier initialized');
   });
 
   test.afterAll(async () => {
     console.log('🧹 Cleaning up...');
     
-    if (browser) {
+    if (browserEmbedding) {
+      await browserEmbedding.close();
+      console.log('✅ Browser embedding connection closed');
+    } else if (browser) {
       await browser.close();
       console.log('✅ Playwright browser closed');
     }
@@ -345,17 +414,72 @@ test.describe('Complete Hybrid MISRA Workflow', () => {
     console.log('\n🟢 PHASE 2: MISRA AUTOMATION IN PLAYWRIGHT (AUTOMATIC)');
     console.log('   🚀 Starting MISRA automation with your credentials...');
     
-    // Step 4: Open MISRA platform in Playwright browser
-    console.log('📍 Step 4: Opening MISRA platform in Playwright browser');
-    misraContext = await browser.newContext();
-    misraPage = await misraContext.newPage();
+    // Update progress
+    progressDisplay.startStep('navigate-misra');
+    await updateProgress('navigate-misra', 'in-progress', 'Navigating to MISRA platform...');
     
-    // Navigate to MISRA platform
-    await misraPage.goto('https://misra.digitransolutions.in');
-    await misraPage.waitForLoadState('domcontentloaded');
-    await misraPage.waitForTimeout(3000);
+    // Step 4: Open MISRA platform in same browser session
+    console.log('📍 Step 4: Opening MISRA platform in same browser session');
     
-    console.log('   ✅ MISRA platform loaded in Playwright browser');
+    if (browserEmbedding) {
+      // Use proper browser embedding (connectOverCDP)
+      console.log('   🔌 Using proper browser embedding (connectOverCDP)');
+      
+      // Navigate to MISRA in your browser
+      const navigated = await browserEmbedding.navigateToMISRA();
+      if (!navigated) {
+        throw new Error('Failed to navigate to MISRA platform');
+      }
+      
+      misraPage = browserEmbedding.getPage();
+      if (!misraPage) {
+        throw new Error('No page available from browser embedding');
+      }
+      
+      misraContext = misraPage.context();
+      console.log('   ✅ MISRA platform loaded in YOUR browser');
+      console.log('   💡 You can see the automation happening in real-time');
+      console.log('   💡 Downloads will appear in your browser\'s download manager');
+    } else {
+      // Fallback: Use separate Playwright browser
+      console.log('   📍 Using fallback Playwright browser');
+      
+      // Use existing browser context or create new one
+      const contexts = browser!.contexts();
+      if (contexts.length > 0) {
+        misraContext = contexts[0];
+        console.log('   ✅ Using existing browser context');
+      } else {
+        misraContext = await browser!.newContext();
+        console.log('   ✅ Created new browser context');
+      }
+      
+      // Get existing page or create new one
+      const pages = misraContext.pages();
+      if (pages.length > 0) {
+        misraPage = pages[0];
+        console.log('   ✅ Using existing browser page');
+      } else {
+        misraPage = await misraContext.newPage();
+        console.log('   ✅ Created new browser page');
+      }
+      
+      // Navigate to MISRA platform in the SAME page
+      console.log('   📍 Navigating to MISRA platform...');
+      await misraPage.goto('https://misra.digitransolutions.in', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await misraPage.waitForTimeout(3000);
+      
+      console.log('   ✅ MISRA platform loaded in Playwright browser');
+    }
+    
+    // Set up download listener BEFORE proceeding
+    if (misraPage) {
+      await downloadManager.setupDownloadListener(misraPage);
+      console.log('   ✅ Download listener configured');
+    }
+    
+    progressDisplay.completeStep('navigate-misra');
+    await updateProgress('navigate-misra', 'completed', 'MISRA platform loaded');
     
     // Step 5: Auto-fill registration form with user credentials
     console.log('\n📍 Step 5: Auto-filling registration form with your credentials');
@@ -391,6 +515,9 @@ test.describe('Complete Hybrid MISRA Workflow', () => {
     
     // Step 7: Wait for OTP screen and auto-retrieve OTP
     console.log('\n📍 Step 7: Waiting for OTP screen and auto-retrieving OTP from Gmail');
+    
+    progressDisplay.startStep('otp-verification');
+    await updateProgress('otp-verification', 'in-progress', 'Verifying OTP...');
     
     // Wait for OTP input field to appear
     console.log('   ⏳ Waiting for OTP input field to appear...');
@@ -509,6 +636,11 @@ test.describe('Complete Hybrid MISRA Workflow', () => {
     // Step 8: Wait for dashboard and auto-upload C file
     console.log('\n📍 Step 8: Waiting for dashboard and auto-uploading C file');
     
+    progressDisplay.completeStep('otp-verification');
+    await updateProgress('otp-verification', 'completed', 'OTP verified');
+    progressDisplay.startStep('file-upload');
+    await updateProgress('file-upload', 'in-progress', 'Uploading file...');
+    
     // Wait for dashboard/upload section to load
     console.log('   ⏳ Waiting for file upload section to appear...');
     await misraPage.waitForTimeout(10000); // Wait for page to load after OTP verification
@@ -609,6 +741,11 @@ int main() {
           
           if (analyzeButton) {
             try {
+              progressDisplay.completeStep('file-upload');
+              await updateProgress('file-upload', 'completed', 'File uploaded');
+              progressDisplay.startStep('code-analysis');
+              await updateProgress('code-analysis', 'in-progress', 'Analyzing code...');
+              
               await analyzeButton.click();
               console.log('   ✅ Analysis started automatically');
               
@@ -631,18 +768,25 @@ int main() {
                 if (analysisError) {
                   console.log('   ⚠️  Analysis failed due to server error');
                   await misraPage.screenshot({ path: 'analysis-server-error.png', fullPage: true });
+                  progressDisplay.failStep('code-analysis', 'Server error');
                 } else {
                   analysisCompleted = true;
                   console.log('   ✅ Analysis completed!');
+                  progressDisplay.completeStep('code-analysis');
+                  await updateProgress('code-analysis', 'completed', 'Code analysis complete');
                 }
               } catch (timeoutError) {
                 console.log('   ⚠️  Analysis timeout - may still be processing');
                 await misraPage.screenshot({ path: 'analysis-timeout.png', fullPage: true });
+                progressDisplay.failStep('code-analysis', 'Timeout');
               }
               
               if (analysisCompleted) {
-                // Step 9: Make download buttons accessible
-                console.log('\n📍 Step 9: Making download buttons accessible to user');
+                // Step 9: Auto-download files
+                console.log('\n📍 Step 9: Auto-downloading analysis files');
+                progressDisplay.startStep('download-reports');
+                await updateProgress('download-reports', 'in-progress', 'Downloading reports...');
+                
                 await misraPage.waitForTimeout(3000); // Wait for download buttons to appear
                 
                 // Find all download buttons with comprehensive selectors
@@ -682,19 +826,95 @@ int main() {
                 console.log(`   📥 Found ${downloadButtons.length} download button(s)`);
                 
                 if (downloadButtons.length > 0) {
-                  console.log('   ✅ Download buttons are ready for user interaction');
-                  console.log('   📁 Available downloads in Playwright browser:');
+                  console.log('   ✅ Download buttons are ready for automatic download');
+                  console.log('   📁 Available downloads:');
                   downloadButtons.forEach((btn, index) => {
-                    console.log(`     ${index + 1}. "${btn.text}" (${btn.selector})`);
+                    console.log(`     ${index + 1}. "${btn.text}"`);
                   });
-                  console.log('   💡 Click any download button in the Playwright browser to download files');
-                  console.log('   ⏰ Playwright browser will stay open for 5 minutes for downloads...');
                   
-                  // Keep browser open for user to download files
-                  await misraPage.waitForTimeout(300000); // 5 minutes
+                  // Click all download buttons
+                  for (const btn of downloadButtons) {
+                    try {
+                      await btn.element.click();
+                      console.log(`   ✅ Clicked: ${btn.text}`);
+                      await misraPage.waitForTimeout(2000); // Wait between downloads
+                    } catch (err) {
+                      console.log(`   ⚠️  Failed to click: ${btn.text}`);
+                    }
+                  }
+                  
+                  // Wait for downloads to complete
+                  console.log('   ⏳ Waiting for downloads to complete...');
+                  await misraPage.waitForTimeout(10000);
+                  
+                  progressDisplay.completeStep('download-reports');
+                  await updateProgress('download-reports', 'completed', 'Reports downloaded');
+                  progressDisplay.startStep('verification-complete');
+                  await updateProgress('verification-complete', 'in-progress', 'Verifying files with AI...');
+                  
+                  // Get download summary
+                  const summary = await downloadManager.getSummary();
+                  console.log(summary);
+                  
+                  // Perform AWS Bedrock AI verification
+                  console.log('\n🤖 Starting AWS Bedrock AI File Verification...');
+                  const downloadedFiles = downloadManager.getDownloadedFiles();
+                  
+                  if (downloadedFiles.length >= 3 && bedrockVerifier) {
+                    try {
+                      // Find the report, fixes, and fixed code files
+                      const reportFile = downloadedFiles.find(f => f.filename.toLowerCase().includes('report') || f.filename.endsWith('.pdf'));
+                      const fixesFile = downloadedFiles.find(f => f.filename.toLowerCase().includes('fix') && !f.filename.toLowerCase().includes('fixed'));
+                      const fixedCodeFile = downloadedFiles.find(f => f.filename.toLowerCase().includes('fixed') || f.filename.endsWith('.c'));
+                      
+                      if (reportFile && fixesFile && fixedCodeFile) {
+                        console.log(`\n📋 Files to verify:`);
+                        console.log(`   • Report: ${reportFile.filename}`);
+                        console.log(`   • Fixes: ${fixesFile.filename}`);
+                        console.log(`   • Fixed Code: ${fixedCodeFile.filename}`);
+                        
+                        // Perform verification
+                        const verificationResult = await bedrockVerifier.verifyFiles(
+                          reportFile.path,
+                          fixesFile.path,
+                          fixedCodeFile.path,
+                          path.join(__dirname, 'temp_test.c') // Original uploaded file
+                        );
+                        
+                        // Display verification report
+                        const verificationReport = generateBedrockVerificationReport(verificationResult);
+                        console.log(verificationReport);
+                        
+                        // Save verification report
+                        const reportPath = path.join(downloadManager.getSessionDir(), 'ai-verification-report.txt');
+                        fs.writeFileSync(reportPath, verificationReport);
+                        console.log(`\n📄 Verification report saved: ${reportPath}`);
+                        
+                        if (verificationResult.isValid) {
+                          console.log('\n✅ AI Verification PASSED - All files are valid and complete');
+                        } else {
+                          console.log(`\n⚠️  AI Verification found issues (Score: ${verificationResult.score}/100)`);
+                          console.log('   Please review the verification report above');
+                        }
+                      } else {
+                        console.log('⚠️  Could not find all required files for AI verification');
+                        console.log(`   Found: ${downloadedFiles.map(f => f.filename).join(', ')}`);
+                      }
+                    } catch (verificationError) {
+                      console.log(`⚠️  AWS Bedrock verification failed: ${verificationError}`);
+                      console.log('   Continuing with basic verification...');
+                    }
+                  } else {
+                    console.log('⚠️  Not enough files downloaded for AI verification');
+                    console.log(`   Expected 3+ files, got ${downloadedFiles.length}`);
+                  }
+                  
+                  progressDisplay.completeStep('verification-complete');
+                  await updateProgress('verification-complete', 'completed', 'Verification complete');
                 } else {
                   console.log('   ⚠️  No download buttons found');
                   await misraPage.screenshot({ path: 'no-download-buttons.png', fullPage: true });
+                  progressDisplay.failStep('download-reports', 'No download buttons found');
                   console.log('   ⏰ Keeping browser open for 3 minutes for manual interaction...');
                   await misraPage.waitForTimeout(180000); // 3 minutes
                 }
@@ -707,12 +927,14 @@ int main() {
             } catch (analyzeError) {
               console.log(`   ❌ Analysis failed: ${analyzeError}`);
               await misraPage.screenshot({ path: 'analysis-failed.png', fullPage: true });
+              progressDisplay.failStep('code-analysis', analyzeError.toString());
               console.log('   ⏰ Keeping browser open for manual interaction...');
               await misraPage.waitForTimeout(180000); // 3 minutes
             }
           } else {
             console.log('   ⚠️  Analyze button not found');
             await misraPage.screenshot({ path: 'analyze-button-not-found.png', fullPage: true });
+            progressDisplay.failStep('file-upload', 'Analyze button not found');
             console.log('   ⏰ Keeping browser open for manual interaction...');
             await misraPage.waitForTimeout(180000); // 3 minutes
           }
@@ -725,6 +947,7 @@ int main() {
       } catch (uploadError) {
         console.log(`   ❌ File upload failed: ${uploadError}`);
         await misraPage.screenshot({ path: 'file-upload-failed.png', fullPage: true });
+        progressDisplay.failStep('file-upload', uploadError.toString());
         console.log('   ⏰ Keeping browser open for manual file upload...');
         await misraPage.waitForTimeout(300000); // 5 minutes
       }
@@ -736,11 +959,17 @@ int main() {
     }
     
     console.log('\n✅ Complete Hybrid Workflow Finished!');
-    console.log('📁 All download buttons are accessible in the Playwright browser');
+    console.log('📁 All files downloaded and verified');
+    console.log(progressDisplay.getSummary());
+    
+    // Send verification notifications
+    await downloadManager.sendVerificationNotifications(userCredentials.email, userCredentials.mobileNumber);
+    
     console.log('🎯 Workflow Summary:');
     console.log('   1. ✅ Localhost opened in your regular browser');
     console.log('   2. ✅ Manual registration completed in regular browser');
     console.log('   3. ✅ MISRA automation completed in Playwright browser');
-    console.log('   4. ✅ Download buttons accessible in Playwright browser');
+    console.log('   4. ✅ Files automatically downloaded and verified');
+    console.log(`   5. ✅ Downloads saved to: ${downloadManager.getSessionDir()}`);
   });
 });

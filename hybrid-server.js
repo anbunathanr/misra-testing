@@ -3,9 +3,15 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const { spawn } = require('child_process')
 const path = require('path')
+const WebSocket = require('ws')
+const http = require('http')
 
 const app = express()
 const PORT = 3000
+
+// Create HTTP server for WebSocket support
+const server = http.createServer(app)
+const wss = new WebSocket.Server({ server })
 
 // Middleware
 app.use(cors())
@@ -19,6 +25,63 @@ let sessionData = {
   mobileNumber: '',
   otpVerified: false,
   testRunning: false
+}
+
+// WebSocket clients for real-time updates
+let wsClients = new Set()
+
+// WebSocket connection handler
+wss.on('connection', (ws) => {
+  console.log('🔌 WebSocket client connected')
+  wsClients.add(ws)
+
+  // Send initial progress state
+  ws.send(JSON.stringify({
+    type: 'progress',
+    data: progressData
+  }))
+
+  // Handle client disconnect
+  ws.on('close', () => {
+    console.log('🔌 WebSocket client disconnected')
+    wsClients.delete(ws)
+  })
+
+  // Handle errors
+  ws.on('error', (error) => {
+    console.log(`⚠️  WebSocket error: ${error}`)
+    wsClients.delete(ws)
+  })
+})
+
+// Function to broadcast progress updates to all connected clients
+function broadcastProgress(update) {
+  const message = JSON.stringify({
+    type: 'progress',
+    data: update,
+    timestamp: new Date().toISOString()
+  })
+
+  wsClients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message)
+    }
+  })
+}
+
+// Progress tracking
+let progressData = {
+  isRunning: false,
+  currentStep: '',
+  steps: [
+    { id: 'launch-browser', name: 'Launch Browser', status: 'pending' },
+    { id: 'navigate-misra', name: 'Navigate to MISRA', status: 'pending' },
+    { id: 'otp-verification', name: 'OTP Verification', status: 'pending' },
+    { id: 'file-upload', name: 'File Upload', status: 'pending' },
+    { id: 'code-analysis', name: 'Code Analysis', status: 'pending' },
+    { id: 'download-reports', name: 'Download Reports', status: 'pending' },
+    { id: 'verification-complete', name: 'Verification Complete', status: 'pending' }
+  ]
 }
 
 // Routes
@@ -368,6 +431,43 @@ app.post('/api/logout', (req, res) => {
   })
 })
 
+// API to get progress updates
+app.get('/api/progress', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      isRunning: progressData.isRunning,
+      currentStep: progressData.currentStep,
+      steps: progressData.steps
+    }
+  })
+})
+
+// API to update progress (called by Playwright test)
+app.post('/api/progress', (req, res) => {
+  const { stepId, status, currentStep } = req.body
+  
+  if (stepId) {
+    const step = progressData.steps.find(s => s.id === stepId)
+    if (step) {
+      step.status = status
+      console.log(`📊 Progress: ${step.name} - ${status}`)
+    }
+  }
+  
+  if (currentStep) {
+    progressData.currentStep = currentStep
+  }
+  
+  // Broadcast progress update to all WebSocket clients
+  broadcastProgress(progressData)
+  
+  res.json({
+    success: true,
+    message: 'Progress updated'
+  })
+})
+
 // API to start test (opens MISRA platform AND starts E2E automation)
 app.post('/api/start-test', (req, res) => {
   if (!sessionData.otpVerified) {
@@ -385,24 +485,34 @@ app.post('/api/start-test', (req, res) => {
   }
 
   sessionData.testRunning = true
+  progressData.isRunning = true
+  
+  // Reset progress steps
+  progressData.steps.forEach(step => {
+    step.status = 'pending'
+  })
+  progressData.currentStep = 'Initializing automation...'
+  
   console.log(`🚀 TEST button clicked by ${sessionData.fullName} (${sessionData.email})`)
-  console.log(`🌐 MISRA automation will start with user credentials`)
+  console.log(`🌐 MISRA will navigate in the SAME browser tab`)
   console.log(`📧 User Email: ${sessionData.email}`)
   console.log(`👤 User Name: ${sessionData.fullName}`)
   console.log(`📱 User Mobile: ${sessionData.mobileNumber}`)
+  console.log(`💡 IMPORTANT: Keep your browser window open - MISRA will load in the same tab`)
 
   // Note: When using npm run test:complete, the Playwright test handles the MISRA automation
   // This API just confirms the TEST button was clicked and credentials are ready
 
   res.json({
     success: true,
-    message: 'TEST button clicked - MISRA automation will start automatically',
+    message: 'TEST button clicked - MISRA will navigate in the SAME browser tab',
     userData: {
       fullName: sessionData.fullName,
       email: sessionData.email,
       mobileNumber: sessionData.mobileNumber
     },
-    misraUrl: 'https://misra.digitransolutions.in'
+    misraUrl: 'https://misra.digitransolutions.in',
+    note: 'MISRA will open in the same browser tab where you are now'
   })
 })
 
@@ -482,25 +592,28 @@ function startE2EAutomation() {
   }
 }
 
-// Start server with error handling
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Hybrid MISRA Testing Server running on http://localhost:${PORT}`)
-  console.log(`📊 Dashboard: http://localhost:${PORT}`)
-  console.log(`🔧 Session Data: ${JSON.stringify(sessionData, null, 2)}`)
-  console.log(`📁 Working Directory: ${__dirname}`)
-  console.log(`🎭 Playwright Path: ${path.join(__dirname, 'packages', 'backend')}`)
-})
+// Start server with error handling and port fallback
+function startServer(port) {
+  server.listen(port, () => {
+    console.log(`🚀 Hybrid MISRA Testing Server running on http://localhost:${port}`)
+    console.log(`📊 Dashboard: http://localhost:${port}`)
+    console.log(`🔌 WebSocket: ws://localhost:${port}`)
+    console.log(`🔧 Session Data: ${JSON.stringify(sessionData, null, 2)}`)
+    console.log(`📁 Working Directory: ${__dirname}`)
+    console.log(`🎭 Playwright Path: ${path.join(__dirname, 'packages', 'backend')}`)
+  })
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`❌ Port ${PORT} is already in use!`)
-    console.log(`💡 To fix this:`)
-    console.log(`   1. Kill the existing process: netstat -ano | findstr :${PORT}`)
-    console.log(`   2. Or use a different port: set PORT=3001 && npm run hybrid`)
-    console.log(`   3. Or restart your terminal and try again`)
-    process.exit(1)
-  } else {
-    console.error(`❌ Server error:`, err)
-    process.exit(1)
-  }
-})
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️  Port ${port} is already in use!`)
+      const nextPort = port + 1
+      console.log(`🔄 Trying port ${nextPort}...`)
+      startServer(nextPort)
+    } else {
+      console.error(`❌ Server error:`, err)
+      process.exit(1)
+    }
+  })
+}
+
+startServer(PORT)

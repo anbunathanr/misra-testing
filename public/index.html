@@ -158,6 +158,16 @@
                 </button>
                 
                 <div id="testMessage" class="mt-6 text-center hidden"></div>
+                
+                <!-- Progress Display Below TEST Button - HIDDEN -->
+                <!-- Progress is now only shown in terminal output, not in browser UI -->
+                <div id="progressDisplay" class="mt-8 p-6 bg-gray-50 rounded-lg hidden" style="display: none !important;">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Automation Progress</h3>
+                    <div id="progressSteps" class="space-y-3">
+                        <!-- Progress steps will be inserted here -->
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -166,12 +176,145 @@
         // State management
         let currentStep = 'registration'
         let userData = {}
+        let progressSteps = [
+            { id: 'launch-browser', name: 'Launch Browser', status: 'pending' },
+            { id: 'navigate-misra', name: 'Navigate to MISRA', status: 'pending' },
+            { id: 'otp-verification', name: 'OTP Verification', status: 'pending' },
+            { id: 'file-upload', name: 'File Upload', status: 'pending' },
+            { id: 'code-analysis', name: 'Code Analysis', status: 'pending' },
+            { id: 'download-reports', name: 'Download Reports', status: 'pending' },
+            { id: 'verification-complete', name: 'Verification Complete', status: 'pending' }
+        ]
+        let progressWebSocket = null
+        let wsConnected = false
 
         // DOM elements
         const regForm = document.getElementById('regForm')
         const registrationForm = document.getElementById('registrationForm')
         const otpFormDiv = document.getElementById('otpForm')
         const dashboard = document.getElementById('dashboard')
+        const progressDisplay = document.getElementById('progressDisplay')
+        const progressStepsDiv = document.getElementById('progressSteps')
+
+        // Initialize WebSocket connection
+        function initializeWebSocket() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+                progressWebSocket = new WebSocket(`${protocol}//${window.location.host}`)
+
+                progressWebSocket.onopen = () => {
+                    console.log('✅ WebSocket connected')
+                    wsConnected = true
+                }
+
+                progressWebSocket.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data)
+                        if (message.type === 'progress') {
+                            updateProgressDisplay(message.data)
+                        }
+                    } catch (error) {
+                        console.log('⚠️  Failed to parse WebSocket message:', error)
+                    }
+                }
+
+                progressWebSocket.onerror = (error) => {
+                    console.log('⚠️  WebSocket error:', error)
+                    wsConnected = false
+                    // Fall back to polling
+                    startProgressPolling()
+                }
+
+                progressWebSocket.onclose = () => {
+                    console.log('🔌 WebSocket disconnected')
+                    wsConnected = false
+                    // Fall back to polling
+                    startProgressPolling()
+                }
+            } catch (error) {
+                console.log('⚠️  WebSocket initialization failed:', error)
+                // Fall back to polling
+                startProgressPolling()
+            }
+        }
+
+        // Update progress display
+        function updateProgressDisplay(data) {
+            if (!data || !data.steps) return
+
+            // Update progress steps
+            progressSteps = data.steps
+
+            // Render progress display
+            if (progressStepsDiv) {
+                progressStepsDiv.innerHTML = ''
+                progressSteps.forEach((step, index) => {
+                    const stepEl = document.createElement('div')
+                    stepEl.className = 'flex items-center p-2 rounded'
+
+                    let statusIcon = ''
+                    let statusClass = ''
+
+                    switch (step.status) {
+                        case 'completed':
+                            statusIcon = '✅'
+                            statusClass = 'text-green-600'
+                            break
+                        case 'in-progress':
+                            statusIcon = '⏳'
+                            statusClass = 'text-blue-600'
+                            break
+                        case 'failed':
+                            statusIcon = '❌'
+                            statusClass = 'text-red-600'
+                            break
+                        case 'pending':
+                            statusIcon = '⭕'
+                            statusClass = 'text-gray-400'
+                            break
+                    }
+
+                    stepEl.innerHTML = `
+                        <span class="text-xl mr-3 ${statusClass}">${statusIcon}</span>
+                        <span class="font-medium flex-1">${index + 1}. ${step.name}</span>
+                        ${step.duration ? `<span class="text-sm text-gray-600">${(step.duration / 1000).toFixed(2)}s</span>` : ''}
+                    `
+                    progressStepsDiv.appendChild(stepEl)
+                })
+
+                // Show progress display if any step is not pending
+                const hasProgress = progressSteps.some(s => s.status !== 'pending')
+                if (hasProgress && progressDisplay) {
+                    progressDisplay.style.display = 'block'
+                }
+            }
+        }
+
+        // Polling fallback for progress updates
+        let pollingInterval = null
+        function startProgressPolling() {
+            if (pollingInterval) return
+
+            console.log('📡 Starting progress polling (WebSocket fallback)')
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/progress')
+                    const result = await response.json()
+                    if (result.success && result.data) {
+                        updateProgressDisplay(result.data)
+                    }
+                } catch (error) {
+                    console.log('⚠️  Polling error:', error)
+                }
+            }, 1000) // Poll every 1 second
+        }
+
+        function stopProgressPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval)
+                pollingInterval = null
+            }
+        }
 
         // Step 1: Registration
         regForm.addEventListener('submit', async (e) => {
@@ -272,6 +415,9 @@
             testBtn.disabled = true
 
             try {
+                // Initialize WebSocket for real-time progress (but don't display in browser)
+                // initializeWebSocket() - DISABLED, progress only in terminal
+
                 // Call the API to start automation
                 const response = await fetch('/api/start-test', {
                     method: 'POST',
@@ -281,33 +427,34 @@
                 const result = await response.json()
                 
                 if (result.success) {
-                    showMessage('testMessage', 'Opening MISRA platform and starting automation...', 'success')
+                    showMessage('testMessage', 'Automation started! Watch the terminal for progress updates...', 'success')
                     
-                    // Open MISRA platform in new tab
-                    setTimeout(() => {
-                        console.log('🌐 Opening MISRA platform: https://misra.digitransolutions.in')
-                        window.open('https://misra.digitransolutions.in', '_blank')
-                        
-                        // Update button state
-                        testBtn.textContent = '✅ Automation Running'
-                        
-                        showMessage('testMessage', 'MISRA platform opened. E2E automation started in background.', 'success')
-                    }, 1000)
+                    // Update button state
+                    testBtn.textContent = '✅ Automation Running'
+                    
                 } else {
                     showMessage('testMessage', result.message, 'error')
                     testBtn.textContent = 'TEST'
                     testBtn.disabled = false
+                    stopProgressPolling()
                 }
             } catch (error) {
                 showMessage('testMessage', 'Network error. Please try again.', 'error')
                 testBtn.textContent = 'TEST'
                 testBtn.disabled = false
+                stopProgressPolling()
             }
         })
 
         // Logout functionality
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             try {
+                // Stop progress polling and close WebSocket
+                stopProgressPolling()
+                if (progressWebSocket) {
+                    progressWebSocket.close()
+                }
+
                 // Call logout API
                 const response = await fetch('/api/logout', {
                     method: 'POST',
@@ -339,6 +486,11 @@
                     document.getElementById('testBtn').textContent = 'TEST'
                     document.getElementById('testBtn').disabled = false
                     
+                    // Hide progress display
+                    if (progressDisplay) {
+                        progressDisplay.style.display = 'none'
+                    }
+                    
                     console.log('✅ Logged out successfully')
                 } else {
                     console.log('⚠️ Logout failed:', result.message)
@@ -350,6 +502,7 @@
                 currentStep = 'registration'
                 dashboard.style.display = 'none'
                 registrationForm.style.display = 'flex'
+                stopProgressPolling()
             }
         })
 
@@ -365,7 +518,24 @@
             }, 5000)
         }
 
-        // Auto-format mobile number
+        // Progress display functions - DISABLED
+        // Progress display is now HIDDEN and only shown in terminal output
+        // The following functions are kept for backward compatibility but do nothing
+        
+        function updateProgressDisplay(data) {
+            // DISABLED - Progress display is hidden
+            // All progress is shown in terminal output only
+            console.log('📊 Progress update (terminal only):', data);
+        }
+
+        function startProgressPolling() {
+            // DISABLED - Progress polling is disabled
+            console.log('📡 Progress polling disabled - terminal output only');
+        }
+
+        function stopProgressPolling() {
+            // DISABLED - Progress polling is disabled
+        }
         document.getElementById('mobileNumber').addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10)
         })

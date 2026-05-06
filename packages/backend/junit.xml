@@ -1,68 +1,8 @@
-<testsuites id="" name="" tests="1" failures="0" skipped="0" errors="1" time="321.891049">
-<testsuite name="complete-hybrid-workflow.spec.ts" timestamp="2026-05-05T06:58:31.870Z" hostname="chromium" tests="1" failures="0" skipped="0" time="307.813" errors="1">
-<testcase name="Complete Hybrid MISRA Workflow › Complete Hybrid Workflow - Regular Browser to Playwright Automation" classname="complete-hybrid-workflow.spec.ts" time="307.813">
-<system-out>
-<![CDATA[🚀 Starting Complete Hybrid Workflow
-📍 Step 1: Starting localhost server...
-   ⏳ Waiting for server to initialize...
-✅ Localhost server started successfully
-   ✅ Server connectivity verified
-📍 Step 2: Opening localhost in your default browser...
-   ✅ Localhost opened in your default browser
-   🌐 URL: http://localhost:3000
-📍 Step 3: Preparing Playwright browser for MISRA automation...
-   ✅ Playwright browser ready for MISRA automation
-
-🎯 Starting Complete Hybrid Workflow Test
-
-🔵 PHASE 1: LOCALHOST IN YOUR BROWSER (MANUAL)
-   📋 Please complete the following in your browser:
-   1. Enter your Full Name, Email, and Mobile Number
-   2. Click "Send OTP" and wait for email from ceo@digitransolutions.in
-   3. Enter the 6-digit OTP and click "Verify & Login"
-   4. Click the "TEST" button when you see the dashboard
-   ⏰ Waiting for you to complete registration and click TEST button...
-   ⏳ Waiting for TEST button to be clicked in your browser...
-   💡 If you get "Network error", please refresh the page and try again
-   Server: 📧 User registered: Sanjana (sanjsr125@gmail.com)
-   Server Error: ❌ Error triggering OTP: Could not find name input field on the page
-   📊 Session status: OTP verified=false, Test running=false
-   📧 User: sanjsr125@gmail.com
-   📊 Session status: OTP verified=false, Test running=false
-   📧 User: sanjsr125@gmail.com
-   📊 Session status: OTP verified=false, Test running=false
-   📧 User: sanjsr125@gmail.com
-   📊 Session status: OTP verified=false, Test running=false
-   📧 User: sanjsr125@gmail.com
-   ❌ Timeout waiting for TEST button click
-🧹 Cleaning up...
-✅ Playwright browser closed
-✅ Localhost server stopped
-
-[[ATTACHMENT|test-results\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\error-context.md]]
-
-[[ATTACHMENT|test-results\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\error-context.md]]
-]]>
-</system-out>
-<error message="TEST button was not clicked within 5 minutes" type="Error">
-<![CDATA[  [chromium] › complete-hybrid-workflow.spec.ts:316:7 › Complete Hybrid MISRA Workflow › Complete Hybrid Workflow - Regular Browser to Playwright Automation 
-
-    Error: TEST button was not clicked within 5 minutes
-
-      332 |     
-      333 |     if (!testButtonClicked) {
-    > 334 |       throw new Error('TEST button was not clicked within 5 minutes');
-          |             ^
-      335 |     }
-      336 |     
-      337 |     // Fetch user credentials from localhost
-        at D:\Code\misra-testing\packages\backend\tests\complete-hybrid-workflow.spec.ts:334:13
-
-    Error Context: ..\test-results\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\error-context.md
-
-    Error Context: ..\test-results\complete-hybrid-workflow-C-5e3e6-er-to-Playwright-Automation-chromium\error-context.md
-]]>
-</error>
+<testsuites id="" name="" tests="1" failures="0" skipped="1" errors="0" time="78.41097599999999">
+<testsuite name="complete-hybrid-workflow.spec.ts" timestamp="2026-05-06T10:19:25.854Z" hostname="chromium" tests="1" failures="0" skipped="1" time="62.769" errors="0">
+<testcase name="Complete Hybrid MISRA Workflow › Complete Hybrid Workflow - Regular Browser to Playwright Automation" classname="complete-hybrid-workflow.spec.ts">
+<skipped>
+</skipped>
 </testcase>
 </testsuite>
 </testsuites>
