@@ -1,8 +1,632 @@
-<testsuites id="" name="" tests="1" failures="0" skipped="1" errors="0" time="78.41097599999999">
-<testsuite name="complete-hybrid-workflow.spec.ts" timestamp="2026-05-06T10:19:25.854Z" hostname="chromium" tests="1" failures="0" skipped="1" time="62.769" errors="0">
-<testcase name="Complete Hybrid MISRA Workflow › Complete Hybrid Workflow - Regular Browser to Playwright Automation" classname="complete-hybrid-workflow.spec.ts">
-<skipped>
-</skipped>
+<testsuites id="" name="" tests="1" failures="0" skipped="0" errors="0" time="285.953386">
+<testsuite name="complete-hybrid-workflow.spec.ts" timestamp="2026-05-06T10:40:07.370Z" hostname="chromium" tests="1" failures="0" skipped="0" time="267.95" errors="0">
+<testcase name="Complete Hybrid MISRA Workflow › Complete Hybrid Workflow - Regular Browser to Playwright Automation" classname="complete-hybrid-workflow.spec.ts" time="267.95">
+<system-out>
+<![CDATA[🚀 Starting Complete Hybrid Workflow
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ⏳ Launch Browser            In Progress
+  2. ⭕ Navigate to MISRA         Pending
+  3. ⭕ OTP Verification          Pending
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 0.01s
+================================================================================
+
+   📁 Created session directory: downloads\session-2026-05-06-10-40-11
+   ✅ Download session initialized: session-1778064011406-eflyv4jcf
+📍 Step 1: Starting localhost server...
+   ⏳ Waiting for server to initialize...
+✅ Localhost server started successfully
+   ✅ Server connectivity verified
+📍 Step 2: Opening localhost in your default browser...
+   ✅ Localhost opened in your default browser
+   🌐 URL: http://localhost:3000
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ⭕ Navigate to MISRA         Pending
+  3. ⭕ OTP Verification          Pending
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 5.37s
+================================================================================
+
+📍 Step 3: Preparing browser for MISRA automation...
+🔌 Connecting to your Chrome browser...
+   Host: localhost
+   Port: 9222
+   Downloads: ./downloads
+
+╔════════════════════════════════════════════════════════════════╗
+║    🔌 PROPER BROWSER EMBEDDING - DOWNLOADS VISIBLE            ║
+╚════════════════════════════════════════════════════════════════╝
+
+TO USE PROPER BROWSER EMBEDDING:
+
+1. START CHROME WITH REMOTE DEBUGGING:
+
+   Windows:
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" \
+   --remote-debugging-port=9222
+
+   Mac:
+   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+   --remote-debugging-port=9222
+
+   Linux:
+   google-chrome --remote-debugging-port=9222
+
+2. WHAT HAPPENS:
+   ✅ Playwright connects to YOUR Chrome browser
+   ✅ MISRA opens in YOUR browser tab
+   ✅ Downloads appear in YOUR browser's download manager
+   ✅ You see everything happening in real-time
+   ✅ Downloads stay visible and accessible
+
+3. KEY FEATURES:
+   ✅ Same browser session
+   ✅ Same browser tab
+   ✅ Downloads visible in browser
+   ✅ No separate Playwright window
+   ✅ Professional appearance
+
+═══════════════════════════════════════════════════════════════════
+
+   ⚠️  Proper browser embedding failed, falling back to separate Playwright browser
+   💡 Make sure Chrome is running with: --remote-debugging-port=9222
+   ✅ Fallback Playwright browser launched
+   ✅ AWS Bedrock verifier initialized
+
+🎯 Starting Complete Hybrid Workflow Test
+
+🔵 PHASE 1: LOCALHOST IN YOUR BROWSER (MANUAL)
+   📋 Please complete the following in your browser:
+   1. Enter your Full Name, Email, and Mobile Number
+   2. Click "Send OTP" and wait for email from ceo@digitransolutions.in
+   3. Enter the 6-digit OTP and click "Verify & Login"
+   4. Click the "TEST" button when you see the dashboard
+   ⏰ Waiting for you to complete registration and click TEST button...
+   ⏳ Waiting for TEST button to be clicked in your browser...
+   💡 If you get "Network error", please refresh the page and try again
+   Server: 📧 User registered: Sanjana  (sanjsr125@gmail.com)
+   Server: 🚀 TEST button clicked by Sanjana  (sanjsr125@gmail.com)
+🌐 MISRA will navigate in the SAME browser tab
+📧 User Email: sanjsr125@gmail.com
+👤 User Name: Sanjana
+   ✅ TEST button clicked detected!
+   ✅ User credentials fetched from localhost:
+     - Name: Sanjana 
+     - Email: sanjsr125@gmail.com
+     - Mobile: 9380653049
+
+🟢 PHASE 2: MISRA AUTOMATION IN PLAYWRIGHT (AUTOMATIC)
+   🚀 Starting MISRA automation with your credentials...
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ⏳ Navigate to MISRA         In Progress
+  3. ⭕ OTP Verification          Pending
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 62.74s
+================================================================================
+
+📍 Step 4: Opening MISRA platform in same browser session
+   📍 Using fallback Playwright browser
+   ✅ Created new browser context
+   ✅ Created new browser page
+   📍 Navigating to MISRA platform...
+   ✅ MISRA platform loaded in Playwright browser
+   🔌 Setting up download event listener...
+   ✅ Download listener ready
+   ✅ Download listener configured
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ⭕ OTP Verification          Pending
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 69.97s
+================================================================================
+
+
+📍 Step 5: Auto-filling registration form with your credentials
+   ✅ Name filled: Sanjana 
+   ✅ Email filled: sanjsr125@gmail.com
+   ✅ Mobile filled: 9380653049
+
+📍 Step 6: Auto-clicking Start button
+   ✅ Start button clicked automatically
+
+📍 Step 7: Waiting for OTP screen and auto-retrieving OTP from Gmail
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ⏳ OTP Verification          In Progress
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 74.83s
+================================================================================
+
+   ⏳ Waiting for OTP input field to appear...
+   ✅ OTP input field found
+   ⏳ Waiting 8 seconds for OTP email to be sent...
+   🔍 Retrieving OTP from Gmail...
+   🔌 Starting OTP retrieval from Gmail...
+   ⏳ OTP Attempt 1/30 - Connecting to Gmail IMAP...
+{"level":30,"time":1778064096901,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"connection","msg":"Established secure TCP connection","cid":"16kk1etvnbnzppzcsra9","secure":true,"host":"imap.gmail.com","servername":"imap.gmail.com","port":993,"address":"2404:6800:4003:c06::6c","localAddress":"2409:4091:90b1:3403:ed3f:7425:54e5:7ab7","localPort":51995,"authorized":true,"algo":"TLS_AES_256_GCM_SHA384","version":"TLSv1.3"}
+{"level":20,"time":1778064097124,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* OK Gimap ready for requests from 2409:4091:90b1:3403:ed3f:7425:54e5:7ab7 41be03b00d2f7-c8240442626mb41091558a12","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097126,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"1 CAPABILITY","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097344,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH2 AUTH=PLAIN AUTH=PLAIN-CLIENTTOKEN AUTH=OAUTHBEARER","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097346,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"1 OK Thats all she wrote! 41be03b00d2f7-c8240442626mb41091558a12","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097348,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"2 ID (\"name\" \"imapflow\" \"version\" \"1.3.2\" \"vendor\" \"Postal Systems\" \"support-url\" \"https://github.com/postalsys/imapflow/issues\")","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097568,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* ID (\"name\" \"GImap\" \"vendor\" \"Google, Inc.\" \"support-url\" \"http://support.google.com/mail\" \"remote-host\" \"2409:4091:90b1:3403:ed3f:7425:54e5:7ab7\" \"connection-token\" \"41be03b00d2f7-c8240442626mb41091558a12\")","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097573,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"2 OK Success 41be03b00d2f7-c8240442626mb41091558a12","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097576,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"3 AUTHENTICATE PLAIN","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097792,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"+","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064097793,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"AHNhbmpzcjEyNUBnbWFpbC5jb20AKCogdmFsdWUgaGlkZGVuICop","comment":"Encoded response for AUTH=PLAIN"}
+{"level":20,"time":1778064098486,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- SPECIAL-USE APPENDLIMIT=35651584","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064098488,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"3 OK sanjsr125@gmail.com authenticated (Success)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":30,"time":1778064098488,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"auth","msg":"User authenticated","cid":"16kk1etvnbnzppzcsra9","user":"sanjsr125@gmail.com"}
+{"level":20,"time":1778064098489,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"4 NAMESPACE","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064098869,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* NAMESPACE ((\"\" \"/\")) NIL NIL","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064098871,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"4 OK Success","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064098872,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"5 COMPRESS DEFLATE","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064099254,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"5 OK Success","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064099261,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"6 ENABLE CONDSTORE UTF8=ACCEPT","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064101982,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* ENABLED CONDSTORE UTF8=ACCEPT","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064101983,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"6 OK Success","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064101985,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"7 LIST \"\" \"INBOX\"","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064102869,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* LIST (\\HasNoChildren) \"/\" \"INBOX\"","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064102871,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"7 OK Success","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064102871,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"8 LSUB \"\" \"INBOX\"","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103249,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* LSUB (\\HasNoChildren) \"/\" \"INBOX\"","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103250,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"8 OK Success","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103301,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"9 SELECT INBOX","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103712,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* FLAGS (\\Answered \\Flagged \\Draft \\Deleted \\Seen $NotPhishing $Phishing)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103713,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* OK [PERMANENTFLAGS (\\Answered \\Flagged \\Draft \\Deleted \\Seen $NotPhishing $Phishing \"\\\\*\")] Flags permitted.","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103714,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* OK [UIDVALIDITY 1] UIDs valid.","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103715,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* 68 EXISTS","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103715,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* 0 RECENT","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103715,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* OK [UIDNEXT 69] Predicted next UID.","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103716,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* OK [HIGHESTMODSEQ 9682]","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103716,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"9 OK [READ-WRITE] INBOX selected. (Success)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064103719,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"A UID SEARCH UNSEEN","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064104105,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* SEARCH 46 47 48 68","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064104105,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"A OK SEARCH completed (Success)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064104107,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"B FETCH 68 (ENVELOPE BODY.PEEK[] X-GM-MSGID MODSEQ UID)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":10,"time":1778064108146,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* 68 FETCH (X-GM-MSGID 1864435329826325889 UID 68 MODSEQ (9619) ENVELOPE (\"Wed, 06 May 2026 10:41:27 +0000\" \"Nice to meet you, Sanjana\" ((NIL NIL \"ceo\" \"digitransolutions.in\")) ((NIL NIL \"ceo\" \"digitransolutions.in\")) ((NIL NIL \"ceo\" \"digitransolutions.in\")) ((NIL NIL \"sanjsr125\" \"gmail.com\")) NIL NIL NIL \"<ce8edfcd-9bf8-b49a-097f-739dc39ff668@digitransolutions.in>\") BODY[] \"(* 6251B literal *)\")","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064108151,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"B OK Success","cid":"16kk1etvnbnzppzcsra9"}
+   ⭐ Priority email from CEO@digitransolutions.in detected!
+   ✅ OTP found: 786744
+{"level":20,"time":1778064108153,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"c","msg":"C LOGOUT","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064108555,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"* BYE LOGOUT Requested","cid":"16kk1etvnbnzppzcsra9"}
+{"level":20,"time":1778064108556,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","src":"s","msg":"C OK 73 good day (Success)","cid":"16kk1etvnbnzppzcsra9"}
+{"level":10,"time":1778064108559,"pid":27784,"hostname":"DELL-INSPIRON","component":"imap-connection","cid":"16kk1etvnbnzppzcsra9","msg":"Connection closed","cid":"16kk1etvnbnzppzcsra9"}
+   ✅ OTP retrieved: 786744
+   ✅ OTP input found with selector: input[placeholder*="code" i]
+   🔍 OTP entered verification: "786744"
+   ✅ OTP entered successfully
+   ✅ Verify button found with selector: button:has-text("Verify")
+   ✅ Verify button clicked automatically
+   ⏳ Waiting for OTP verification to complete...
+   ✅ OTP verification successful - moved to next screen
+
+📍 Step 8: Waiting for dashboard and auto-uploading C file
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ⭕ File Upload               Pending
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 109.02s
+================================================================================
+
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ⏳ File Upload               In Progress
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 109.02s
+================================================================================
+
+   ⏳ Waiting for file upload section to appear...
+   ✅ File input found with selector: input[type="file"]
+   ✅ Temporary C file created (simple version to avoid server errors)
+   ✅ C file uploaded automatically
+   ✅ Analyze button found with selector: button:has-text("Analyze")
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ⭕ Code Analysis             Pending
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 125.39s
+================================================================================
+
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ⏳ Code Analysis             In Progress
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 125.40s
+================================================================================
+
+   ✅ Analysis started automatically
+   ⏳ Waiting for analysis to complete (up to 3 minutes)...
+   ✅ Analysis completed!
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ✅ Code Analysis             Completed (83.28s)
+  6. ⭕ Download Reports          Pending
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 208.68s
+================================================================================
+
+
+📍 Step 9: Auto-downloading analysis files
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ✅ Code Analysis             Completed (83.28s)
+  6. ⏳ Download Reports          In Progress
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 208.69s
+================================================================================
+
+   📥 Found 8 download button(s)
+   ✅ Download buttons are ready for automatic download
+   📁 Available downloads:
+     1. "Download Report"
+     2. "Download Fixes"
+     3. "Download Fixed Code"
+     4. "Download Fixed Code"
+     5. "Download Report"
+     6. "Download Report"
+     7. "Download Fixes"
+     8. "Download Fixed Code"
+   ✅ Clicked: Download Report
+
+   📥 Download started: misra-check-report.md
+   ⏱️  Start time: 4:13:45 pm
+
+   📥 Download started: misra-fix-report.md
+   ⏱️  Start time: 4:13:46 pm
+   ✅ Download completed: misra-check-report.md
+   📊 File size: 2.81 KB
+   ⏱️  Duration: 1.44s
+
+   🔍 Verifying file: misra-check-report.md
+   ⚠️  Unknown file extension: .md
+   ✅ Verification successful
+      ✅ File exists
+      ✅ File size valid (2.81 KB)
+      ✅ Report content verified
+   🎉 File verified: misra-check-report.md
+   ✅ Download completed: misra-fix-report.md
+   📊 File size: 1.03 KB
+   ⏱️  Duration: 0.38s
+
+   🔍 Verifying file: misra-fix-report.md
+   ⚠️  Unknown file extension: .md
+   ✅ Verification successful
+      ✅ File exists
+      ✅ File size valid (1.03 KB)
+      ✅ Report content verified
+   🎉 File verified: misra-fix-report.md
+   ✅ Clicked: Download Fixes
+
+   📥 Download started: misra-fixed.c
+   ⏱️  Start time: 4:13:50 pm
+   ✅ Download completed: misra-fixed.c
+   📊 File size: 76 Bytes
+   ⏱️  Duration: 0.20s
+
+   🔍 Verifying file: misra-fixed.c
+   ✅ Verification successful
+      ✅ File exists
+      ✅ File size valid (76 Bytes)
+      ✅ File format valid (.c)
+      ✅ Fixed code syntax verified
+   🎉 File verified: misra-fixed.c
+   ✅ Clicked: Download Fixed Code
+   ✅ Clicked: Download Fixed Code
+   ⚠️  File already downloaded, skipping duplicate: misra-fixed.c
+   ⚠️  File already downloaded, skipping duplicate: misra-check-report.md
+   ✅ Clicked: Download Report
+   ⚠️  File already downloaded, skipping duplicate: misra-check-report.md
+   ✅ Clicked: Download Report
+   ✅ Clicked: Download Fixes
+   ⚠️  File already downloaded, skipping duplicate: misra-fix-report.md
+   ✅ Clicked: Download Fixed Code
+   ⚠️  File already downloaded, skipping duplicate: misra-fixed.c
+   ⏳ Waiting for downloads to complete...
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ✅ Code Analysis             Completed (83.28s)
+  6. ✅ Download Reports          Completed (37.71s)
+  7. ⭕ Verification Complete     Pending
+================================================================================
+⏱️  Total Time: 246.40s
+================================================================================
+
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ✅ Code Analysis             Completed (83.28s)
+  6. ✅ Download Reports          Completed (37.71s)
+  7. ⏳ Verification Complete     In Progress
+================================================================================
+⏱️  Total Time: 246.41s
+================================================================================
+
+
+================================================================================
+📊 DOWNLOAD SUMMARY
+================================================================================
+Session ID: session-1778064011406-eflyv4jcf
+Total Files: 3
+Verified: 3/3
+Total Size: 3.91 KB
+Total Time: 246.28s
+Session Directory: downloads\session-2026-05-06-10-40-11
+Manifest: downloads\session-2026-05-06-10-40-11\manifest.json
+Verification Log: downloads\session-2026-05-06-10-40-11\verification-log.txt
+================================================================================
+
+📁 Downloaded Files:
+  1. ✅ misra-check-report.md (2.81 KB)
+  2. ✅ misra-fix-report.md (1.03 KB)
+  3. ✅ misra-fixed.c (76 Bytes)
+
+
+🤖 Starting AWS Bedrock AI File Verification...
+
+📋 Files to verify:
+   • Report: misra-check-report.md
+   • Fixes: misra-fix-report.md
+   • Fixed Code: misra-fixed.c
+🤖 Starting AWS Bedrock AI file verification...
+   Model: Claude 3.5 Sonnet
+   Region: us-east-1
+╔════════════════════════════════════════════════════════════╗
+║     🤖 AWS BEDROCK AI FILE VERIFICATION REPORT            ║
+╚════════════════════════════════════════════════════════════╝
+
+🔧 AI Model: Claude 3.5 Sonnet (AWS Bedrock) - Fallback Mode
+⏱️  Analysis Time: 5366ms
+
+📊 OVERALL STATUS: ❌ INVALID
+📈 VERIFICATION SCORE: 0/100
+
+📋 VERIFICATION DETAILS:
+  • Report Quality: Poor
+  • Fixes Quality: Poor
+  • Code Quality: Poor
+  • Completeness: Incomplete
+
+❌ CRITICAL ISSUES:
+  • Report does not mention any violations
+  • Fixes file does not document any fixes
+  • Fixed code does not have proper braces
+  • Report file is empty
+  • Fixes file is empty
+  • Fixed code file is empty
+
+⚠️  WARNINGS:
+  • Report does not mention any functions from uploaded code
+  • Report seems too short - may be incomplete
+  • Fixes documentation seems too short
+  • Fixed code does not have any includes
+  • Fixed code does not have main function
+
+💡 RECOMMENDATIONS:
+  • Review all identified issues
+  • Verify fixes are correctly applied
+  • Test fixed code compilation
+  • Validate against MISRA standards
+
+═══════════════════════════════════════════════════════════
+
+📄 Verification report saved: downloads\session-2026-05-06-10-40-11\ai-verification-report.txt
+
+⚠️  AI Verification found issues (Score: 0/100)
+   Please review the verification report above
+
+================================================================================
+📊 AUTOMATION PROGRESS
+================================================================================
+  1. ✅ Launch Browser            Completed (5.36s)
+  2. ✅ Navigate to MISRA         Completed (7.24s)
+  3. ✅ OTP Verification          Completed (34.19s)
+  4. ✅ File Upload               Completed (16.37s)
+  5. ✅ Code Analysis             Completed (83.28s)
+  6. ✅ Download Reports          Completed (37.71s)
+  7. ✅ Verification Complete     Completed (5.38s)
+================================================================================
+⏱️  Total Time: 251.79s
+================================================================================
+
+   ✅ Temporary file cleaned up
+
+✅ Complete Hybrid Workflow Finished!
+📁 All files downloaded and verified
+
+✅ Automation Complete!
+  Completed: 7/7
+  Failed: 0
+  Total Time: 251.81s
+
+
+   📧 Sending verification notifications...
+   📧 Sending email to sanjsr125@gmail.com...
+   ⚠️  Nodemailer not available or email send failed: Unexpected socket close
+   📝 Email content would have been sent to: sanjsr125@gmail.com
+   📱 Sending WhatsApp to 9380653049...
+   ⚠️  Twilio not available or WhatsApp send failed: Cannot find module 'twilio'
+Require stack:
+- D:\Code\misra-testing\packages\backend\tests\download-manager.ts
+- D:\Code\misra-testing\packages\backend\tests\complete-hybrid-workflow.spec.ts
+- D:\Code\misra-testing\node_modules\playwright\lib\transform\transform.js
+- D:\Code\misra-testing\node_modules\playwright\lib\common\configLoader.js
+- D:\Code\misra-testing\node_modules\playwright\lib\worker\workerMain.js
+- D:\Code\misra-testing\node_modules\playwright\lib\common\process.js
+   📱 WhatsApp message would have been sent to: 9380653049
+   ✅ Notifications sent successfully
+🎯 Workflow Summary:
+   1. ✅ Localhost opened in your regular browser
+   2. ✅ Manual registration completed in regular browser
+   3. ✅ MISRA automation completed in Playwright browser
+   4. ✅ Files automatically downloaded and verified
+   5. ✅ Downloads saved to: downloads\session-2026-05-06-10-40-11
+🧹 Cleaning up...
+✅ Playwright browser closed
+✅ Localhost server stopped
+]]>
+</system-out>
+<system-err>
+<![CDATA[❌ Failed to connect to your browser: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222
+Call log:
+[2m  - <ws preparing> retrieving websocket url from http://localhost:9222[22m
+
+    at ProperBrowserEmbedding.connectToYourBrowser [90m(D:\Code\misra-testing\packages\backend\[39mtests\browser-embedding-proper.ts:54:37[90m)[39m
+    at setupProperBrowserEmbedding [90m(D:\Code\misra-testing\packages\backend\[39mtests\browser-embedding-proper.ts:388:36[90m)[39m
+    at [90mD:\Code\misra-testing\packages\backend\[39mtests\complete-hybrid-workflow.spec.ts:334:57 {
+  name: [32m'Error'[39m,
+  [[32mSymbol(step)[39m]: {
+    location: {
+      file: [32m'D:\\Code\\misra-testing\\packages\\backend\\tests\\browser-embedding-proper.ts'[39m,
+      line: [33m54[39m,
+      column: [33m37[39m,
+      function: [32m'ProperBrowserEmbedding.connectToYourBrowser'[39m
+    },
+    category: [32m'pw:api'[39m,
+    title: [32m'Connect over CDP'[39m,
+    apiName: [32m'browserType.connectOverCDP'[39m,
+    params: {
+      endpointURL: [32m'http://localhost:9222'[39m,
+      headers: [90mundefined[39m,
+      slowMo: [90mundefined[39m,
+      timeout: [33m30000[39m,
+      isLocal: [90mundefined[39m
+    },
+    group: [90mundefined[39m,
+    stepId: [32m'pw:api@25'[39m,
+    boxedStack: [90mundefined[39m,
+    steps: [],
+    attachmentIndices: [],
+    info: TestStepInfoImpl {
+      annotations: [],
+      _testInfo: [36m[TestInfoImpl][39m,
+      _stepId: [32m'pw:api@25'[39m,
+      _title: [32m'Connect over CDP'[39m,
+      _parentStep: [36m[TestStepInfoImpl][39m,
+      skip: [36m[Function (anonymous)][39m
+    },
+    complete: [36m[Function: complete][39m,
+    endWallTime: [33m1778064017100[39m,
+    error: {
+      message: [32m'Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\n'[39m +
+        [32m'Call log:\n'[39m +
+        [32m'\x1B[2m  - <ws preparing> retrieving websocket url from http://localhost:9222\x1B[22m\n'[39m,
+      stack: [32m'Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\n'[39m +
+        [32m'Call log:\n'[39m +
+        [32m'\x1B[2m  - <ws preparing> retrieving websocket url from http://localhost:9222\x1B[22m\n'[39m +
+        [32m'\n'[39m +
+        [32m'    at browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\n'[39m +
+        [32m'    at ProperBrowserEmbedding.connectToYourBrowser (D:\\Code\\misra-testing\\packages\\backend\\tests\\browser-embedding-proper.ts:54:37)\n'[39m +
+        [32m'    at setupProperBrowserEmbedding (D:\\Code\\misra-testing\\packages\\backend\\tests\\browser-embedding-proper.ts:388:36)\n'[39m +
+        [32m'    at D:\\Code\\misra-testing\\packages\\backend\\tests\\complete-hybrid-workflow.spec.ts:334:57'[39m,
+      cause: [90mundefined[39m
+    }
+  }
+}
+💡 Make sure Chrome is running with: --remote-debugging-port=9222
+⚠️  File not found: undefined
+⚠️  File not found: undefined
+⚠️  File not found: undefined
+⚠️  AWS SDK not available, using fallback verification
+⚠️  AWS Bedrock API call failed, falling back to basic verification
+]]>
+</system-err>
 </testcase>
 </testsuite>
 </testsuites>
